@@ -14,7 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      characters: {
+        Row: {
+          alternate_greetings: string[] | null
+          avatar_url: string | null
+          character_book: Json | null
+          character_version: string
+          created_at: string
+          creator: string
+          creator_notes: string
+          description: string
+          extensions: Json | null
+          first_mes: string
+          id: string
+          is_public: boolean
+          mes_example: string
+          name: string
+          personality: string
+          post_history_instructions: string
+          scenario: string
+          short_summary: string | null
+          system_prompt: string
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alternate_greetings?: string[] | null
+          avatar_url?: string | null
+          character_book?: Json | null
+          character_version?: string
+          created_at?: string
+          creator?: string
+          creator_notes?: string
+          description?: string
+          extensions?: Json | null
+          first_mes?: string
+          id?: string
+          is_public?: boolean
+          mes_example?: string
+          name: string
+          personality?: string
+          post_history_instructions?: string
+          scenario?: string
+          short_summary?: string | null
+          system_prompt?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alternate_greetings?: string[] | null
+          avatar_url?: string | null
+          character_book?: Json | null
+          character_version?: string
+          created_at?: string
+          creator?: string
+          creator_notes?: string
+          description?: string
+          extensions?: Json | null
+          first_mes?: string
+          id?: string
+          is_public?: boolean
+          mes_example?: string
+          name?: string
+          personality?: string
+          post_history_instructions?: string
+          scenario?: string
+          short_summary?: string | null
+          system_prompt?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
