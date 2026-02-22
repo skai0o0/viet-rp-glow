@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getActiveBanner, BannerData } from "@/services/bannerDb";
 
 const HomePage = () => {
+  const [tagFilter, setTagFilter] = useState("");
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<BannerData | null>(null);
@@ -279,23 +280,39 @@ const HomePage = () => {
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto scrollbar-thin">
-                  {allTags.map((tag) => (
-                    <Badge
+                <div className="relative mb-2">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={tagFilter}
+                    onChange={(e) => setTagFilter(e.target.value)}
+                    placeholder="Tìm tag..."
+                    className="w-full h-8 pl-8 pr-3 rounded-md bg-oled-base border border-gray-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-blue transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 max-h-48 overflow-y-auto scrollbar-thin">
+                  {allTags
+                    .filter((t) => t.toLowerCase().includes(tagFilter.toLowerCase()))
+                    .map((tag) => (
+                    <button
                       key={tag}
-                      variant="outline"
                       onClick={() => toggleTag(tag)}
-                      className={`cursor-pointer text-xs transition-colors ${
+                      className={`flex items-center gap-2 w-full text-left text-xs px-2.5 py-1.5 rounded-md transition-colors ${
                         selectedTags.includes(tag)
-                          ? "bg-neon-purple/20 border-neon-purple text-neon-purple"
-                          : "border-gray-border text-muted-foreground hover:border-neon-blue hover:text-neon-blue"
+                          ? "bg-neon-purple/20 text-neon-purple"
+                          : "text-muted-foreground hover:bg-oled-elevated hover:text-foreground"
                       }`}
                     >
+                      <span className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
+                        selectedTags.includes(tag) ? "border-neon-purple bg-neon-purple" : "border-gray-border"
+                      }`}>
+                        {selectedTags.includes(tag) && <span className="text-[8px] text-white">✓</span>}
+                      </span>
                       {tag}
-                    </Badge>
+                    </button>
                   ))}
-                  {allTags.length === 0 && (
-                    <p className="text-xs text-muted-foreground">Không có tag nào</p>
+                  {allTags.filter((t) => t.toLowerCase().includes(tagFilter.toLowerCase())).length === 0 && (
+                    <p className="text-xs text-muted-foreground py-2 text-center">Không có tag nào</p>
                   )}
                 </div>
               </PopoverContent>
