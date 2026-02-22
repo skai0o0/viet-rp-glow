@@ -1,4 +1,4 @@
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
 const topItems = [
@@ -89,8 +90,7 @@ const NavigationRail = () => {
 
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
-        <NavItem item={{ icon: Settings, label: "Cài đặt", path: "/settings" }} />
-
+        {/* Settings dropdown */}
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -98,20 +98,25 @@ const NavigationRail = () => {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
-                  location.pathname === "/profile"
+                  location.pathname === "/settings"
                     ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
                     : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
                 }`}
               >
-                <User size={20} />
+                <Settings size={20} />
               </motion.button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="end" className="bg-oled-elevated border-gray-border w-48">
-              <DropdownMenuItem onClick={() => navigate("/profile")} className="text-foreground focus:bg-oled-surface cursor-pointer">
-                <User size={14} className="mr-2" /> Hồ sơ của tôi
-              </DropdownMenuItem>
+            <DropdownMenuContent side="right" align="end" className="bg-oled-elevated border-gray-border w-52 z-50">
               <DropdownMenuItem onClick={() => navigate("/settings")} className="text-foreground focus:bg-oled-surface cursor-pointer">
                 <Key size={14} className="mr-2" /> Thẻ API của tôi
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-gray-border" />
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Trạng thái</DropdownMenuLabel>
+              <DropdownMenuItem className="text-foreground focus:bg-oled-surface cursor-pointer">
+                <UserCheck size={14} className="mr-2 text-neon-blue" /> Hướng ngoại (Online)
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-foreground focus:bg-oled-surface cursor-pointer">
+                <UserX size={14} className="mr-2 text-muted-foreground" /> Hướng nội (Ẩn)
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-gray-border" />
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 cursor-pointer">
@@ -119,6 +124,39 @@ const NavigationRail = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        ) : (
+          <NavItem item={{ icon: Settings, label: "Cài đặt", path: "/settings" }} />
+        )}
+
+        {/* Profile - direct link */}
+        {user ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <NavLink to="/profile" className="block">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
+                    location.pathname === "/profile"
+                      ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
+                  }`}
+                >
+                  <User size={20} />
+                  {location.pathname === "/profile" && (
+                    <motion.div
+                      layoutId="nav-indicator"
+                      className="absolute -left-[14px] w-[3px] h-5 rounded-r-full bg-neon-purple shadow-neon-purple"
+                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    />
+                  )}
+                </motion.div>
+              </NavLink>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
+              Hồ sơ
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
