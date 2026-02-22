@@ -225,7 +225,7 @@ const CreatePage = () => {
                   <Textarea
                     value={data.description}
                     onChange={(e) => updateData({ description: e.target.value })}
-                    placeholder="{{char}} là một cô gái cosplayer nổi tiếng..."
+                    placeholder="VD: {{char}} là một cô gái sống tại Sài Gòn, tính tình vui vẻ..."
                     className={textareaStyle}
                   />
                 </div>
@@ -247,7 +247,7 @@ const CreatePage = () => {
                   <Textarea
                     value={data.scenario}
                     onChange={(e) => updateData({ scenario: e.target.value })}
-                    placeholder="Bạn gặp {{char}} tại một quán cà phê..."
+                    placeholder="VD: Bạn gặp {{char}} tại một quán cà phê..."
                     className={textareaStyle}
                   />
                 </div>
@@ -258,7 +258,7 @@ const CreatePage = () => {
                   <Textarea
                     value={data.first_mes}
                     onChange={(e) => updateData({ first_mes: e.target.value })}
-                    placeholder="*{{char}} ngoảnh đầu lại và mỉm cười* Ê! Cuối cùng cũng gặp được cậu rồi~"
+                    placeholder="VD: *{{char}} ngoảnh đầu lại và mỉm cười* Ê! Cuối cùng cũng gặp được cậu rồi~"
                     className={`${textareaStyle} min-h-[140px]`}
                   />
                 </div>
@@ -326,7 +326,7 @@ const CreatePage = () => {
                   <Textarea
                     value={data.system_prompt}
                     onChange={(e) => updateData({ system_prompt: e.target.value })}
-                    placeholder="Bạn là {{char}}, hãy luôn nhập vai và không bao giờ thoát ra..."
+                    placeholder="VD: Bạn là {{char}}, hãy luôn nhập vai và không bao giờ thoát ra..."
                     className={textareaStyle}
                   />
                 </div>
@@ -337,7 +337,7 @@ const CreatePage = () => {
                   <Textarea
                     value={data.post_history_instructions}
                     onChange={(e) => updateData({ post_history_instructions: e.target.value })}
-                    placeholder="[Hãy viết tối thiểu 3 đoạn văn mỗi lượt...]"
+                    placeholder="VD: [Hãy viết tối thiểu 3 đoạn văn mỗi lượt...]"
                     className={textareaStyle}
                   />
                 </div>
@@ -350,7 +350,7 @@ const CreatePage = () => {
                   <Textarea
                     value={data.mes_example}
                     onChange={(e) => updateData({ mes_example: e.target.value })}
-                    placeholder={"<START>\n{{user}}: Chào buổi sáng!\n{{char}}: Ê ê! Chào cậu~ ✨"}
+                    placeholder={"VD:\n<START>\n{{user}}: Chào buổi sáng!\n{{char}}: Ê ê! Chào cậu~ ✨"}
                     className={`${textareaStyle} min-h-[160px]`}
                   />
                 </div>
@@ -361,7 +361,7 @@ const CreatePage = () => {
                   <Textarea
                     value={data.creator_notes}
                     onChange={(e) => updateData({ creator_notes: e.target.value })}
-                    placeholder="Nhân vật này hoạt động tốt nhất với mô hình Claude..."
+                    placeholder="VD: Nhân vật này hoạt động tốt nhất với mô hình Claude..."
                     className={inputStyle}
                   />
                 </div>
@@ -449,7 +449,7 @@ const CreatePage = () => {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                               <Label className={fieldLabel}>Tên Lorebook</Label>
-                              <Input value={data.character_book.name || ""} onChange={(e) => updateBook({ name: e.target.value })} placeholder="VD: Thế giới của Marin" className={inputStyle} />
+                              <Input value={data.character_book.name || ""} onChange={(e) => updateBook({ name: e.target.value })} placeholder="VD: Thế giới của nhân vật" className={inputStyle} />
                             </div>
                             <div>
                               <Label className={fieldLabel}>Scan Depth</Label>
@@ -461,12 +461,12 @@ const CreatePage = () => {
                             </div>
                             <div className="flex items-center gap-3 pt-5">
                               <Switch checked={data.character_book.recursive_scanning || false} onCheckedChange={(v) => updateBook({ recursive_scanning: v })} />
-                              <Label className="text-xs text-muted-foreground">Recursive Scanning</Label>
+                              <Label className="text-xs text-muted-foreground">Quét đệ quy</Label>
                             </div>
                           </div>
                           <div>
                             <Label className={fieldLabel}>Mô tả</Label>
-                            <Textarea value={data.character_book.description || ""} onChange={(e) => updateBook({ description: e.target.value })} placeholder="Mô tả ngắn về Lorebook..." className={inputStyle} />
+                            <Textarea value={data.character_book.description || ""} onChange={(e) => updateBook({ description: e.target.value })} placeholder="VD: Mô tả ngắn về Lorebook..." className={inputStyle} />
                           </div>
                         </motion.div>
                       )}
@@ -572,7 +572,7 @@ const LoreEntryCard = ({
                     value={keyInput}
                     onChange={(e) => setKeyInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addKey("keys"))}
-                    placeholder="Thêm keyword..."
+                    placeholder="Thêm từ khóa..."
                     className="bg-oled-surface border-gray-border text-foreground text-xs h-7 flex-1"
                   />
                   <Button variant="ghost" size="icon" onClick={() => addKey("keys")} className="h-7 w-7 text-muted-foreground">
@@ -584,7 +584,7 @@ const LoreEntryCard = ({
               {/* Content */}
               <div>
                 <Label className="text-xs text-muted-foreground">Nội dung</Label>
-                <Textarea value={entry.content} onChange={(e) => onUpdate({ content: e.target.value })} placeholder="Kiến thức AI sẽ nhớ khi gặp từ khóa..." className="bg-oled-surface border-gray-border text-foreground text-xs min-h-[80px] font-mono" />
+                <Textarea value={entry.content} onChange={(e) => onUpdate({ content: e.target.value })} placeholder="VD: Kiến thức AI sẽ nhớ khi gặp từ khóa..." className="bg-oled-surface border-gray-border text-foreground text-xs min-h-[80px] font-mono" />
               </div>
 
               {/* Toggles */}
@@ -595,19 +595,19 @@ const LoreEntryCard = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch checked={entry.constant || false} onCheckedChange={(v) => onUpdate({ constant: v })} className="scale-75" />
-                  <span className="text-[10px] text-muted-foreground">Constant</span>
+                  <span className="text-[10px] text-muted-foreground">Luôn bật</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch checked={entry.selective || false} onCheckedChange={(v) => onUpdate({ selective: v })} className="scale-75" />
-                  <span className="text-[10px] text-muted-foreground">Selective</span>
+                  <span className="text-[10px] text-muted-foreground">Chọn lọc</span>
                 </div>
                 <Select value={entry.position || "before_char"} onValueChange={(v) => onUpdate({ position: v as 'before_char' | 'after_char' })}>
                   <SelectTrigger className="h-6 text-[10px] w-[110px] bg-oled-surface border-gray-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-oled-elevated border-gray-border">
-                    <SelectItem value="before_char" className="text-xs">Before Char</SelectItem>
-                    <SelectItem value="after_char" className="text-xs">After Char</SelectItem>
+                    <SelectItem value="before_char" className="text-xs">Trước nhân vật</SelectItem>
+                    <SelectItem value="after_char" className="text-xs">Sau nhân vật</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
