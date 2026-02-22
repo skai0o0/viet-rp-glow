@@ -204,7 +204,7 @@ const CreatePage = () => {
                     <Input
                       value={data.name}
                       onChange={(e) => updateData({ name: e.target.value })}
-                      placeholder="VD: Marin Kitagawa"
+                      placeholder="VD: Nguyễn Thị Bé"
                       className={inputStyle}
                     />
                   </div>
