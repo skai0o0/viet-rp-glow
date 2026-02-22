@@ -77,9 +77,15 @@ const NavigationRail = () => {
   return (
     <nav className="hidden md:flex flex-col items-center w-16 h-screen bg-oled-surface border-r border-gray-border py-4 flex-shrink-0">
       {/* Brand */}
-      <div className="mb-6">
-        <span className="text-xs font-bold text-neon-purple neon-text-purple">V</span>
-      </div>
+      <NavLink to="/" className="mb-6 block">
+        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+          <img
+            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ29FmznIurzWTiRoFHhR9CTJJWVTLAaV3gtw&s"
+            alt="VietRP Logo"
+            className="w-8 h-8 rounded-lg object-cover"
+          />
+        </motion.div>
+      </NavLink>
 
       {/* Top items */}
       <div className="flex flex-col items-center gap-2 flex-1">
