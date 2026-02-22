@@ -221,10 +221,6 @@ const CreatePage = () => {
             <Eye size={14} />
             <span className="hidden sm:inline ml-1">Xem trước</span>
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple">
-            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            <span className="hidden sm:inline ml-1">{isSaving ? "Đang lưu..." : "Lưu Nhân Vật"}</span>
-          </Button>
         </div>
       </div>
 
