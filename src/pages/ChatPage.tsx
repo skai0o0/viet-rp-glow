@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Menu, Plus } from "lucide-react";
+import { Menu } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages } from "@/utils/promptBuilder";
@@ -13,6 +13,7 @@ import {
   getSessionMessages,
   addMessage,
   deleteLastAssistantMessage,
+  branchChatSession,
   DbChatSession,
 } from "@/services/chatDb";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,6 +42,12 @@ const ChatPage = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Sessions filtered by active character
+  const charSessions = useMemo(
+    () => (activeCharId ? sessions.filter((s) => s.character_id === activeCharId) : []),
+    [sessions, activeCharId]
+  );
+
   // Load character from URL param
   useEffect(() => {
     if (!characterId) return;
@@ -65,7 +72,7 @@ const ChatPage = () => {
       .catch(() => toast.error("Không thể tải nhân vật này"));
   }, [characterId]);
 
-  // Load sessions when user or character changes
+  // Load sessions when user changes
   useEffect(() => {
     if (!user) return;
     getUserSessions()
@@ -76,15 +83,12 @@ const ChatPage = () => {
   // Auto-create or load session when character loaded
   useEffect(() => {
     if (!user || !activeCharId || !activeCharacter) return;
-    if (activeSessionId) return; // already have a session
+    if (activeSessionId) return;
 
-    // Find existing sessions for this character
-    const charSessions = sessions.filter((s) => s.character_id === activeCharId);
-    if (charSessions.length > 0) {
-      // Load the most recent one
-      loadSession(charSessions[0].id);
+    const existing = sessions.filter((s) => s.character_id === activeCharId);
+    if (existing.length > 0) {
+      loadSession(existing[0].id);
     } else {
-      // Create new session
       handleNewChat();
     }
   }, [user, activeCharId, activeCharacter, sessions.length]);
@@ -113,7 +117,6 @@ const ChatPage = () => {
 
     try {
       const session = await createSession(user.id, activeCharId, activeCharacter.name);
-      // Add first message
       const firstMsg = await addMessage(session.id, "assistant", activeCharacter.first_mes);
       setActiveSessionId(session.id);
       setMessages([
@@ -137,7 +140,6 @@ const ChatPage = () => {
       if (activeSessionId === sessionId) {
         setActiveSessionId(null);
         setMessages([]);
-        // Load another session if available
         const remaining = sessions.filter((s) => s.id !== sessionId);
         if (remaining.length > 0) {
           loadSession(remaining[0].id);
@@ -148,6 +150,45 @@ const ChatPage = () => {
       toast.error("Không thể xoá cuộc trò chuyện");
     }
   };
+
+  // Branch chat at a specific message index
+  const handleBranch = useCallback(
+    async (messageIndex: number) => {
+      if (!user || !activeCharId || !activeSessionId) return;
+
+      const toastId = toast.loading("Đang tạo nhánh mới...");
+
+      try {
+        const branchNum = charSessions.length + 1;
+        const branchTitle = `Nhánh ${branchNum} — ${new Date().toLocaleDateString("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`;
+
+        const msgSnapshot = messages.map((m) => ({ role: m.role, content: m.content }));
+
+        const newSession = await branchChatSession(
+          activeSessionId,
+          user.id,
+          activeCharId,
+          msgSnapshot,
+          messageIndex,
+          branchTitle
+        );
+
+        setSessions((prev) => [newSession, ...prev]);
+
+        // Load the new branch
+        await loadSession(newSession.id);
+        toast.success("Đã tạo nhánh mới!", { id: toastId });
+      } catch {
+        toast.error("Không thể tạo nhánh", { id: toastId });
+      }
+    },
+    [user, activeCharId, activeSessionId, messages, charSessions.length]
+  );
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -168,9 +209,7 @@ const ChatPage = () => {
       }
       if (!activeSessionId || !activeCharacter) return;
 
-      // Save user message to DB
       const savedUserMsg = await addMessage(activeSessionId, "user", content);
-
       const userMsg: ChatMessage = {
         id: savedUserMsg.id,
         role: "user",
@@ -212,7 +251,6 @@ const ChatPage = () => {
           onDone: async () => {
             setIsStreaming(false);
             abortRef.current = null;
-            // Save to DB
             if (assistantContent) {
               const saved = await addMessage(activeSessionId, "assistant", assistantContent);
               setMessages((prev) =>
@@ -242,10 +280,8 @@ const ChatPage = () => {
   const handleRegenerate = useCallback(async () => {
     if (!activeSessionId || !activeCharacter || isStreaming) return;
 
-    // Remove last assistant message from DB
     await deleteLastAssistantMessage(activeSessionId);
 
-    // Remove from local state
     const withoutLast = messages.slice(0, -1);
     setMessages(withoutLast);
     setIsStreaming(true);
@@ -311,6 +347,37 @@ const ChatPage = () => {
     return -1;
   })();
 
+  // Handle session selection (from sidebar or header dropdown)
+  const handleSelectSession = useCallback(
+    (id: string) => {
+      const session = sessions.find((s) => s.id === id);
+      if (!session) return;
+
+      if (session.character_id !== activeCharId) {
+        setActiveCharId(session.character_id);
+        getCharacterById(session.character_id).then((dbChar) => {
+          setActiveCharacter(dbCharToCard(dbChar));
+          setCharMap((prev) => {
+            const next = new Map(prev);
+            next.set(dbChar.id, {
+              id: dbChar.id,
+              name: dbChar.name,
+              avatar_url: dbChar.avatar_url,
+              short_summary: dbChar.short_summary,
+              tags: dbChar.tags,
+              description: dbChar.description,
+            });
+            return next;
+          });
+          loadSession(id);
+        });
+      } else {
+        loadSession(id);
+      }
+    },
+    [sessions, activeCharId]
+  );
+
   // No character selected state
   if (!activeCharacter) {
     return (
@@ -321,16 +388,7 @@ const ChatPage = () => {
           sessions={sessions}
           characters={charMap}
           activeSessionId={activeSessionId}
-          onSelectSession={(id) => {
-            const session = sessions.find((s) => s.id === id);
-            if (session) {
-              setActiveCharId(session.character_id);
-              getCharacterById(session.character_id).then((dbChar) => {
-                setActiveCharacter(dbCharToCard(dbChar));
-                loadSession(id);
-              });
-            }
-          }}
+          onSelectSession={handleSelectSession}
           onNewChat={() => {}}
           onDeleteSession={handleDeleteSession}
         />
@@ -364,28 +422,8 @@ const ChatPage = () => {
         characters={charMap}
         activeSessionId={activeSessionId}
         onSelectSession={(id) => {
-          const session = sessions.find((s) => s.id === id);
-          if (session && session.character_id !== activeCharId) {
-            setActiveCharId(session.character_id);
-            getCharacterById(session.character_id).then((dbChar) => {
-              setActiveCharacter(dbCharToCard(dbChar));
-              setCharMap((prev) => {
-                const next = new Map(prev);
-                next.set(dbChar.id, {
-                  id: dbChar.id,
-                  name: dbChar.name,
-                  avatar_url: dbChar.avatar_url,
-                  short_summary: dbChar.short_summary,
-                  tags: dbChar.tags,
-                  description: dbChar.description,
-                });
-                return next;
-              });
-              loadSession(id);
-            });
-          } else {
-            loadSession(id);
-          }
+          handleSelectSession(id);
+          setSidebarOpen(false);
         }}
         onNewChat={handleNewChat}
         onDeleteSession={handleDeleteSession}
@@ -405,6 +443,9 @@ const ChatPage = () => {
               character={activeCharacter}
               onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
               onNewChat={handleNewChat}
+              sessions={charSessions}
+              activeSessionId={activeSessionId}
+              onSelectSession={handleSelectSession}
             />
           </div>
         </div>
@@ -433,6 +474,7 @@ const ChatPage = () => {
                 }
                 isLastAssistant={idx === lastAssistantIdx}
                 onRegenerate={handleRegenerate}
+                onBranch={() => handleBranch(idx)}
               />
             ))}
           </AnimatePresence>
@@ -448,7 +490,6 @@ const ChatPage = () => {
   );
 };
 
-// Simple icon component for empty state
 const MessageSquareIcon = () => (
   <div className="w-16 h-16 rounded-2xl bg-oled-surface border border-gray-border flex items-center justify-center">
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-neon-purple/50">
