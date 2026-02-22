@@ -11,7 +11,7 @@ import { Shield, Loader2 } from "lucide-react";
 const STORAGE_KEY = "vietrp_global_system_prompt";
 
 // Mock admin check — expand later with a proper roles system
-const ADMIN_EMAILS = ["admin@vietrp.com"]; // Add your email here
+const ADMIN_EMAILS = ["hoangskai0o0nam2006@gmail.com"];
 function isAdmin(email?: string): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email);
