@@ -1,5 +1,6 @@
 import { CharacterCard } from "@/types/character";
 import { getCachedUserPersona } from "@/services/profileDb";
+import { getGlobalSystemPrompt } from "@/pages/AdminPage";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -19,31 +20,40 @@ export function replaceMacros(text: string, charName: string, userName: string =
  * Build the system prompt from character card fields
  */
 export function buildSystemPrompt(character: CharacterCard, userName: string = "User"): string {
-  const parts: string[] = [];
+  const sections: string[] = [];
 
+  // 1. Global base system prompt (from admin config)
+  const globalPrompt = getGlobalSystemPrompt();
+  if (globalPrompt) {
+    sections.push(globalPrompt);
+  }
+
+  // 2. Character info section
+  const charParts: string[] = [];
   if (character.description) {
-    parts.push(character.description);
+    charParts.push(character.description);
   }
   if (character.personality) {
-    parts.push(`Personality: ${character.personality}`);
+    charParts.push(`Personality: ${character.personality}`);
   }
   if (character.scenario) {
-    parts.push(`Scenario: ${character.scenario}`);
+    charParts.push(`Scenario: ${character.scenario}`);
   }
-
-  // If the character has extended fields (from TavernCardV2), include system_prompt
   const ext = character as any;
   if (ext.system_prompt) {
-    parts.push(ext.system_prompt);
+    charParts.push(ext.system_prompt);
+  }
+  if (charParts.length > 0) {
+    sections.push("--- CHARACTER INFO ---\n" + charParts.join("\n\n"));
   }
 
-  // Append user persona description
+  // 3. User info section
   const persona = getCachedUserPersona();
   if (persona.userDescription) {
-    parts.push(`[User's Details: ${persona.userDescription}]`);
+    sections.push("--- USER INFO ---\n" + `[User's Details: ${persona.userDescription}]`);
   }
 
-  const combined = parts.join("\n\n");
+  const combined = sections.join("\n\n");
   return replaceMacros(combined, character.name, userName);
 }
 
