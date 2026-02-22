@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import ModelCombobox from "@/components/ModelCombobox";
 import { getModel, setModel } from "@/services/openRouter";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const STORAGE_KEY_MAX_TOKENS = "vietrp_max_tokens";
 const STORAGE_KEY_RESPONSE_STYLE = "vietrp_response_style";
@@ -91,7 +90,7 @@ const GenerationSettings = ({ scenario, onScenarioChange, onClose }: GenerationS
   };
 
   return (
-    <div className="h-full flex flex-col bg-oled-surface">
+    <div className="h-full flex flex-col bg-oled-surface overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-border">
         <div className="flex items-center gap-2">
@@ -105,7 +104,7 @@ const GenerationSettings = ({ scenario, onScenarioChange, onClose }: GenerationS
         )}
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
         <div className="p-4 space-y-6">
           {/* Response Style */}
           <div className="space-y-2">
@@ -169,7 +168,7 @@ const GenerationSettings = ({ scenario, onScenarioChange, onClose }: GenerationS
             </div>
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };

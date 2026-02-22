@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Menu, Settings2 } from "lucide-react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
@@ -401,13 +401,13 @@ const ChatPage = () => {
         characterName={activeCharacter.name}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <div className="flex items-center bg-oled-base border-b border-gray-border">
           <button onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-4 text-muted-foreground hover:text-foreground transition-colors">
             <Menu size={20} />
           </button>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <ChatHeader character={activeCharacter} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
               onNewChat={handleNewChat} sessions={charSessions} activeSessionId={activeSessionId}
               onSelectSession={handleSelectSession} />
@@ -456,12 +456,24 @@ const ChatPage = () => {
             <ChatInput onSend={handleSend} disabled={isStreaming} />
           </div>
 
-          {/* Desktop right sidebar */}
-          {!isMobile && settingsOpen && (
-            <div className="w-72 border-l border-gray-border flex-shrink-0">
-              {settingsContent}
-            </div>
-          )}
+          {/* Desktop/Tablet right sidebar with animation */}
+          <AnimatePresence>
+            {!isMobile && settingsOpen && (
+              <motion.div
+                key="settings-sidebar"
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: 288, opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="border-l border-gray-border overflow-hidden"
+                style={{ flexShrink: 0, maxWidth: 288 }}
+              >
+                <div style={{ width: 288 }} className="h-full">
+                  {settingsContent}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
