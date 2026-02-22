@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Menu } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { marinCharacter, mockMessages } from "@/data/mockData";
+import { buildMessages } from "@/utils/promptBuilder";
+import { streamChat, getApiKey } from "@/services/openRouter";
+import { toast } from "sonner";
 import ChatHeader from "@/components/ChatHeader";
 import ChatSidebar from "@/components/ChatSidebar";
 import ChatInput from "@/components/ChatInput";
@@ -13,38 +16,90 @@ const ChatPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeCharacter, setActiveCharacter] = useState<CharacterCard>(marinCharacter);
   const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
-  const [isTyping, setIsTyping] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isTyping]);
+  }, [messages, isStreaming]);
 
-  const handleSend = (content: string) => {
+  const handleSend = useCallback((content: string) => {
+    if (!getApiKey()) {
+      toast.error("Vui lòng nhập API Key của OpenRouter trong phần Cài Đặt.", {
+        action: {
+          label: "Đi tới Cài Đặt",
+          onClick: () => window.location.href = "/settings",
+        },
+      });
+      return;
+    }
+
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
       content,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMsg]);
-    setIsTyping(true);
 
-    setTimeout(() => {
-      const aiMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Waaaa cậu giỏi quá đi! 🎉 Mình rất vui khi nghe cậu nói vậy. Để mình nghĩ xem nên bắt đầu từ đâu nhé... À, cậu thích nhân vật nào trong anime gần đây không? Mình có thể gợi ý bộ cosplay phù hợp cho cậu! ✨",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-      setIsTyping(false);
-    }, 2000);
-  };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsStreaming(true);
+
+    const assistantId = (Date.now() + 1).toString();
+    let assistantContent = "";
+
+    // Build messages for API
+    const allMessages = [...messages, userMsg];
+    const apiMessages = buildMessages(
+      activeCharacter,
+      allMessages.map((m) => ({ role: m.role, content: m.content }))
+    );
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Create initial empty assistant message
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
+    ]);
+
+    streamChat(
+      apiMessages,
+      {
+        onDelta: (text) => {
+          assistantContent += text;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: assistantContent } : m
+            )
+          );
+        },
+        onDone: () => {
+          setIsStreaming(false);
+          abortRef.current = null;
+        },
+        onError: (error) => {
+          setIsStreaming(false);
+          abortRef.current = null;
+          // Remove empty assistant message on error
+          if (!assistantContent) {
+            setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          }
+          toast.error(error);
+        },
+      },
+      controller.signal
+    );
+  }, [messages, activeCharacter]);
 
   const handleSelectCharacter = (char: CharacterCard) => {
+    // Abort ongoing stream
+    abortRef.current?.abort();
+    setIsStreaming(false);
+
     setActiveCharacter(char);
     const firstMsg: ChatMessage = {
       id: "first",
@@ -57,7 +112,6 @@ const ChatPage = () => {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Character Sidebar */}
       <ChatSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -65,9 +119,7 @@ const ChatPage = () => {
         onSelectCharacter={handleSelectCharacter}
       />
 
-      {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header with menu button */}
         <div className="flex items-center bg-oled-base border-b border-gray-border">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -83,7 +135,6 @@ const ChatPage = () => {
           </div>
         </div>
 
-        {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">
           {activeCharacter.scenario && (
             <div className="mx-4 md:mx-6 p-3 rounded-xl bg-oled-surface border border-gray-border">
@@ -101,15 +152,17 @@ const ChatPage = () => {
                 message={msg}
                 characterAvatar={activeCharacter.avatar}
                 characterName={activeCharacter.name}
+                isStreaming={isStreaming && msg.id === messages[messages.length - 1]?.id && msg.role === "assistant"}
               />
             ))}
           </AnimatePresence>
 
-          {isTyping && <TypingIndicator />}
+          {isStreaming && messages[messages.length - 1]?.content === "" && (
+            <TypingIndicator />
+          )}
         </div>
 
-        {/* Input */}
-        <ChatInput onSend={handleSend} disabled={isTyping} />
+        <ChatInput onSend={handleSend} disabled={isStreaming} />
       </div>
     </div>
   );
