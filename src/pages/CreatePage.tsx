@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, Upload, ImagePlus } from "lucide-react";
@@ -599,14 +600,14 @@ const CreatePage = () => {
           </Tabs>
 
           {/* Fullscreen Preview Dialog */}
-          <AnimatePresence>
-            {showPreview && (
+          {showPreview && createPortal(
+            <AnimatePresence>
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xl flex items-center justify-center p-4"
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4"
                 onClick={() => setShowPreview(false)}
               >
                 <motion.div
@@ -614,19 +615,19 @@ const CreatePage = () => {
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  className="w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl"
+                  className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Close button */}
                   <button
                     onClick={() => setShowPreview(false)}
-                    className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-oled-base/80 border border-gray-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                    className="sticky top-3 ml-auto mr-3 z-10 w-8 h-8 rounded-full bg-oled-base/80 border border-gray-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <X size={16} />
                   </button>
 
                   {/* Avatar Image */}
-                  <div className="relative w-full aspect-square overflow-hidden">
+                  <div className="relative w-full aspect-square overflow-hidden -mt-8">
                     {avatarPreview ? (
                       <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
@@ -636,7 +637,6 @@ const CreatePage = () => {
                         </span>
                       </div>
                     )}
-                    {/* Gradient overlay at bottom */}
                     <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-oled-surface to-transparent" />
                   </div>
 
@@ -679,8 +679,9 @@ const CreatePage = () => {
                   </div>
                 </motion.div>
               </motion.div>
-            )}
-          </AnimatePresence>
+            </AnimatePresence>,
+            document.body
+          )}
         </motion.div>
       </div>
     </div>
