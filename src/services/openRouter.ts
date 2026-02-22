@@ -1,15 +1,26 @@
 import { OpenRouterMessage } from "@/utils/promptBuilder";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const STORAGE_KEY_API = "vietrp_openrouter_key";
 const STORAGE_KEY_MODEL = "vietrp_openrouter_model";
 
+// Fallback models if API fetch fails
 export const AVAILABLE_MODELS = [
   { id: "nousresearch/nous-hermes-2-mixtral-8x7b-dpo", label: "Nous Hermes 2 Mixtral 8x7B" },
   { id: "anthropic/claude-3-haiku", label: "Claude 3 Haiku" },
   { id: "google/gemini-pro", label: "Gemini Pro" },
   { id: "gryphe/mythomax-l2-13b", label: "MythoMax L2 13B" },
 ] as const;
+
+export interface OpenRouterModel {
+  id: string;
+  name: string;
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+  };
+}
 
 export function getApiKey(): string {
   return localStorage.getItem(STORAGE_KEY_API) || "";
@@ -25,6 +36,45 @@ export function getModel(): string {
 
 export function setModel(model: string) {
   localStorage.setItem(STORAGE_KEY_MODEL, model);
+}
+
+/** Verify API key by calling OpenRouter's /auth/key endpoint */
+export async function verifyApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/auth/key", {
+      headers: {
+        "Authorization": `Bearer ${key}`,
+      },
+    });
+    if (res.ok) {
+      return { valid: true };
+    }
+    if (res.status === 401) {
+      return { valid: false, error: "API Key không hợp lệ." };
+    }
+    return { valid: false, error: `Lỗi: ${res.status}` };
+  } catch {
+    return { valid: false, error: "Không thể kết nối tới OpenRouter." };
+  }
+}
+
+/** Fetch all available models from OpenRouter */
+export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
+  try {
+    const res = await fetch(OPENROUTER_MODELS_URL);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const models: OpenRouterModel[] = (json.data || []).map((m: any) => ({
+      id: m.id,
+      name: m.name || m.id,
+      pricing: m.pricing,
+    }));
+    // Sort by name
+    models.sort((a, b) => a.name.localeCompare(b.name));
+    return models;
+  } catch {
+    return [];
+  }
 }
 
 export interface StreamCallbacks {
@@ -120,7 +170,6 @@ export async function streamChat(
           const content = parsed.choices?.[0]?.delta?.content as string | undefined;
           if (content) callbacks.onDelta(content);
         } catch {
-          // Partial JSON, put back and wait
           buffer = line + "\n" + buffer;
           break;
         }
