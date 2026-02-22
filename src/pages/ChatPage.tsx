@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Menu, Settings2 } from "lucide-react";
+import { Menu, Settings2, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages } from "@/utils/promptBuilder";
@@ -93,6 +93,22 @@ const ChatPage = () => {
       .then(setSessions)
       .catch(() => setSessions([]));
   }, [user]);
+
+  // Populate charMap for all sessions' characters
+  useEffect(() => {
+    if (sessions.length === 0) return;
+    const unknownIds = [...new Set(sessions.map((s) => s.character_id))].filter((id) => !charMap.has(id));
+    if (unknownIds.length === 0) return;
+    Promise.all(unknownIds.map((id) => getCharacterById(id).catch(() => null))).then((chars) => {
+      setCharMap((prev) => {
+        const next = new Map(prev);
+        chars.forEach((c) => {
+          if (c) next.set(c.id, { id: c.id, name: c.name, avatar_url: c.avatar_url, short_summary: c.short_summary, tags: c.tags, description: c.description });
+        });
+        return next;
+      });
+    });
+  }, [sessions]);
 
   // Auto-create or load session when character loaded
   useEffect(() => {
@@ -464,7 +480,7 @@ const ChatPage = () => {
     />
   ) : null;
 
-  // No character selected state
+  // No character selected — show all sessions list
   if (!activeCharacter) {
     return (
       <div className="flex-1 flex overflow-hidden">
@@ -473,18 +489,72 @@ const ChatPage = () => {
           sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
           onSelectSession={handleSelectSession} onNewChat={() => {}} onDeleteSession={handleDeleteSession}
         />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="absolute top-4 left-4 p-2 text-muted-foreground hover:text-foreground transition-colors md:hidden">
-            <Menu size={20} />
-          </button>
-          <MessageSquareIcon />
-          <p className="text-lg font-medium">Chọn nhân vật để bắt đầu trò chuyện</p>
-          <Button variant="outline"
-            className="border-gray-border text-muted-foreground hover:border-neon-purple hover:text-neon-purple"
-            onClick={() => navigate("/")}>
-            Khám phá nhân vật
-          </Button>
+        <div className="flex-1 flex flex-col">
+          <div className="h-14 flex items-center px-4 md:px-6 border-b border-gray-border flex-shrink-0">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 mr-2 text-muted-foreground hover:text-foreground transition-colors md:hidden">
+              <Menu size={20} />
+            </button>
+            <h1 className="text-sm font-bold">
+              <span className="text-neon-blue neon-text-blue">Cuộc trò chuyện</span>
+            </h1>
+          </div>
+
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-4 md:p-6">
+            {sessions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+                <MessageSquareIcon />
+                <p className="text-lg font-medium">Chưa có cuộc trò chuyện nào</p>
+                <Button variant="outline"
+                  className="border-gray-border text-muted-foreground hover:border-neon-purple hover:text-neon-purple"
+                  onClick={() => navigate("/")}>
+                  Khám phá nhân vật
+                </Button>
+              </div>
+            ) : (
+              <div className="max-w-2xl mx-auto space-y-2">
+                {sessions.map((session) => {
+                  const char = charMap.get(session.character_id);
+                  const initial = char?.name?.charAt(0)?.toUpperCase() || "?";
+                  const displayTitle = session.title || char?.name || "Cuộc trò chuyện";
+                  const timeStr = new Date(session.updated_at).toLocaleDateString("vi-VN", {
+                    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                  });
+
+                  return (
+                    <motion.div
+                      key={session.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-border bg-oled-surface hover:bg-oled-elevated hover:border-neon-purple/30 transition-all duration-200 cursor-pointer"
+                      onClick={() => {
+                        handleSelectSession(session.id);
+                        if (!characterId) {
+                          navigate(`/chat/${session.character_id}`);
+                        }
+                      }}
+                    >
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold bg-oled-elevated text-neon-purple border border-neon-purple/20 flex-shrink-0">
+                        {initial}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{displayTitle}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {char?.name || "..."} · {timeStr}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
+                        className="p-1.5 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
