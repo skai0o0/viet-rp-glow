@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Shield, Loader2 } from "lucide-react";
+import { Shield, Loader2, Upload, FileJson } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { createCharacter } from "@/services/characterDb";
+import { readJsonFile } from "@/utils/importCharacterJson";
 
 const STORAGE_KEY = "vietrp_global_system_prompt";
 
-// Mock admin check — expand later with a proper roles system
 const ADMIN_EMAILS = ["hoangskai0o0nam2006@gmail.com"];
 function isAdmin(email?: string): boolean {
   if (!email) return false;
@@ -24,6 +26,8 @@ export function getGlobalSystemPrompt(): string {
 const AdminPage = () => {
   const { user, isLoading } = useAuth();
   const [prompt, setPrompt] = useState("");
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPrompt(getGlobalSystemPrompt());
@@ -46,6 +50,34 @@ const AdminPage = () => {
     toast.success("Đã lưu cấu hình thành công!");
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const card = await readJsonFile(file);
+
+      if (!card.data.name.trim()) {
+        toast.error("File JSON thiếu trường 'name'.");
+        return;
+      }
+
+      const saved = await createCharacter(card, user!.id, true);
+      toast.success(`Đã import nhân vật công khai: ${saved.name}`);
+    } catch (err: any) {
+      toast.error(err.message || "Import thất bại.");
+    } finally {
+      setImporting(false);
+      // Reset input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -59,6 +91,7 @@ const AdminPage = () => {
         </h1>
       </div>
 
+      {/* Global System Prompt */}
       <div className="flex flex-col gap-3">
         <Label htmlFor="global-prompt" className="text-base font-semibold text-foreground">
           Global Base System Prompt
@@ -82,6 +115,41 @@ const AdminPage = () => {
       >
         Lưu cấu hình
       </Button>
+
+      {/* Import Character JSON */}
+      <div className="border-t border-gray-border pt-6 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <FileJson className="text-neon-blue" size={20} />
+          <Label className="text-base font-semibold text-foreground">
+            Import Character Card (JSON)
+          </Label>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Upload file JSON theo chuẩn TavernCardV2 để tạo nhân vật công khai ngay lập tức.
+        </p>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
+        <Button
+          onClick={handleImportClick}
+          disabled={importing}
+          variant="outline"
+          className="self-start border-neon-blue text-neon-blue hover:bg-neon-blue/10"
+        >
+          {importing ? (
+            <Loader2 size={14} className="animate-spin mr-2" />
+          ) : (
+            <Upload size={14} className="mr-2" />
+          )}
+          {importing ? "Đang import..." : "Chọn file JSON"}
+        </Button>
+      </div>
     </motion.div>
   );
 };

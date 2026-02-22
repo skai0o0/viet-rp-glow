@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2 } from "lucide-react";
+import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, Upload } from "lucide-react";
+import { readJsonFile } from "@/utils/importCharacterJson";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +39,24 @@ const CreatePage = () => {
   const [bookOpen, setBookOpen] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
+
+  // Feature flag: set to true to show import button for all users
+  const SHOW_IMPORT_FOR_ALL = false;
+
+  const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const imported = await readJsonFile(file);
+      setCard(imported);
+      toast({ title: "Import thành công! 🎉", description: `Đã tải dữ liệu nhân vật "${imported.data.name}".` });
+    } catch (err: any) {
+      toast({ title: "Lỗi Import", description: err.message, variant: "destructive" });
+    } finally {
+      if (jsonInputRef.current) jsonInputRef.current.value = "";
+    }
+  };
 
   const data = card.data;
 
@@ -158,6 +177,15 @@ const CreatePage = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          {SHOW_IMPORT_FOR_ALL && (
+            <>
+              <input ref={jsonInputRef} type="file" accept=".json" className="hidden" onChange={handleImportJson} />
+              <Button variant="outline" size="sm" onClick={() => jsonInputRef.current?.click()} className="border-gray-border text-muted-foreground hover:text-foreground hover:border-neon-blue">
+                <Upload size={14} />
+                <span className="hidden sm:inline ml-1">Import JSON</span>
+              </Button>
+            </>
+          )}
           <Button variant="outline" size="sm" onClick={handlePreview} className="border-gray-border text-muted-foreground hover:text-foreground hover:border-neon-blue">
             <Eye size={14} />
             <span className="hidden sm:inline ml-1">Xem trước</span>
