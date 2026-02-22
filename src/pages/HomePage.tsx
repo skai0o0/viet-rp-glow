@@ -32,75 +32,117 @@ const HomePage = () => {
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-y-auto scrollbar-thin">
       {/* Hero Banner */}
-      <section className="relative min-h-[50vh] flex flex-col justify-center items-center text-center py-20 overflow-hidden">
-        {/* Background radial glow */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 50% at 50% 40%, rgba(176,38,255,0.06) 0%, transparent 70%)",
-          }}
-        />
-        {/* Subtle grid pattern */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(176,38,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(176,38,255,0.4) 1px, transparent 1px)",
-            backgroundSize: "60px 60px",
-          }}
-        />
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="relative rounded-3xl border border-neon-purple/20 bg-oled-surface overflow-hidden"
+        >
+          {/* Animated border glow */}
+          <div
+            className="absolute inset-0 rounded-3xl pointer-events-none"
             style={{
-              background: "linear-gradient(135deg, #00F0FF 0%, #B026FF 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              boxShadow:
+                "inset 0 0 60px rgba(176,38,255,0.06), 0 0 40px rgba(176,38,255,0.08)",
             }}
-          >
-            VietRP — Vũ trụ Roleplay của riêng người Việt
-          </motion.h1>
+          />
+          {/* Radial glow */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse 70% 60% at 50% 30%, rgba(176,38,255,0.1) 0%, transparent 70%)",
+            }}
+          />
+          {/* Grid pattern */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.035]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(176,38,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(176,38,255,0.5) 1px, transparent 1px)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+          {/* Corner accents */}
+          <div className="absolute top-0 left-0 w-20 h-20 pointer-events-none">
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-neon-purple/60 to-transparent" />
+            <div className="absolute top-0 left-0 h-full w-[1px] bg-gradient-to-b from-neon-purple/60 to-transparent" />
+          </div>
+          <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none">
+            <div className="absolute top-0 right-0 w-full h-[1px] bg-gradient-to-l from-neon-blue/60 to-transparent" />
+            <div className="absolute top-0 right-0 h-full w-[1px] bg-gradient-to-b from-neon-blue/60 to-transparent" />
+          </div>
+          <div className="absolute bottom-0 left-0 w-20 h-20 pointer-events-none">
+            <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-neon-blue/40 to-transparent" />
+            <div className="absolute bottom-0 left-0 h-full w-[1px] bg-gradient-to-t from-neon-blue/40 to-transparent" />
+          </div>
+          <div className="absolute bottom-0 right-0 w-20 h-20 pointer-events-none">
+            <div className="absolute bottom-0 right-0 w-full h-[1px] bg-gradient-to-l from-neon-purple/40 to-transparent" />
+            <div className="absolute bottom-0 right-0 h-full w-[1px] bg-gradient-to-t from-neon-purple/40 to-transparent" />
+          </div>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="mt-4 text-muted-foreground max-w-2xl mx-auto text-base sm:text-lg"
-          >
-            Khởi tạo thực tại, kết nối vô cực. Trải nghiệm trò chuyện với AI
-            không giới hạn, bảo mật và hoàn toàn riêng tư.
-          </motion.p>
+          {/* Content */}
+          <div className="relative z-10 py-16 sm:py-20 px-6 sm:px-10 flex flex-col items-center text-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="w-14 h-14 rounded-2xl bg-neon-purple/10 border border-neon-purple/30 flex items-center justify-center mb-6"
+            >
+              <Sparkles className="text-neon-purple" size={24} />
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="mt-8 flex flex-col sm:flex-row gap-4 justify-center"
-          >
-            <Button
-              onClick={handleStartNow}
-              className="bg-neon-purple text-white hover:shadow-neon-purple hover:scale-105 transition-all duration-200 px-6 h-11 text-base"
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
+              style={{
+                background: "linear-gradient(135deg, #00F0FF 0%, #B026FF 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
             >
-              <Sparkles size={18} className="mr-2" />
-              Bắt đầu ngay
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="border-gray-border text-muted-foreground hover:border-neon-blue hover:text-neon-blue hover:shadow-neon-blue transition-all duration-200 px-6 h-11 text-base bg-transparent"
+              VietRP — Vũ trụ Roleplay của riêng người Việt
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              className="mt-4 text-muted-foreground max-w-2xl mx-auto text-base sm:text-lg"
             >
-              <Link to="/create">
-                <ArrowRight size={18} className="mr-2" />
-                Tạo nhân vật
-              </Link>
-            </Button>
-          </motion.div>
-        </div>
+              Khởi tạo thực tại, kết nối vô cực. Trải nghiệm trò chuyện với AI
+              không giới hạn, bảo mật và hoàn toàn riêng tư.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="mt-8 flex flex-col sm:flex-row gap-4 justify-center"
+            >
+              <Button
+                onClick={handleStartNow}
+                className="bg-neon-purple text-white hover:shadow-neon-purple hover:scale-105 transition-all duration-200 px-6 h-11 text-base"
+              >
+                <Sparkles size={18} className="mr-2" />
+                Bắt đầu ngay
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="border-gray-border text-muted-foreground hover:border-neon-blue hover:text-neon-blue hover:shadow-neon-blue transition-all duration-200 px-6 h-11 text-base bg-transparent"
+              >
+                <Link to="/create">
+                  <ArrowRight size={18} className="mr-2" />
+                  Tạo nhân vật
+                </Link>
+              </Button>
+            </motion.div>
+          </div>
+        </motion.div>
       </section>
 
       {/* Discover Section */}
