@@ -28,7 +28,7 @@ export type DbCharacter = {
 
 export type CharacterSummary = Pick<
   DbCharacter,
-  "id" | "name" | "avatar_url" | "short_summary" | "tags"
+  "id" | "name" | "avatar_url" | "short_summary" | "tags" | "description"
 >;
 
 /** Create a new character from TavernCardV2 form data */
@@ -72,7 +72,7 @@ export async function createCharacter(
 export async function getPublicCharacters(): Promise<CharacterSummary[]> {
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags")
+    .select("id, name, avatar_url, short_summary, tags, description")
     .eq("is_public", true)
     .order("created_at", { ascending: false });
 
