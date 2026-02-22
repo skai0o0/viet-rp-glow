@@ -36,7 +36,8 @@ export async function createCharacter(
   card: TavernCardV2,
   userId: string,
   isPublic: boolean = false,
-  shortSummary?: string
+  shortSummary?: string,
+  avatarUrl?: string | null
 ) {
   const d = card.data;
   const { data, error } = await supabase
@@ -44,6 +45,7 @@ export async function createCharacter(
     .insert({
       user_id: userId,
       is_public: isPublic,
+      avatar_url: avatarUrl || null,
       name: d.name,
       short_summary: shortSummary || d.description.slice(0, 200),
       tags: d.tags,
