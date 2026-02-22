@@ -185,9 +185,6 @@ const CreatePage = () => {
               <TabsTrigger value="advanced" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1">
                 Nâng cao
               </TabsTrigger>
-              <TabsTrigger value="greetings" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1">
-                Lời chào
-              </TabsTrigger>
               <TabsTrigger value="lorebook" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1">
                 Lorebook
               </TabsTrigger>
@@ -252,6 +249,17 @@ const CreatePage = () => {
                     onChange={(e) => updateData({ scenario: e.target.value })}
                     placeholder="Bạn gặp {{char}} tại một quán cà phê..."
                     className={textareaStyle}
+                  />
+                </div>
+
+                <div>
+                  <Label className={fieldLabel}>Lời chào đầu tiên (first_mes) *</Label>
+                  <p className={fieldHint}>Tin nhắn đầu tiên AI gửi khi bắt đầu cuộc trò chuyện mới.</p>
+                  <Textarea
+                    value={data.first_mes}
+                    onChange={(e) => updateData({ first_mes: e.target.value })}
+                    placeholder="*{{char}} ngoảnh đầu lại và mỉm cười* Ê! Cuối cùng cũng gặp được cậu rồi~"
+                    className={`${textareaStyle} min-h-[140px]`}
                   />
                 </div>
               </div>
@@ -357,31 +365,9 @@ const CreatePage = () => {
                     className={inputStyle}
                   />
                 </div>
-              </div>
-            </TabsContent>
 
-            {/* ===== GREETINGS TAB ===== */}
-            <TabsContent value="greetings" className="space-y-4 mt-4">
-              <div className={sectionCard}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={14} className="text-neon-purple" />
-                  <span className="text-sm font-semibold text-foreground">Lời chào đầu tiên</span>
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>First Message (first_mes) *</Label>
-                  <p className={fieldHint}>Tin nhắn đầu tiên AI gửi khi bắt đầu cuộc trò chuyện mới.</p>
-                  <Textarea
-                    value={data.first_mes}
-                    onChange={(e) => updateData({ first_mes: e.target.value })}
-                    placeholder="*{{char}} ngoảnh đầu lại và mỉm cười* Ê! Cuối cùng cũng gặp được cậu rồi~"
-                    className={`${textareaStyle} min-h-[140px]`}
-                  />
-                </div>
-              </div>
-
-              <div className={sectionCard}>
-                <div className="flex items-center justify-between mb-2">
+                {/* Alternate Greetings */}
+                <div className="flex items-center justify-between mb-2 mt-2">
                   <div className="flex items-center gap-2">
                     <Sparkles size={14} className="text-neon-blue" />
                     <span className="text-sm font-semibold text-foreground">Lời chào thay thế</span>
