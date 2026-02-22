@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import {
 import ModelCombobox from "@/components/ModelCombobox";
 
 const SettingsPage = () => {
+  const navigate = useNavigate();
   const [apiKey, setApiKeyState] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
@@ -52,6 +54,7 @@ const SettingsPage = () => {
   const handleSave = () => {
     setApiKey(apiKey);
     toast.success("Đã lưu cài đặt!");
+    navigate("/");
   };
 
   return (
