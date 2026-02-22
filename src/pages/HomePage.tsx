@@ -7,10 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import CharacterCard from "@/components/CharacterCard";
 import { getPublicCharacters, CharacterSummary } from "@/services/characterDb";
 import { useAuth } from "@/contexts/AuthContext";
+import { getActiveBanner, BannerData } from "@/services/bannerDb";
 
 const HomePage = () => {
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [banner, setBanner] = useState<BannerData | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -19,6 +21,9 @@ const HomePage = () => {
       .then(setCharacters)
       .catch(() => setCharacters([]))
       .finally(() => setLoading(false));
+    getActiveBanner()
+      .then(setBanner)
+      .catch(() => setBanner(null));
   }, []);
 
   const handleStartNow = () => {
@@ -39,7 +44,7 @@ const HomePage = () => {
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="relative rounded-3xl border border-neon-purple/20 bg-oled-surface overflow-hidden"
         >
-          {/* Animated border glow */}
+          {/* Background effects */}
           <div
             className="absolute inset-0 rounded-3xl pointer-events-none"
             style={{
@@ -47,15 +52,13 @@ const HomePage = () => {
                 "inset 0 0 60px rgba(176,38,255,0.06), 0 0 40px rgba(176,38,255,0.08)",
             }}
           />
-          {/* Radial glow */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                "radial-gradient(ellipse 70% 60% at 50% 30%, rgba(176,38,255,0.1) 0%, transparent 70%)",
+                "radial-gradient(ellipse 70% 60% at 30% 50%, rgba(176,38,255,0.1) 0%, transparent 70%)",
             }}
           />
-          {/* Grid pattern */}
           <div
             className="absolute inset-0 pointer-events-none opacity-[0.035]"
             style={{
@@ -69,78 +72,110 @@ const HomePage = () => {
             <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-neon-purple/60 to-transparent" />
             <div className="absolute top-0 left-0 h-full w-[1px] bg-gradient-to-b from-neon-purple/60 to-transparent" />
           </div>
-          <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none">
-            <div className="absolute top-0 right-0 w-full h-[1px] bg-gradient-to-l from-neon-blue/60 to-transparent" />
-            <div className="absolute top-0 right-0 h-full w-[1px] bg-gradient-to-b from-neon-blue/60 to-transparent" />
-          </div>
           <div className="absolute bottom-0 left-0 w-20 h-20 pointer-events-none">
             <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-neon-blue/40 to-transparent" />
             <div className="absolute bottom-0 left-0 h-full w-[1px] bg-gradient-to-t from-neon-blue/40 to-transparent" />
           </div>
-          <div className="absolute bottom-0 right-0 w-20 h-20 pointer-events-none">
-            <div className="absolute bottom-0 right-0 w-full h-[1px] bg-gradient-to-l from-neon-purple/40 to-transparent" />
-            <div className="absolute bottom-0 right-0 h-full w-[1px] bg-gradient-to-t from-neon-purple/40 to-transparent" />
-          </div>
 
-          {/* Content */}
-          <div className="relative z-10 py-16 sm:py-20 px-6 sm:px-10 flex flex-col items-center text-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="w-14 h-14 rounded-2xl bg-neon-purple/10 border border-neon-purple/30 flex items-center justify-center mb-6"
-            >
-              <Sparkles className="text-neon-purple" size={24} />
-            </motion.div>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
-              style={{
-                background: "linear-gradient(135deg, #00F0FF 0%, #B026FF 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              VietRP — Vũ trụ Roleplay của riêng người Việt
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.45 }}
-              className="mt-4 text-muted-foreground max-w-2xl mx-auto text-base sm:text-lg"
-            >
-              Khởi tạo thực tại, kết nối vô cực. Trải nghiệm trò chuyện với AI
-              không giới hạn, bảo mật và hoàn toàn riêng tư.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-              className="mt-8 flex flex-col sm:flex-row gap-4 justify-center"
-            >
-              <Button
-                onClick={handleStartNow}
-                className="bg-neon-purple text-white hover:shadow-neon-purple hover:scale-105 transition-all duration-200 px-6 h-11 text-base"
+          {/* Content: Left text + Right trapezoid image */}
+          <div className="relative z-10 flex flex-col md:flex-row items-stretch min-h-[320px]">
+            {/* Left side - Text content */}
+            <div className="flex-1 flex flex-col justify-center py-12 sm:py-16 px-6 sm:px-10">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="w-12 h-12 rounded-xl bg-neon-purple/10 border border-neon-purple/30 flex items-center justify-center mb-5"
               >
-                <Sparkles size={18} className="mr-2" />
-                Bắt đầu ngay
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="border-gray-border text-muted-foreground hover:border-neon-blue hover:text-neon-blue hover:shadow-neon-blue transition-all duration-200 px-6 h-11 text-base bg-transparent"
+                <Sparkles className="text-neon-purple" size={22} />
+              </motion.div>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-left"
+                style={{
+                  background: "linear-gradient(135deg, hsl(var(--neon-blue)) 0%, hsl(var(--neon-purple)) 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
               >
-                <Link to="/create">
-                  <ArrowRight size={18} className="mr-2" />
-                  Tạo nhân vật
-                </Link>
-              </Button>
-            </motion.div>
+                {banner?.title || "VietRP — Vũ trụ Roleplay của riêng người Việt"}
+              </motion.h1>
+
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.45 }}
+                className="mt-4 text-muted-foreground max-w-lg text-sm sm:text-base text-left"
+              >
+                {banner?.subtitle || "Khởi tạo thực tại, kết nối vô cực. Trải nghiệm trò chuyện với AI không giới hạn, bảo mật và hoàn toàn riêng tư."}
+              </motion.p>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="mt-6 flex flex-col sm:flex-row gap-3"
+              >
+                <Button
+                  onClick={handleStartNow}
+                  className="bg-neon-purple text-white hover:shadow-neon-purple hover:scale-105 transition-all duration-200 px-5 h-10 text-sm"
+                >
+                  <Sparkles size={16} className="mr-2" />
+                  Bắt đầu ngay
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-gray-border text-muted-foreground hover:border-neon-blue hover:text-neon-blue hover:shadow-neon-blue transition-all duration-200 px-5 h-10 text-sm bg-transparent"
+                >
+                  <Link to="/create">
+                    <ArrowRight size={16} className="mr-2" />
+                    Tạo nhân vật
+                  </Link>
+                </Button>
+              </motion.div>
+            </div>
+
+            {/* Right side - Trapezoid image area */}
+            <div className="relative w-full md:w-[40%] lg:w-[38%] min-h-[200px] md:min-h-0 overflow-hidden">
+              {/* Trapezoid clip path: slanted left edge on desktop */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  clipPath: "polygon(15% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                }}
+              >
+                {banner?.image_url ? (
+                  <img
+                    src={banner.image_url}
+                    alt="Banner"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, hsl(var(--neon-purple) / 0.15) 0%, hsl(var(--neon-blue) / 0.1) 50%, hsl(var(--neon-purple) / 0.05) 100%)",
+                    }}
+                  >
+                    <div className="w-full h-full flex items-center justify-center opacity-20">
+                      <Sparkles size={64} className="text-neon-purple" />
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Gradient fade on the slanted edge */}
+              <div
+                className="absolute inset-0 pointer-events-none hidden md:block"
+                style={{
+                  background: "linear-gradient(90deg, hsl(var(--oled-surface)) 0%, transparent 20%)",
+                }}
+              />
+            </div>
           </div>
         </motion.div>
       </section>
