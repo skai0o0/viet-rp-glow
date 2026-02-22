@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { Compass, ArrowRight, Sparkles, Search, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CharacterCard from "@/components/CharacterCard";
+import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
 import { getPublicCharacters, CharacterSummary } from "@/services/characterDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { getActiveBanner, BannerData } from "@/services/bannerDb";
@@ -19,6 +21,7 @@ const HomePage = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -378,12 +381,17 @@ const HomePage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.35, delay: 0.55 + i * 0.07 }}
                 >
-                  <CharacterCard character={char} />
+                  <CharacterCard character={char} onClick={() => setPreviewChar(char)} />
                 </motion.div>
               ))
           }
         </div>
       </section>
+
+      {previewChar && createPortal(
+        <CharacterPreviewDialog character={previewChar} onClose={() => setPreviewChar(null)} />,
+        document.body
+      )}
     </div>
   );
 };
