@@ -146,7 +146,7 @@ const ChatPage = () => {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center bg-oled-base border-b border-gray-border">
           <button
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-4 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Menu size={20} />
