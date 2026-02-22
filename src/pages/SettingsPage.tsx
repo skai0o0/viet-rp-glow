@@ -47,12 +47,11 @@ const SettingsPage = () => {
 
   const handleModelChange = (value: string) => {
     setSelectedModel(value);
-    setModel(value);
-    toast.success("Đã thay đổi model AI!");
   };
 
   const handleSave = () => {
     setApiKey(apiKey);
+    setModel(selectedModel);
     toast.success("Đã lưu cài đặt!");
     navigate("/");
   };
