@@ -4,6 +4,7 @@ import { RotateCcw, Copy, Check, GitBranch } from "lucide-react";
 import { ChatMessage } from "@/types/character";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import RoleplayMessage from "@/components/RoleplayMessage";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -76,7 +77,7 @@ const MessageBubble = ({
               : undefined
           }
         >
-          <span className="whitespace-pre-wrap">{message.content}</span>
+          <span className="whitespace-pre-wrap"><RoleplayMessage text={message.content} /></span>
           {isStreaming && !isUser && (
             <span className="text-neon-purple animate-blink font-mono ml-0.5">|</span>
           )}
