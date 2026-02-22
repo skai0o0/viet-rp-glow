@@ -1,15 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck, Search } from "lucide-react";
+import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   getApiKey,
@@ -18,36 +11,20 @@ import {
   setModel,
   AVAILABLE_MODELS,
   verifyApiKey,
-  fetchOpenRouterModels,
-  type OpenRouterModel,
 } from "@/services/openRouter";
+import ModelCombobox from "@/components/ModelCombobox";
 
 const SettingsPage = () => {
   const [apiKey, setApiKeyState] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [model, setModelState] = useState<string>(AVAILABLE_MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
-  const [models, setModels] = useState<OpenRouterModel[]>([]);
-  const [loadingModels, setLoadingModels] = useState(true);
-  const [modelSearch, setModelSearch] = useState("");
 
   useEffect(() => {
     setApiKeyState(getApiKey());
-    setModelState(getModel());
-    fetchOpenRouterModels().then((m) => {
-      setModels(m);
-      setLoadingModels(false);
-    });
+    setSelectedModel(getModel());
   }, []);
-
-  const filteredModels = useMemo(() => {
-    if (!modelSearch.trim()) return models;
-    const q = modelSearch.toLowerCase();
-    return models.filter(
-      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
-    );
-  }, [models, modelSearch]);
 
   const handleVerify = async () => {
     if (!apiKey.trim()) {
@@ -66,15 +43,15 @@ const SettingsPage = () => {
     }
   };
 
+  const handleModelChange = (value: string) => {
+    setSelectedModel(value);
+    setModel(value);
+    toast.success("Đã thay đổi model AI!");
+  };
+
   const handleSave = () => {
     setApiKey(apiKey);
     toast.success("Đã lưu cài đặt!");
-  };
-
-  const handleModelChange = (value: string) => {
-    setModelState(value);
-    setModel(value);
-    toast.success("Đã thay đổi model AI!");
   };
 
   return (
@@ -100,16 +77,12 @@ const SettingsPage = () => {
         <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-5">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-neon-purple shadow-neon-purple" />
-            <h2 className="text-sm font-semibold text-foreground">
-              Kết nối AI
-            </h2>
+            <h2 className="text-sm font-semibold text-foreground">Kết nối AI</h2>
           </div>
 
           {/* API Key */}
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">
-              OpenRouter API Key
-            </label>
+            <label className="text-xs text-muted-foreground">OpenRouter API Key</label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
@@ -141,24 +114,13 @@ const SettingsPage = () => {
                     : "bg-neon-blue/10 border-neon-blue/30 text-neon-blue hover:shadow-neon-blue"
                 }`}
               >
-                {verifying ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : verified === true ? (
-                  <ShieldCheck size={14} />
-                ) : (
-                  <ShieldCheck size={14} />
-                )}
+                {verifying ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
                 {verified === true ? "OK" : "Verify"}
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground">
               Lấy API Key tại{" "}
-              <a
-                href="https://openrouter.ai/keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-neon-blue hover:underline"
-              >
+              <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline">
                 openrouter.ai/keys
               </a>
               . Key được lưu trữ cục bộ trên trình duyệt của bạn.
@@ -168,68 +130,13 @@ const SettingsPage = () => {
           {/* Model Selector */}
           <div className="space-y-2">
             <label className="text-xs text-muted-foreground">Model AI</label>
-            {loadingModels ? (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
-                <Loader2 size={14} className="animate-spin" /> Đang tải danh sách model...
-              </div>
-            ) : models.length > 0 ? (
-              <>
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={modelSearch}
-                    onChange={(e) => setModelSearch(e.target.value)}
-                    placeholder="Tìm model..."
-                    className="bg-oled-elevated border-gray-border text-foreground pl-9 focus:border-neon-purple focus:ring-neon-purple/30 mb-2"
-                  />
-                </div>
-                <Select value={model} onValueChange={handleModelChange}>
-                  <SelectTrigger className="bg-oled-elevated border-gray-border text-foreground focus:border-neon-purple focus:ring-neon-purple/30">
-                    <SelectValue placeholder="Chọn model..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-oled-elevated border-gray-border max-h-60 z-50">
-                    {filteredModels.length === 0 ? (
-                      <div className="py-3 px-4 text-sm text-muted-foreground text-center">
-                        Không tìm thấy model nào.
-                      </div>
-                    ) : (
-                      filteredModels.map((m) => (
-                        <SelectItem
-                          key={m.id}
-                          value={m.id}
-                          className="text-foreground focus:bg-neon-purple/10 focus:text-foreground"
-                        >
-                          {m.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-muted-foreground">
-                  {models.length} model khả dụng từ OpenRouter.
-                </p>
-              </>
-            ) : (
-              <Select value={model} onValueChange={handleModelChange}>
-                <SelectTrigger className="bg-oled-elevated border-gray-border text-foreground focus:border-neon-purple focus:ring-neon-purple/30">
-                  <SelectValue placeholder="Chọn model..." />
-                </SelectTrigger>
-                <SelectContent className="bg-oled-elevated border-gray-border z-50">
-                  {AVAILABLE_MODELS.map((m) => (
-                    <SelectItem
-                      key={m.id}
-                      value={m.id}
-                      className="text-foreground focus:bg-neon-purple/10 focus:text-foreground"
-                    >
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <ModelCombobox value={selectedModel} onValueChange={handleModelChange} />
+            <p className="text-[10px] text-muted-foreground">
+              Chọn model phù hợp với nhu cầu roleplay của bạn.
+            </p>
           </div>
 
-          {/* Save button at bottom */}
+          {/* Save button */}
           <Button
             onClick={handleSave}
             className="w-full bg-neon-purple text-primary-foreground hover:shadow-neon-purple hover:scale-[1.02] transition-all duration-200"
