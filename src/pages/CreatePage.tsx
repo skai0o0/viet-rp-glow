@@ -36,6 +36,7 @@ const CreatePage = () => {
   const [tagInput, setTagInput] = useState("");
   const [greetingDraft, setGreetingDraft] = useState("");
   const [bookOpen, setBookOpen] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const data = card.data;
@@ -128,7 +129,7 @@ const CreatePage = () => {
         return;
       }
 
-      const saved = await createCharacter(card, session.session.user.id);
+      const saved = await createCharacter(card, session.session.user.id, isPublic);
       toast({ title: "Thành công! 🎉", description: "Tạo nhân vật thành công!" });
       navigate(`/chat?characterId=${saved.id}`);
     } catch (err: any) {
@@ -278,7 +279,16 @@ const CreatePage = () => {
                       </Badge>
                     ))}
                   </div>
-                )}
+                 )}
+
+                {/* Public toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-gray-border bg-oled-base p-3">
+                  <div>
+                    <Label className={fieldLabel}>Công khai nhân vật</Label>
+                    <p className={fieldHint}>Cho phép mọi người xem và trò chuyện với nhân vật này trên trang Khám Phá.</p>
+                  </div>
+                  <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
