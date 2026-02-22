@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { marinCharacter, mockMessages } from "@/data/mockData";
 import { buildMessages } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
+import { getCharacterById, dbCharToCard } from "@/services/characterDb";
 import { toast } from "sonner";
 import ChatHeader from "@/components/ChatHeader";
 import ChatSidebar from "@/components/ChatSidebar";
@@ -13,12 +15,34 @@ import MessageBubble from "@/components/MessageBubble";
 import TypingIndicator from "@/components/TypingIndicator";
 
 const ChatPage = () => {
+  const { characterId } = useParams<{ characterId: string }>();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeCharacter, setActiveCharacter] = useState<CharacterCard>(marinCharacter);
   const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
   const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Load character from DB if characterId param is present
+  useEffect(() => {
+    if (!characterId) return;
+    getCharacterById(characterId)
+      .then((dbChar) => {
+        const card = dbCharToCard(dbChar);
+        setActiveCharacter(card);
+        setMessages([
+          {
+            id: "first",
+            role: "assistant",
+            content: card.first_mes,
+            timestamp: new Date(),
+          },
+        ]);
+      })
+      .catch(() => {
+        toast.error("Không thể tải nhân vật này");
+      });
+  }, [characterId]);
 
   useEffect(() => {
     if (scrollRef.current) {
