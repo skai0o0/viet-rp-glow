@@ -1,6 +1,7 @@
 import { CharacterCard } from "@/types/character";
 import { getCachedUserPersona } from "@/services/profileDb";
 import { getGlobalSystemPrompt } from "@/pages/AdminPage";
+import { getResponseStylePrompt } from "@/components/GenerationSettings";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -111,22 +112,29 @@ export function parseMesExample(mesExample: string, charName: string, userName: 
 export function buildMessages(
   character: CharacterCard,
   chatHistory: { role: "user" | "assistant"; content: string }[],
-  userName?: string
+  userName?: string,
+  scenarioOverride?: string
 ): OpenRouterMessage[] {
   const persona = getCachedUserPersona();
   const resolvedUserName = userName || persona.displayName || "User";
+
+  // If scenarioOverride provided, use it instead of character.scenario
+  const effectiveCharacter = scenarioOverride !== undefined
+    ? { ...character, scenario: scenarioOverride }
+    : character;
+
   const messages: OpenRouterMessage[] = [];
 
   // 1. System prompt
   messages.push({
     role: "system",
-    content: buildSystemPrompt(character, resolvedUserName),
+    content: buildSystemPrompt(effectiveCharacter, resolvedUserName),
   });
 
   // 2. Example messages (if any)
-  const ext = character as any;
+  const ext = effectiveCharacter as any;
   if (ext.mes_example) {
-    const examples = parseMesExample(ext.mes_example, character.name, userName);
+    const examples = parseMesExample(ext.mes_example, effectiveCharacter.name, userName);
     messages.push(...examples);
   }
 
@@ -136,6 +144,15 @@ export function buildMessages(
       role: msg.role,
       content: msg.content,
     });
+  }
+
+  // 4. Post-history instructions (response style)
+  const stylePrompt = getResponseStylePrompt();
+  if (stylePrompt) {
+    const resolved = stylePrompt
+      .replace(/\{\{char\}\}/gi, effectiveCharacter.name)
+      .replace(/\{\{user\}\}/gi, resolvedUserName);
+    messages.push({ role: "system", content: resolved });
   }
 
   return messages;

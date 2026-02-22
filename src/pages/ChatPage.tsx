@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Menu, Settings2 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages } from "@/utils/promptBuilder";
@@ -23,14 +23,19 @@ import ChatSidebar from "@/components/ChatSidebar";
 import ChatInput from "@/components/ChatInput";
 import MessageBubble from "@/components/MessageBubble";
 import TypingIndicator from "@/components/TypingIndicator";
+import GenerationSettings from "@/components/GenerationSettings";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const ChatPage = () => {
   const { characterId } = useParams<{ characterId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeCharacter, setActiveCharacter] = useState<CharacterCard | null>(null);
   const [activeCharId, setActiveCharId] = useState<string | null>(characterId || null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -38,15 +43,22 @@ const ChatPage = () => {
   const [sessions, setSessions] = useState<DbChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [charMap, setCharMap] = useState<Map<string, CharacterSummary>>(new Map());
+  const [scenarioOverride, setScenarioOverride] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Sessions filtered by active character
   const charSessions = useMemo(
     () => (activeCharId ? sessions.filter((s) => s.character_id === activeCharId) : []),
     [sessions, activeCharId]
   );
+
+  // Sync scenario when character loads
+  useEffect(() => {
+    if (activeCharacter) {
+      setScenarioOverride(activeCharacter.scenario || "");
+    }
+  }, [activeCharacter]);
 
   // Load character from URL param
   useEffect(() => {
@@ -151,36 +163,20 @@ const ChatPage = () => {
     }
   };
 
-  // Branch chat at a specific message index
   const handleBranch = useCallback(
     async (messageIndex: number) => {
       if (!user || !activeCharId || !activeSessionId) return;
-
       const toastId = toast.loading("Đang tạo nhánh mới...");
-
       try {
         const branchNum = charSessions.length + 1;
         const branchTitle = `Nhánh ${branchNum} — ${new Date().toLocaleDateString("vi-VN", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
+          day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
         })}`;
-
         const msgSnapshot = messages.map((m) => ({ role: m.role, content: m.content }));
-
         const newSession = await branchChatSession(
-          activeSessionId,
-          user.id,
-          activeCharId,
-          msgSnapshot,
-          messageIndex,
-          branchTitle
+          activeSessionId, user.id, activeCharId, msgSnapshot, messageIndex, branchTitle
         );
-
         setSessions((prev) => [newSession, ...prev]);
-
-        // Load the new branch
         await loadSession(newSession.id);
         toast.success("Đã tạo nhánh mới!", { id: toastId });
       } catch {
@@ -200,10 +196,7 @@ const ChatPage = () => {
     async (content: string) => {
       if (!getApiKey()) {
         toast.error("Vui lòng nhập API Key của OpenRouter trong phần Cài Đặt.", {
-          action: {
-            label: "Đi tới Cài Đặt",
-            onClick: () => navigate("/settings"),
-          },
+          action: { label: "Đi tới Cài Đặt", onClick: () => navigate("/settings") },
         });
         return;
       }
@@ -211,10 +204,7 @@ const ChatPage = () => {
 
       const savedUserMsg = await addMessage(activeSessionId, "user", content);
       const userMsg: ChatMessage = {
-        id: savedUserMsg.id,
-        role: "user",
-        content,
-        timestamp: new Date(savedUserMsg.created_at),
+        id: savedUserMsg.id, role: "user", content, timestamp: new Date(savedUserMsg.created_at),
       };
 
       setMessages((prev) => [...prev, userMsg]);
@@ -226,7 +216,9 @@ const ChatPage = () => {
       const allMessages = [...messages, userMsg];
       const apiMessages = buildMessages(
         activeCharacter,
-        allMessages.map((m) => ({ role: m.role, content: m.content }))
+        allMessages.map((m) => ({ role: m.role, content: m.content })),
+        undefined,
+        scenarioOverride
       );
 
       const controller = new AbortController();
@@ -243,9 +235,7 @@ const ChatPage = () => {
           onDelta: (text) => {
             assistantContent += text;
             setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, content: assistantContent } : m
-              )
+              prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
             );
           },
           onDone: async () => {
@@ -255,9 +245,7 @@ const ChatPage = () => {
               const saved = await addMessage(activeSessionId, "assistant", assistantContent);
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) }
-                    : m
+                  m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
             }
@@ -274,14 +262,12 @@ const ChatPage = () => {
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, navigate]
+    [messages, activeCharacter, activeSessionId, navigate, scenarioOverride]
   );
 
   const handleRegenerate = useCallback(async () => {
     if (!activeSessionId || !activeCharacter || isStreaming) return;
-
     await deleteLastAssistantMessage(activeSessionId);
-
     const withoutLast = messages.slice(0, -1);
     setMessages(withoutLast);
     setIsStreaming(true);
@@ -291,7 +277,9 @@ const ChatPage = () => {
 
     const apiMessages = buildMessages(
       activeCharacter,
-      withoutLast.map((m) => ({ role: m.role, content: m.content }))
+      withoutLast.map((m) => ({ role: m.role, content: m.content })),
+      undefined,
+      scenarioOverride
     );
 
     const controller = new AbortController();
@@ -308,9 +296,7 @@ const ChatPage = () => {
         onDelta: (text) => {
           assistantContent += text;
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: assistantContent } : m
-            )
+            prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
           );
         },
         onDone: async () => {
@@ -320,9 +306,7 @@ const ChatPage = () => {
             const saved = await addMessage(activeSessionId, "assistant", assistantContent);
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) }
-                  : m
+                m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
               )
             );
           }
@@ -338,7 +322,7 @@ const ChatPage = () => {
       },
       controller.signal
     );
-  }, [messages, activeCharacter, activeSessionId, isStreaming]);
+  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride]);
 
   const lastAssistantIdx = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -347,12 +331,10 @@ const ChatPage = () => {
     return -1;
   })();
 
-  // Handle session selection (from sidebar or header dropdown)
   const handleSelectSession = useCallback(
     (id: string) => {
       const session = sessions.find((s) => s.id === id);
       if (!session) return;
-
       if (session.character_id !== activeCharId) {
         setActiveCharId(session.character_id);
         getCharacterById(session.character_id).then((dbChar) => {
@@ -360,12 +342,8 @@ const ChatPage = () => {
           setCharMap((prev) => {
             const next = new Map(prev);
             next.set(dbChar.id, {
-              id: dbChar.id,
-              name: dbChar.name,
-              avatar_url: dbChar.avatar_url,
-              short_summary: dbChar.short_summary,
-              tags: dbChar.tags,
-              description: dbChar.description,
+              id: dbChar.id, name: dbChar.name, avatar_url: dbChar.avatar_url,
+              short_summary: dbChar.short_summary, tags: dbChar.tags, description: dbChar.description,
             });
             return next;
           });
@@ -378,34 +356,34 @@ const ChatPage = () => {
     [sessions, activeCharId]
   );
 
+  // Settings sidebar content
+  const settingsContent = activeCharacter ? (
+    <GenerationSettings
+      scenario={scenarioOverride}
+      onScenarioChange={setScenarioOverride}
+      onClose={isMobile ? () => setSettingsOpen(false) : undefined}
+    />
+  ) : null;
+
   // No character selected state
   if (!activeCharacter) {
     return (
       <div className="flex-1 flex overflow-hidden">
         <ChatSidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          sessions={sessions}
-          characters={charMap}
-          activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-          onNewChat={() => {}}
-          onDeleteSession={handleDeleteSession}
+          open={sidebarOpen} onClose={() => setSidebarOpen(false)}
+          sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
+          onSelectSession={handleSelectSession} onNewChat={() => {}} onDeleteSession={handleDeleteSession}
         />
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="absolute top-4 left-4 p-2 text-muted-foreground hover:text-foreground transition-colors md:hidden"
-          >
+          <button onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="absolute top-4 left-4 p-2 text-muted-foreground hover:text-foreground transition-colors md:hidden">
             <Menu size={20} />
           </button>
           <MessageSquareIcon />
           <p className="text-lg font-medium">Chọn nhân vật để bắt đầu trò chuyện</p>
-          <Button
-            variant="outline"
+          <Button variant="outline"
             className="border-gray-border text-muted-foreground hover:border-neon-purple hover:text-neon-purple"
-            onClick={() => navigate("/")}
-          >
+            onClick={() => navigate("/")}>
             Khám phá nhân vật
           </Button>
         </div>
@@ -416,76 +394,85 @@ const ChatPage = () => {
   return (
     <div className="flex-1 flex overflow-hidden">
       <ChatSidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        sessions={sessions}
-        characters={charMap}
-        activeSessionId={activeSessionId}
-        onSelectSession={(id) => {
-          handleSelectSession(id);
-          setSidebarOpen(false);
-        }}
-        onNewChat={handleNewChat}
-        onDeleteSession={handleDeleteSession}
+        open={sidebarOpen} onClose={() => setSidebarOpen(false)}
+        sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
+        onSelectSession={(id) => { handleSelectSession(id); setSidebarOpen(false); }}
+        onNewChat={handleNewChat} onDeleteSession={handleDeleteSession}
         characterName={activeCharacter.name}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center bg-oled-base border-b border-gray-border">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-4 text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <button onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-4 text-muted-foreground hover:text-foreground transition-colors">
             <Menu size={20} />
           </button>
           <div className="flex-1">
-            <ChatHeader
-              character={activeCharacter}
-              onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-              onNewChat={handleNewChat}
-              sessions={charSessions}
-              activeSessionId={activeSessionId}
-              onSelectSession={handleSelectSession}
-            />
+            <ChatHeader character={activeCharacter} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+              onNewChat={handleNewChat} sessions={charSessions} activeSessionId={activeSessionId}
+              onSelectSession={handleSelectSession} />
           </div>
+          {/* Settings toggle button */}
+          <button onClick={() => setSettingsOpen(!settingsOpen)}
+            className={`p-4 transition-colors ${settingsOpen ? "text-neon-purple" : "text-muted-foreground hover:text-foreground"}`}>
+            <Settings2 size={20} />
+          </button>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">
-          {activeCharacter.scenario && (
-            <div className="mx-4 md:mx-6 p-3 rounded-xl bg-oled-surface border border-gray-border">
-              <p className="text-[11px] text-muted-foreground">
-                <span className="text-neon-purple font-medium">Kịch bản:</span>{" "}
-                {activeCharacter.scenario}
-              </p>
+        <div className="flex-1 flex overflow-hidden">
+          {/* Chat messages area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">
+              {activeCharacter.scenario && !scenarioOverride && (
+                <div className="mx-4 md:mx-6 p-3 rounded-xl bg-oled-surface border border-gray-border">
+                  <p className="text-[11px] text-muted-foreground">
+                    <span className="text-neon-purple font-medium">Kịch bản:</span>{" "}
+                    {activeCharacter.scenario}
+                  </p>
+                </div>
+              )}
+              {scenarioOverride && (
+                <div className="mx-4 md:mx-6 p-3 rounded-xl bg-oled-surface border border-gray-border">
+                  <p className="text-[11px] text-muted-foreground">
+                    <span className="text-neon-purple font-medium">Kịch bản:</span>{" "}
+                    {scenarioOverride}
+                  </p>
+                </div>
+              )}
+
+              <AnimatePresence>
+                {messages.map((msg, idx) => (
+                  <MessageBubble key={msg.id} message={msg}
+                    characterAvatar={activeCharacter.avatar} characterName={activeCharacter.name}
+                    isStreaming={isStreaming && msg.id === messages[messages.length - 1]?.id && msg.role === "assistant"}
+                    isLastAssistant={idx === lastAssistantIdx}
+                    onRegenerate={handleRegenerate} onBranch={() => handleBranch(idx)} />
+                ))}
+              </AnimatePresence>
+
+              {isStreaming && messages[messages.length - 1]?.content === "" && <TypingIndicator />}
+            </div>
+
+            <ChatInput onSend={handleSend} disabled={isStreaming} />
+          </div>
+
+          {/* Desktop right sidebar */}
+          {!isMobile && settingsOpen && (
+            <div className="w-72 border-l border-gray-border flex-shrink-0">
+              {settingsContent}
             </div>
           )}
-
-          <AnimatePresence>
-            {messages.map((msg, idx) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                characterAvatar={activeCharacter.avatar}
-                characterName={activeCharacter.name}
-                isStreaming={
-                  isStreaming &&
-                  msg.id === messages[messages.length - 1]?.id &&
-                  msg.role === "assistant"
-                }
-                isLastAssistant={idx === lastAssistantIdx}
-                onRegenerate={handleRegenerate}
-                onBranch={() => handleBranch(idx)}
-              />
-            ))}
-          </AnimatePresence>
-
-          {isStreaming && messages[messages.length - 1]?.content === "" && (
-            <TypingIndicator />
-          )}
         </div>
-
-        <ChatInput onSend={handleSend} disabled={isStreaming} />
       </div>
+
+      {/* Mobile settings drawer */}
+      {isMobile && (
+        <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <SheetContent side="right" className="p-0 w-80 bg-oled-surface border-gray-border">
+            {settingsContent}
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 };
