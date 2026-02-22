@@ -98,6 +98,7 @@ export async function streamChat(
   }
 
   const model = getModel();
+  const maxTokens = parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
 
   try {
     const response = await fetch(OPENROUTER_API_URL, {
@@ -112,6 +113,7 @@ export async function streamChat(
         model,
         messages,
         stream: true,
+        max_tokens: maxTokens,
       }),
       signal,
     });
