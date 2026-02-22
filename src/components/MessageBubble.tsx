@@ -5,9 +5,10 @@ interface MessageBubbleProps {
   message: ChatMessage;
   characterAvatar?: string;
   characterName?: string;
+  isStreaming?: boolean;
 }
 
-const MessageBubble = ({ message, characterAvatar, characterName }: MessageBubbleProps) => {
+const MessageBubble = ({ message, characterAvatar, characterName, isStreaming }: MessageBubbleProps) => {
   const isUser = message.role === "user";
 
   return (
@@ -20,7 +21,7 @@ const MessageBubble = ({ message, characterAvatar, characterName }: MessageBubbl
       {/* AI Avatar */}
       {!isUser && (
         <div className="flex-shrink-0 mt-1">
-          <div className="w-8 h-8 rounded-full bg-oled-surface flex items-center justify-center text-neon-purple text-sm font-semibold border border-neon-purple/30 animate-breathing">
+          <div className={`w-8 h-8 rounded-full bg-oled-surface flex items-center justify-center text-neon-purple text-sm font-semibold border border-neon-purple/30 ${isStreaming ? "animate-breathing" : ""}`}>
             {characterAvatar || "AI"}
           </div>
         </div>
@@ -50,7 +51,10 @@ const MessageBubble = ({ message, characterAvatar, characterName }: MessageBubbl
               : undefined
           }
         >
-          {message.content}
+          <span className="whitespace-pre-wrap">{message.content}</span>
+          {isStreaming && !isUser && (
+            <span className="text-neon-purple animate-blink font-mono ml-0.5">|</span>
+          )}
         </div>
 
         {/* Timestamp */}
