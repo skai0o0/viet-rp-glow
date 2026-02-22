@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Trash2, Pencil, Eye, EyeOff, Check, Loader2, ShieldCheck, Search } from "lucide-react";
+import { User, Trash2, Eye, EyeOff, Check, Loader2, ShieldCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,10 +36,9 @@ import {
   setModel,
   AVAILABLE_MODELS,
   verifyApiKey,
-  fetchOpenRouterModels,
-  type OpenRouterModel,
 } from "@/services/openRouter";
 import CharacterCard from "@/components/CharacterCard";
+import ModelCombobox from "@/components/ModelCombobox";
 import { Link } from "react-router-dom";
 
 const ProfilePage = () => {
@@ -61,9 +60,6 @@ const ProfilePage = () => {
   const [model, setModelState] = useState<string>(AVAILABLE_MODELS[0].id);
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
-  const [models, setModels] = useState<OpenRouterModel[]>([]);
-  const [loadingModels, setLoadingModels] = useState(true);
-  const [modelSearch, setModelSearch] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -86,10 +82,6 @@ const ProfilePage = () => {
     // Load settings
     setApiKeyVal(getApiKey());
     setModelState(getModel());
-    fetchOpenRouterModels().then((m) => {
-      setModels(m);
-      setLoadingModels(false);
-    });
   }, [user]);
 
   const handleSavePersona = async () => {
@@ -120,13 +112,6 @@ const ProfilePage = () => {
     toast.success("Đã xoá nhân vật.");
   };
 
-  const filteredModels = useMemo(() => {
-    if (!modelSearch.trim()) return models;
-    const q = modelSearch.toLowerCase();
-    return models.filter(
-      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
-    );
-  }, [models, modelSearch]);
 
   const handleVerifyKey = async () => {
     if (!apiKeyVal.trim()) {
@@ -371,57 +356,7 @@ const ProfilePage = () => {
 
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">Model AI</label>
-                  {loadingModels ? (
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
-                      <Loader2 size={14} className="animate-spin" /> Đang tải danh sách model...
-                    </div>
-                  ) : models.length > 0 ? (
-                    <>
-                      <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          value={modelSearch}
-                          onChange={(e) => setModelSearch(e.target.value)}
-                          placeholder="Tìm model..."
-                          className="bg-oled-elevated border-gray-border text-foreground pl-9 focus:border-neon-purple focus:ring-neon-purple/30 mb-2"
-                        />
-                      </div>
-                      <Select value={model} onValueChange={handleModelChange}>
-                        <SelectTrigger className="bg-oled-elevated border-gray-border text-foreground focus:border-neon-purple focus:ring-neon-purple/30">
-                          <SelectValue placeholder="Chọn model..." />
-                        </SelectTrigger>
-                        <SelectContent className="bg-oled-elevated border-gray-border max-h-60 z-50">
-                          {filteredModels.length === 0 ? (
-                            <div className="py-3 px-4 text-sm text-muted-foreground text-center">
-                              Không tìm thấy model nào.
-                            </div>
-                          ) : (
-                            filteredModels.map((m) => (
-                              <SelectItem key={m.id} value={m.id} className="text-foreground focus:bg-neon-purple/10 focus:text-foreground">
-                                {m.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[10px] text-muted-foreground">
-                        {models.length} model khả dụng từ OpenRouter.
-                      </p>
-                    </>
-                  ) : (
-                    <Select value={model} onValueChange={handleModelChange}>
-                      <SelectTrigger className="bg-oled-elevated border-gray-border text-foreground focus:border-neon-purple focus:ring-neon-purple/30">
-                        <SelectValue placeholder="Chọn model..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-oled-elevated border-gray-border z-50">
-                        {AVAILABLE_MODELS.map((m) => (
-                          <SelectItem key={m.id} value={m.id} className="text-foreground focus:bg-neon-purple/10 focus:text-foreground">
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <ModelCombobox value={model} onValueChange={handleModelChange} />
                 </div>
 
                 {/* Save button at bottom */}
