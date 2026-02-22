@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye } from "lucide-react";
+import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { createCharacter } from "@/services/characterDb";
 import {
   TavernCardV2,
   TavernCardV2Data,
@@ -28,10 +31,12 @@ const sectionCard =
   "rounded-xl border border-gray-border bg-oled-surface/50 p-4 space-y-4";
 
 const CreatePage = () => {
+  const navigate = useNavigate();
   const [card, setCard] = useState<TavernCardV2>(createEmptyTavernCard());
   const [tagInput, setTagInput] = useState("");
   const [greetingDraft, setGreetingDraft] = useState("");
   const [bookOpen, setBookOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const data = card.data;
 
@@ -108,19 +113,29 @@ const CreatePage = () => {
     updateBook({ entries: data.character_book.entries.filter((_, i) => i !== idx) });
   };
 
-  const handleExportJSON = () => {
+  const handleSave = async () => {
     if (!data.name.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng nhập tên nhân vật trước khi xuất.", variant: "destructive" });
+      toast({ title: "Lỗi", description: "Vui lòng nhập tên nhân vật trước khi lưu.", variant: "destructive" });
       return;
     }
-    const blob = new Blob([JSON.stringify(card, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${data.name.replace(/\s+/g, "_")}_v2.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Đã xuất!", description: `${data.name}_v2.json đã được tải về.` });
+
+    setIsSaving(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        toast({ title: "Lỗi", description: "Bạn cần đăng nhập để lưu nhân vật.", variant: "destructive" });
+        setIsSaving(false);
+        return;
+      }
+
+      const saved = await createCharacter(card, session.session.user.id);
+      toast({ title: "Thành công! 🎉", description: "Tạo nhân vật thành công!" });
+      navigate(`/chat?characterId=${saved.id}`);
+    } catch (err: any) {
+      toast({ title: "Lỗi", description: err.message || "Không thể lưu nhân vật.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePreview = () => {
@@ -146,9 +161,9 @@ const CreatePage = () => {
             <Eye size={14} />
             <span className="hidden sm:inline ml-1">Xem trước</span>
           </Button>
-          <Button size="sm" onClick={handleExportJSON} className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple">
-            <Save size={14} />
-            <span className="hidden sm:inline ml-1">Xuất JSON</span>
+          <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple">
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            <span className="hidden sm:inline ml-1">{isSaving ? "Đang lưu..." : "Lưu Nhân Vật"}</span>
           </Button>
         </div>
       </div>
