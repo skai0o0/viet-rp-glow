@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Compass, ArrowRight, Sparkles } from "lucide-react";
+import { Compass, ArrowRight, Sparkles, Search, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CharacterCard from "@/components/CharacterCard";
 import { getPublicCharacters, CharacterSummary } from "@/services/characterDb";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,8 +15,38 @@ const HomePage = () => {
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<BannerData | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    characters.forEach((c) => c.tags?.forEach((t) => tags.add(t)));
+    return Array.from(tags).sort();
+  }, [characters]);
+
+  const filteredCharacters = useMemo(() => {
+    return characters.filter((c) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        c.description?.toLowerCase().includes(q) ||
+        c.short_summary?.toLowerCase().includes(q) ||
+        c.tags?.some((t) => t.toLowerCase().includes(q));
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.every((st) => c.tags?.includes(st));
+      return matchesSearch && matchesTags;
+    });
+  }, [characters, searchQuery, selectedTags]);
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
 
   useEffect(() => {
     getPublicCharacters()
@@ -141,7 +173,6 @@ const HomePage = () => {
 
             {/* Right side - Trapezoid image area */}
             <div className="relative w-full md:w-[40%] lg:w-[38%] min-h-[200px] md:min-h-0 overflow-hidden">
-              {/* Trapezoid clip path: slanted left edge on desktop */}
               <div
                 className="absolute inset-0"
                 style={{
@@ -168,7 +199,6 @@ const HomePage = () => {
                   </div>
                 )}
               </div>
-              {/* Gradient fade on the slanted edge */}
               <div
                 className="absolute inset-0 pointer-events-none hidden md:block"
                 style={{
@@ -205,13 +235,109 @@ const HomePage = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.5 }}
-          className="flex items-center gap-3 mb-8"
+          className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8"
         >
-          <Compass className="text-secondary" size={24} />
-          <h2 className="text-2xl font-bold text-foreground neon-text-purple">
-            Khám Phá Nhân Vật Nổi Bật
-          </h2>
+          <div className="flex items-center gap-3">
+            <Compass className="text-secondary" size={24} />
+            <h2 className="text-2xl font-bold text-foreground neon-text-purple whitespace-nowrap">
+              Khám Phá Nhân Vật Nổi Bật
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto">
+            {/* Tag filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={`relative shrink-0 border-gray-border bg-oled-surface hover:border-neon-blue hover:text-neon-blue ${selectedTags.length > 0 ? "border-neon-purple text-neon-purple" : "text-muted-foreground"}`}
+                >
+                  <Filter size={16} />
+                  {selectedTags.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-neon-purple text-[10px] text-white flex items-center justify-center">
+                      {selectedTags.length}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-72 bg-oled-surface border-gray-border p-3"
+                align="end"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-foreground">Lọc theo tag</p>
+                  {selectedTags.length > 0 && (
+                    <button
+                      onClick={() => setSelectedTags([])}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Xoá tất cả
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto scrollbar-thin">
+                  {allTags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      onClick={() => toggleTag(tag)}
+                      className={`cursor-pointer text-xs transition-colors ${
+                        selectedTags.includes(tag)
+                          ? "bg-neon-purple/20 border-neon-purple text-neon-purple"
+                          : "border-gray-border text-muted-foreground hover:border-neon-blue hover:text-neon-blue"
+                      }`}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                  {allTags.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Không có tag nào</p>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Search input */}
+            <div className="relative flex-1 sm:w-64 sm:flex-none">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm nhân vật..."
+                className="w-full h-9 pl-9 pr-8 rounded-lg bg-oled-surface border border-gray-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-blue transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
         </motion.div>
+
+        {/* Active tag filters */}
+        {selectedTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {selectedTags.map((tag) => (
+              <Badge
+                key={tag}
+                className="bg-neon-purple/20 border-neon-purple text-neon-purple cursor-pointer text-xs gap-1"
+                onClick={() => toggleTag(tag)}
+              >
+                {tag}
+                <X size={12} />
+              </Badge>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {loading
@@ -231,15 +357,21 @@ const HomePage = () => {
                   </div>
                 </div>
               ))
-            : characters.length === 0
+            : filteredCharacters.length === 0
               ? (
                 <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground">
                   <Compass size={48} className="mb-4 opacity-30" />
-                  <p className="text-lg">Chưa có nhân vật nào</p>
-                  <p className="text-sm mt-1">Hãy tạo nhân vật đầu tiên cho cộng đồng!</p>
+                  <p className="text-lg">
+                    {characters.length === 0 ? "Chưa có nhân vật nào" : "Không tìm thấy nhân vật phù hợp"}
+                  </p>
+                  <p className="text-sm mt-1">
+                    {characters.length === 0
+                      ? "Hãy tạo nhân vật đầu tiên cho cộng đồng!"
+                      : "Thử thay đổi từ khoá hoặc bộ lọc"}
+                  </p>
                 </div>
               )
-              : characters.map((char, i) => (
+              : filteredCharacters.map((char, i) => (
                 <motion.div
                   key={char.id}
                   initial={{ opacity: 0, y: 20 }}
