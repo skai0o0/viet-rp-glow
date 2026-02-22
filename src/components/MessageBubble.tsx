@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw, Trash2, Copy, Check } from "lucide-react";
+import { RotateCcw, Copy, Check, GitBranch } from "lucide-react";
 import { ChatMessage } from "@/types/character";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -11,7 +12,7 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
   isLastAssistant?: boolean;
   onRegenerate?: () => void;
-  onDelete?: (messageId: string) => void;
+  onBranch?: () => void;
 }
 
 const MessageBubble = ({
@@ -21,7 +22,7 @@ const MessageBubble = ({
   isStreaming,
   isLastAssistant,
   onRegenerate,
-  onDelete,
+  onBranch,
 }: MessageBubbleProps) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -108,6 +109,22 @@ const MessageBubble = ({
                 >
                   <RotateCcw size={12} />
                 </button>
+              )}
+
+              {onBranch && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={onBranch}
+                      className="p-1 rounded text-muted-foreground hover:text-neon-blue transition-colors"
+                    >
+                      <GitBranch size={12} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground">
+                    Tạo nhánh trò chuyện từ đây
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           )}

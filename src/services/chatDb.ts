@@ -90,6 +90,22 @@ export async function addMessage(
   return data as DbChatMessage;
 }
 
+/** Bulk insert messages into a session */
+export async function addMessages(
+  sessionId: string,
+  msgs: { role: "user" | "assistant"; content: string }[]
+): Promise<void> {
+  if (msgs.length === 0) return;
+  const rows = msgs.map((m) => ({ session_id: sessionId, role: m.role, content: m.content }));
+  const { error } = await supabase.from("chat_messages").insert(rows);
+  if (error) throw error;
+
+  await supabase
+    .from("chat_sessions")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", sessionId);
+}
+
 /** Update a message's content (for regen) */
 export async function updateMessage(messageId: string, content: string): Promise<void> {
   const { error } = await supabase
@@ -131,4 +147,28 @@ export async function updateSessionTitle(sessionId: string, title: string): Prom
     .update({ title })
     .eq("id", sessionId);
   if (error) throw error;
+}
+
+/**
+ * Branch a chat session at a specific message index (JSONB Snapshot approach).
+ * Slices messages 0..messageIndex (inclusive) and creates a new session with them.
+ */
+export async function branchChatSession(
+  currentSessionId: string,
+  userId: string,
+  characterId: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  messageIndex: number,
+  branchTitle: string
+): Promise<DbChatSession> {
+  // Slice messages up to and including the branch point
+  const branchedMessages = messages.slice(0, messageIndex + 1);
+
+  // Create new session
+  const newSession = await createSession(userId, characterId, branchTitle);
+
+  // Bulk insert snapshot messages
+  await addMessages(newSession.id, branchedMessages);
+
+  return newSession;
 }
