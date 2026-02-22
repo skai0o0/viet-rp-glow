@@ -13,6 +13,8 @@ import {
   getSessionMessages,
   addMessage,
   deleteLastAssistantMessage,
+  deleteMessage,
+  updateMessage,
   branchChatSession,
   DbChatSession,
 } from "@/services/chatDb";
@@ -331,6 +333,103 @@ const ChatPage = () => {
     return -1;
   })();
 
+  const lastUserIdx = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return i;
+    }
+    return -1;
+  })();
+
+  const handleDeleteMessage = useCallback(
+    async (msgId: string) => {
+      try {
+        await deleteMessage(msgId);
+        setMessages((prev) => prev.filter((m) => m.id !== msgId));
+        toast.success("Đã xóa tin nhắn");
+      } catch {
+        toast.error("Không thể xóa tin nhắn");
+      }
+    },
+    []
+  );
+
+  const handleEditAndResend = useCallback(
+    async (msgIndex: number, newContent: string) => {
+      if (!activeSessionId || !activeCharacter || isStreaming) return;
+      const msg = messages[msgIndex];
+
+      // Update the user message in DB
+      await updateMessage(msg.id, newContent);
+
+      // Delete the following assistant message if it exists
+      const nextMsg = messages[msgIndex + 1];
+      if (nextMsg && nextMsg.role === "assistant") {
+        await deleteMessage(nextMsg.id);
+      }
+
+      // Update state: replace user msg content, remove following assistant msg
+      const updatedMessages = messages.map((m, i) =>
+        i === msgIndex ? { ...m, content: newContent } : m
+      ).filter((_, i) => !(i === msgIndex + 1 && nextMsg?.role === "assistant"));
+
+      setMessages(updatedMessages);
+
+      // Now regenerate
+      setIsStreaming(true);
+      const assistantId = "streaming-" + Date.now();
+      let assistantContent = "";
+
+      const apiMessages = buildMessages(
+        activeCharacter,
+        updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+        undefined,
+        scenarioOverride
+      );
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
+      ]);
+
+      streamChat(
+        apiMessages,
+        {
+          onDelta: (text) => {
+            assistantContent += text;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
+            );
+          },
+          onDone: async () => {
+            setIsStreaming(false);
+            abortRef.current = null;
+            if (assistantContent) {
+              const saved = await addMessage(activeSessionId, "assistant", assistantContent);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
+                )
+              );
+            }
+          },
+          onError: (error) => {
+            setIsStreaming(false);
+            abortRef.current = null;
+            if (!assistantContent) {
+              setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+            }
+            toast.error(error);
+          },
+        },
+        controller.signal
+      );
+    },
+    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride]
+  );
+
   const handleSelectSession = useCallback(
     (id: string) => {
       const session = sessions.find((s) => s.id === id);
@@ -446,7 +545,10 @@ const ChatPage = () => {
                     characterAvatar={activeCharacter.avatar} characterName={activeCharacter.name}
                     isStreaming={isStreaming && msg.id === messages[messages.length - 1]?.id && msg.role === "assistant"}
                     isLastAssistant={idx === lastAssistantIdx}
-                    onRegenerate={handleRegenerate} onBranch={() => handleBranch(idx)} />
+                    isLastUser={idx === lastUserIdx}
+                    onRegenerate={handleRegenerate} onBranch={() => handleBranch(idx)}
+                    onDelete={() => handleDeleteMessage(msg.id)}
+                    onEdit={(newContent) => handleEditAndResend(idx, newContent)} />
                 ))}
               </AnimatePresence>
 
