@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { Compass, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import CharacterCard from "@/components/CharacterCard";
+import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
 import { getPublicCharacters, CharacterSummary } from "@/services/characterDb";
 
 const HubPage = () => {
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
 
   useEffect(() => {
     getPublicCharacters()
@@ -74,10 +77,15 @@ const HubPage = () => {
               </div>
             )
           : filtered.map((char) => (
-              <CharacterCard key={char.id} character={char} />
+              <CharacterCard key={char.id} character={char} onClick={() => setPreviewChar(char)} />
             ))
         }
       </div>
+
+      {previewChar && createPortal(
+        <CharacterPreviewDialog character={previewChar} onClose={() => setPreviewChar(null)} />,
+        document.body
+      )}
     </div>
   );
 };
