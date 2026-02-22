@@ -676,6 +676,18 @@ const CreatePage = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Save button */}
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-neon-purple text-white font-medium text-sm hover:bg-neon-purple/80 hover:shadow-neon-purple transition-all duration-200 disabled:opacity-50"
+                      >
+                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        {isSaving ? "Đang lưu..." : "Lưu Nhân Vật"}
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               </motion.div>
