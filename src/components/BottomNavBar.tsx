@@ -1,4 +1,4 @@
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,13 +9,13 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
 const navItems = [
   { icon: Home, label: "Khám phá", path: "/" },
   { icon: MessageSquare, label: "Chat", path: "/chat" },
   { icon: PlusCircle, label: "Tạo", path: "/create" },
-  { icon: Settings, label: "Cài đặt", path: "/settings" },
 ];
 
 const BottomNavBar = () => {
@@ -69,7 +69,7 @@ const BottomNavBar = () => {
         );
       })}
 
-      {/* Profile / Auth item */}
+      {/* Settings dropdown */}
       {user ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -80,29 +80,34 @@ const BottomNavBar = () => {
               >
                 <div
                   className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
-                    location.pathname === "/profile"
+                    location.pathname === "/settings"
                       ? "text-neon-purple bg-neon-purple/10"
                       : "text-muted-foreground"
                   }`}
                 >
-                  <User size={20} />
+                  <Settings size={20} />
                 </div>
                 <span
                   className={`text-[10px] transition-colors duration-200 ${
-                    location.pathname === "/profile" ? "text-neon-purple font-medium" : "text-muted-foreground"
+                    location.pathname === "/settings" ? "text-neon-purple font-medium" : "text-muted-foreground"
                   }`}
                 >
-                  Hồ sơ
+                  Cài đặt
                 </span>
               </motion.div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="end" className="bg-oled-elevated border-gray-border w-48 mb-2">
-            <DropdownMenuItem onClick={() => navigate("/profile")} className="text-foreground focus:bg-oled-surface cursor-pointer">
-              <User size={14} className="mr-2" /> Hồ sơ của tôi
-            </DropdownMenuItem>
+          <DropdownMenuContent side="top" align="center" className="bg-oled-elevated border-gray-border w-52 mb-2 z-50">
             <DropdownMenuItem onClick={() => navigate("/settings")} className="text-foreground focus:bg-oled-surface cursor-pointer">
               <Key size={14} className="mr-2" /> Thẻ API của tôi
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-gray-border" />
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Trạng thái</DropdownMenuLabel>
+            <DropdownMenuItem className="text-foreground focus:bg-oled-surface cursor-pointer">
+              <UserCheck size={14} className="mr-2 text-neon-blue" /> Hướng ngoại (Online)
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-foreground focus:bg-oled-surface cursor-pointer">
+              <UserX size={14} className="mr-2 text-muted-foreground" /> Hướng nội (Ẩn)
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-border" />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 cursor-pointer">
@@ -110,6 +115,45 @@ const BottomNavBar = () => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      ) : (
+        <NavLink to="/settings" className="flex-1">
+          <motion.div
+            whileTap={{ scale: 0.9 }}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div className="flex items-center justify-center w-10 h-8 rounded-lg text-muted-foreground transition-colors duration-200">
+              <Settings size={20} />
+            </div>
+            <span className="text-[10px] text-muted-foreground">Cài đặt</span>
+          </motion.div>
+        </NavLink>
+      )}
+
+      {/* Profile - direct link */}
+      {user ? (
+        <NavLink to="/profile" className="flex-1">
+          <motion.div
+            whileTap={{ scale: 0.9 }}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div
+              className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
+                location.pathname === "/profile"
+                  ? "text-neon-purple bg-neon-purple/10"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <User size={20} />
+            </div>
+            <span
+              className={`text-[10px] transition-colors duration-200 ${
+                location.pathname === "/profile" ? "text-neon-purple font-medium" : "text-muted-foreground"
+              }`}
+            >
+              Hồ sơ
+            </span>
+          </motion.div>
+        </NavLink>
       ) : (
         <NavLink to="/auth" className="flex-1">
           <motion.div
