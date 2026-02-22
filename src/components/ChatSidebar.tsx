@@ -20,6 +20,7 @@ const ChatSidebar = ({ open, onClose, activeCharacter, onSelectCharacter }: Chat
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
             onClick={onClose}
             className="fixed inset-0 bg-black/60 z-40 md:hidden"
           />
@@ -30,10 +31,10 @@ const ChatSidebar = ({ open, onClose, activeCharacter, onSelectCharacter }: Chat
       <AnimatePresence>
         {open && (
           <motion.aside
-            initial={{ x: -280 }}
-            animate={{ x: 0 }}
-            exit={{ x: -280 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            initial={{ x: "-100%", opacity: 0.5 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "-100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
             className="fixed md:relative z-50 w-[280px] h-full bg-oled-surface border-r border-gray-border flex flex-col"
           >
             {/* Sidebar header */}
