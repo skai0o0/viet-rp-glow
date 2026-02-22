@@ -1,48 +1,153 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Menu, Plus } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
-import { marinCharacter, mockMessages } from "@/data/mockData";
 import { buildMessages } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
-import { getCharacterById, dbCharToCard } from "@/services/characterDb";
+import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
+import {
+  getUserSessions,
+  createSession,
+  deleteSession,
+  getSessionMessages,
+  addMessage,
+  deleteLastAssistantMessage,
+  DbChatSession,
+} from "@/services/chatDb";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ChatHeader from "@/components/ChatHeader";
 import ChatSidebar from "@/components/ChatSidebar";
 import ChatInput from "@/components/ChatInput";
 import MessageBubble from "@/components/MessageBubble";
 import TypingIndicator from "@/components/TypingIndicator";
+import { Button } from "@/components/ui/button";
 
 const ChatPage = () => {
   const { characterId } = useParams<{ characterId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeCharacter, setActiveCharacter] = useState<CharacterCard>(marinCharacter);
-  const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
+  const [activeCharacter, setActiveCharacter] = useState<CharacterCard | null>(null);
+  const [activeCharId, setActiveCharId] = useState<string | null>(characterId || null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [sessions, setSessions] = useState<DbChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [charMap, setCharMap] = useState<Map<string, CharacterSummary>>(new Map());
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Load character from DB if characterId param is present
+  // Load character from URL param
   useEffect(() => {
     if (!characterId) return;
+    setActiveCharId(characterId);
     getCharacterById(characterId)
       .then((dbChar) => {
         const card = dbCharToCard(dbChar);
         setActiveCharacter(card);
-        setMessages([
-          {
-            id: "first",
-            role: "assistant",
-            content: card.first_mes,
-            timestamp: new Date(),
-          },
-        ]);
+        setCharMap((prev) => {
+          const next = new Map(prev);
+          next.set(characterId, {
+            id: dbChar.id,
+            name: dbChar.name,
+            avatar_url: dbChar.avatar_url,
+            short_summary: dbChar.short_summary,
+            tags: dbChar.tags,
+            description: dbChar.description,
+          });
+          return next;
+        });
       })
-      .catch(() => {
-        toast.error("Không thể tải nhân vật này");
-      });
+      .catch(() => toast.error("Không thể tải nhân vật này"));
   }, [characterId]);
+
+  // Load sessions when user or character changes
+  useEffect(() => {
+    if (!user) return;
+    getUserSessions()
+      .then(setSessions)
+      .catch(() => setSessions([]));
+  }, [user]);
+
+  // Auto-create or load session when character loaded
+  useEffect(() => {
+    if (!user || !activeCharId || !activeCharacter) return;
+    if (activeSessionId) return; // already have a session
+
+    // Find existing sessions for this character
+    const charSessions = sessions.filter((s) => s.character_id === activeCharId);
+    if (charSessions.length > 0) {
+      // Load the most recent one
+      loadSession(charSessions[0].id);
+    } else {
+      // Create new session
+      handleNewChat();
+    }
+  }, [user, activeCharId, activeCharacter, sessions.length]);
+
+  const loadSession = async (sessionId: string) => {
+    try {
+      const msgs = await getSessionMessages(sessionId);
+      setActiveSessionId(sessionId);
+      setMessages(
+        msgs.map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          timestamp: new Date(m.created_at),
+        }))
+      );
+    } catch {
+      toast.error("Không thể tải tin nhắn");
+    }
+  };
+
+  const handleNewChat = async () => {
+    if (!user || !activeCharId || !activeCharacter) return;
+    abortRef.current?.abort();
+    setIsStreaming(false);
+
+    try {
+      const session = await createSession(user.id, activeCharId, activeCharacter.name);
+      // Add first message
+      const firstMsg = await addMessage(session.id, "assistant", activeCharacter.first_mes);
+      setActiveSessionId(session.id);
+      setMessages([
+        {
+          id: firstMsg.id,
+          role: "assistant",
+          content: activeCharacter.first_mes,
+          timestamp: new Date(firstMsg.created_at),
+        },
+      ]);
+      setSessions((prev) => [session, ...prev]);
+    } catch {
+      toast.error("Không thể tạo cuộc trò chuyện mới");
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      await deleteSession(sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null);
+        setMessages([]);
+        // Load another session if available
+        const remaining = sessions.filter((s) => s.id !== sessionId);
+        if (remaining.length > 0) {
+          loadSession(remaining[0].id);
+        }
+      }
+      toast.success("Đã xoá cuộc trò chuyện");
+    } catch {
+      toast.error("Không thể xoá cuộc trò chuyện");
+    }
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -50,41 +155,112 @@ const ChatPage = () => {
     }
   }, [messages, isStreaming]);
 
-  const handleSend = useCallback((content: string) => {
-    if (!getApiKey()) {
-      toast.error("Vui lòng nhập API Key của OpenRouter trong phần Cài Đặt.", {
-        action: {
-          label: "Đi tới Cài Đặt",
-          onClick: () => window.location.href = "/settings",
+  const handleSend = useCallback(
+    async (content: string) => {
+      if (!getApiKey()) {
+        toast.error("Vui lòng nhập API Key của OpenRouter trong phần Cài Đặt.", {
+          action: {
+            label: "Đi tới Cài Đặt",
+            onClick: () => navigate("/settings"),
+          },
+        });
+        return;
+      }
+      if (!activeSessionId || !activeCharacter) return;
+
+      // Save user message to DB
+      const savedUserMsg = await addMessage(activeSessionId, "user", content);
+
+      const userMsg: ChatMessage = {
+        id: savedUserMsg.id,
+        role: "user",
+        content,
+        timestamp: new Date(savedUserMsg.created_at),
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setIsStreaming(true);
+
+      const assistantId = "streaming-" + Date.now();
+      let assistantContent = "";
+
+      const allMessages = [...messages, userMsg];
+      const apiMessages = buildMessages(
+        activeCharacter,
+        allMessages.map((m) => ({ role: m.role, content: m.content }))
+      );
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
+      ]);
+
+      streamChat(
+        apiMessages,
+        {
+          onDelta: (text) => {
+            assistantContent += text;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content: assistantContent } : m
+              )
+            );
+          },
+          onDone: async () => {
+            setIsStreaming(false);
+            abortRef.current = null;
+            // Save to DB
+            if (assistantContent) {
+              const saved = await addMessage(activeSessionId, "assistant", assistantContent);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) }
+                    : m
+                )
+              );
+            }
+          },
+          onError: (error) => {
+            setIsStreaming(false);
+            abortRef.current = null;
+            if (!assistantContent) {
+              setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+            }
+            toast.error(error);
+          },
         },
-      });
-      return;
-    }
+        controller.signal
+      );
+    },
+    [messages, activeCharacter, activeSessionId, navigate]
+  );
 
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content,
-      timestamp: new Date(),
-    };
+  const handleRegenerate = useCallback(async () => {
+    if (!activeSessionId || !activeCharacter || isStreaming) return;
 
-    setMessages((prev) => [...prev, userMsg]);
+    // Remove last assistant message from DB
+    await deleteLastAssistantMessage(activeSessionId);
+
+    // Remove from local state
+    const withoutLast = messages.slice(0, -1);
+    setMessages(withoutLast);
     setIsStreaming(true);
 
-    const assistantId = (Date.now() + 1).toString();
+    const assistantId = "streaming-" + Date.now();
     let assistantContent = "";
 
-    // Build messages for API
-    const allMessages = [...messages, userMsg];
     const apiMessages = buildMessages(
       activeCharacter,
-      allMessages.map((m) => ({ role: m.role, content: m.content }))
+      withoutLast.map((m) => ({ role: m.role, content: m.content }))
     );
 
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Create initial empty assistant message
     setMessages((prev) => [
       ...prev,
       { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
@@ -101,14 +277,23 @@ const ChatPage = () => {
             )
           );
         },
-        onDone: () => {
+        onDone: async () => {
           setIsStreaming(false);
           abortRef.current = null;
+          if (assistantContent) {
+            const saved = await addMessage(activeSessionId, "assistant", assistantContent);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) }
+                  : m
+              )
+            );
+          }
         },
         onError: (error) => {
           setIsStreaming(false);
           abortRef.current = null;
-          // Remove empty assistant message on error
           if (!assistantContent) {
             setMessages((prev) => prev.filter((m) => m.id !== assistantId));
           }
@@ -117,30 +302,94 @@ const ChatPage = () => {
       },
       controller.signal
     );
-  }, [messages, activeCharacter]);
+  }, [messages, activeCharacter, activeSessionId, isStreaming]);
 
-  const handleSelectCharacter = (char: CharacterCard) => {
-    // Abort ongoing stream
-    abortRef.current?.abort();
-    setIsStreaming(false);
+  const lastAssistantIdx = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return i;
+    }
+    return -1;
+  })();
 
-    setActiveCharacter(char);
-    const firstMsg: ChatMessage = {
-      id: "first",
-      role: "assistant",
-      content: char.first_mes,
-      timestamp: new Date(),
-    };
-    setMessages([firstMsg]);
-  };
+  // No character selected state
+  if (!activeCharacter) {
+    return (
+      <div className="flex-1 flex overflow-hidden">
+        <ChatSidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          sessions={sessions}
+          characters={charMap}
+          activeSessionId={activeSessionId}
+          onSelectSession={(id) => {
+            const session = sessions.find((s) => s.id === id);
+            if (session) {
+              setActiveCharId(session.character_id);
+              getCharacterById(session.character_id).then((dbChar) => {
+                setActiveCharacter(dbCharToCard(dbChar));
+                loadSession(id);
+              });
+            }
+          }}
+          onNewChat={() => {}}
+          onDeleteSession={handleDeleteSession}
+        />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="absolute top-4 left-4 p-2 text-muted-foreground hover:text-foreground transition-colors md:hidden"
+          >
+            <Menu size={20} />
+          </button>
+          <MessageSquareIcon />
+          <p className="text-lg font-medium">Chọn nhân vật để bắt đầu trò chuyện</p>
+          <Button
+            variant="outline"
+            className="border-gray-border text-muted-foreground hover:border-neon-purple hover:text-neon-purple"
+            onClick={() => navigate("/")}
+          >
+            Khám phá nhân vật
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex overflow-hidden">
       <ChatSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        activeCharacter={activeCharacter}
-        onSelectCharacter={handleSelectCharacter}
+        sessions={sessions}
+        characters={charMap}
+        activeSessionId={activeSessionId}
+        onSelectSession={(id) => {
+          const session = sessions.find((s) => s.id === id);
+          if (session && session.character_id !== activeCharId) {
+            setActiveCharId(session.character_id);
+            getCharacterById(session.character_id).then((dbChar) => {
+              setActiveCharacter(dbCharToCard(dbChar));
+              setCharMap((prev) => {
+                const next = new Map(prev);
+                next.set(dbChar.id, {
+                  id: dbChar.id,
+                  name: dbChar.name,
+                  avatar_url: dbChar.avatar_url,
+                  short_summary: dbChar.short_summary,
+                  tags: dbChar.tags,
+                  description: dbChar.description,
+                });
+                return next;
+              });
+              loadSession(id);
+            });
+          } else {
+            loadSession(id);
+          }
+        }}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
+        characterName={activeCharacter.name}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -155,6 +404,7 @@ const ChatPage = () => {
             <ChatHeader
               character={activeCharacter}
               onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+              onNewChat={handleNewChat}
             />
           </div>
         </div>
@@ -170,13 +420,19 @@ const ChatPage = () => {
           )}
 
           <AnimatePresence>
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <MessageBubble
                 key={msg.id}
                 message={msg}
                 characterAvatar={activeCharacter.avatar}
                 characterName={activeCharacter.name}
-                isStreaming={isStreaming && msg.id === messages[messages.length - 1]?.id && msg.role === "assistant"}
+                isStreaming={
+                  isStreaming &&
+                  msg.id === messages[messages.length - 1]?.id &&
+                  msg.role === "assistant"
+                }
+                isLastAssistant={idx === lastAssistantIdx}
+                onRegenerate={handleRegenerate}
               />
             ))}
           </AnimatePresence>
@@ -191,5 +447,14 @@ const ChatPage = () => {
     </div>
   );
 };
+
+// Simple icon component for empty state
+const MessageSquareIcon = () => (
+  <div className="w-16 h-16 rounded-2xl bg-oled-surface border border-gray-border flex items-center justify-center">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-neon-purple/50">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  </div>
+);
 
 export default ChatPage;
