@@ -1,21 +1,25 @@
-import { Home, MessageSquare, PlusCircle, Settings, User } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const topItems = [
   { icon: Home, label: "Khám phá", path: "/" },
   { icon: MessageSquare, label: "Cuộc trò chuyện", path: "/chat" },
   { icon: PlusCircle, label: "Tạo nhân vật", path: "/create" },
-];
-
-const bottomItems = [
-  { icon: Settings, label: "Cài đặt", path: "/settings" },
-  { icon: User, label: "Hồ sơ", path: "/profile" },
 ];
 
 const NavItem = ({
@@ -59,6 +63,16 @@ const NavItem = ({
 };
 
 const NavigationRail = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogout = async () => {
+    await logout();
+    toast.success("Đã đăng xuất");
+    navigate("/");
+  };
+
   return (
     <nav className="hidden md:flex flex-col items-center w-16 h-screen bg-oled-surface border-r border-gray-border py-4 flex-shrink-0">
       {/* Brand */}
@@ -75,9 +89,54 @@ const NavigationRail = () => {
 
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
-        {bottomItems.map((item) => (
-          <NavItem key={item.path} item={item} />
-        ))}
+        <NavItem item={{ icon: Settings, label: "Cài đặt", path: "/settings" }} />
+
+        {user ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
+                  location.pathname === "/profile"
+                    ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
+                }`}
+              >
+                <User size={20} />
+              </motion.button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="end" className="bg-oled-elevated border-gray-border w-48">
+              <DropdownMenuItem onClick={() => navigate("/profile")} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                <User size={14} className="mr-2" /> Hồ sơ của tôi
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/settings")} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                <Key size={14} className="mr-2" /> Thẻ API của tôi
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-gray-border" />
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 cursor-pointer">
+                <LogOut size={14} className="mr-2" /> Đăng xuất
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <NavLink to="/auth" className="block">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex items-center justify-center w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-oled-elevated transition-colors"
+                >
+                  <User size={20} />
+                </motion.div>
+              </NavLink>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
+              Đăng nhập
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </nav>
   );

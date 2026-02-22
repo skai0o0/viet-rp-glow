@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { Send, LogIn } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -10,6 +12,8 @@ interface ChatInputProps {
 const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleSend = () => {
     if (!value.trim() || disabled) return;
@@ -23,6 +27,22 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       handleSend();
     }
   };
+
+  if (!user) {
+    return (
+      <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate("/auth", { state: { from: "/chat" } })}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-neon-blue/10 border border-neon-blue/30 text-neon-blue font-medium text-sm shadow-[0_0_12px_rgba(0,240,255,0.15)] hover:shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all duration-300"
+        >
+          <LogIn size={18} />
+          Vui lòng đăng nhập để bắt đầu trò chuyện
+        </motion.button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border">
