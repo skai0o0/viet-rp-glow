@@ -598,58 +598,86 @@ const CreatePage = () => {
             </TabsContent>
           </Tabs>
 
-          {/* Live Preview Panel */}
+          {/* Fullscreen Preview Dialog */}
           <AnimatePresence>
             {showPreview && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={() => setShowPreview(false)}
               >
-                <div className={sectionCard}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Eye size={14} className="text-neon-blue" />
-                    <span className="text-sm font-semibold text-foreground">Xem trước Card</span>
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                  className="w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Close button */}
+                  <button
+                    onClick={() => setShowPreview(false)}
+                    className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-oled-base/80 border border-gray-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+
+                  {/* Avatar Image */}
+                  <div className="relative w-full aspect-[3/4] overflow-hidden">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-oled-elevated to-oled-base flex items-center justify-center">
+                        <span className="text-7xl font-bold text-secondary">
+                          {data.name?.charAt(0)?.toUpperCase() || "?"}
+                        </span>
+                      </div>
+                    )}
+                    {/* Gradient overlay at bottom */}
+                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-oled-surface to-transparent" />
                   </div>
-                  <div className="max-w-xs mx-auto">
-                    <div className="bg-oled-surface rounded-2xl border border-gray-border overflow-hidden shadow-lg">
-                      {/* Image Section */}
-                      <div className="relative aspect-[4/3] w-full overflow-hidden">
-                        {avatarPreview ? (
-                          <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-oled-elevated to-oled-base flex items-center justify-center">
-                            <span className="text-4xl font-bold text-secondary">
-                              {data.name?.charAt(0)?.toUpperCase() || "?"}
+
+                  {/* Info */}
+                  <div className="p-5 -mt-10 relative space-y-4">
+                    <h2 className="text-2xl font-bold text-foreground">
+                      {data.name || "Tên nhân vật"}
+                    </h2>
+
+                    {data.description && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Mô tả</h4>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                          {data.description}
+                        </p>
+                      </div>
+                    )}
+
+                    {data.personality && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tính cách</h4>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                          {data.personality}
+                        </p>
+                      </div>
+                    )}
+
+                    {data.tags.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tags</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {data.tags.map((tag) => (
+                            <span key={tag} className="text-xs bg-oled-elevated text-primary rounded-full px-3 py-1 border border-gray-border">
+                              {tag}
                             </span>
-                          </div>
-                        )}
+                          ))}
+                        </div>
                       </div>
-                      {/* Info Section */}
-                      <div className="p-4">
-                        <h3 className="text-lg font-bold text-foreground truncate">
-                          {data.name || "Tên nhân vật"}
-                        </h3>
-                        {data.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                            {data.description.slice(0, 200)}
-                          </p>
-                        )}
-                        {data.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {data.tags.slice(0, 5).map((tag) => (
-                              <span key={tag} className="text-xs bg-oled-elevated text-primary rounded-full px-2 py-1">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    )}
                   </div>
-                </div>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
