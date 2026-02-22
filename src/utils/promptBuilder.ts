@@ -1,4 +1,5 @@
 import { CharacterCard } from "@/types/character";
+import { getCachedUserPersona } from "@/services/profileDb";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -34,6 +35,12 @@ export function buildSystemPrompt(character: CharacterCard, userName: string = "
   const ext = character as any;
   if (ext.system_prompt) {
     parts.push(ext.system_prompt);
+  }
+
+  // Append user persona description
+  const persona = getCachedUserPersona();
+  if (persona.userDescription) {
+    parts.push(`[User's Details: ${persona.userDescription}]`);
   }
 
   const combined = parts.join("\n\n");
@@ -94,14 +101,16 @@ export function parseMesExample(mesExample: string, charName: string, userName: 
 export function buildMessages(
   character: CharacterCard,
   chatHistory: { role: "user" | "assistant"; content: string }[],
-  userName: string = "User"
+  userName?: string
 ): OpenRouterMessage[] {
+  const persona = getCachedUserPersona();
+  const resolvedUserName = userName || persona.displayName || "User";
   const messages: OpenRouterMessage[] = [];
 
   // 1. System prompt
   messages.push({
     role: "system",
-    content: buildSystemPrompt(character, userName),
+    content: buildSystemPrompt(character, resolvedUserName),
   });
 
   // 2. Example messages (if any)
