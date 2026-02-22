@@ -180,6 +180,25 @@ const HomePage = () => {
         </motion.div>
       </section>
 
+      {/* Announcement Banner */}
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="rounded-2xl border border-neon-blue/20 bg-oled-surface/80 backdrop-blur-sm px-5 py-4"
+        >
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <span className="text-neon-blue font-semibold mr-1.5">📢 Sắp ra mắt:</span>
+            Hỗ trợ <span className="text-foreground font-medium">OpenAI</span> và{" "}
+            <span className="text-foreground font-medium">Google GenAI</span> đang được phát triển.{" "}
+            <span className="text-foreground font-medium">LM Studio</span> &{" "}
+            <span className="text-foreground font-medium">Ollama</span>{" "}
+            <span className="italic text-muted-foreground/70">— đang cân nhắc 🤔</span>
+          </p>
+        </motion.div>
+      </section>
+
       {/* Discover Section */}
       <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-16 pb-10">
         <motion.div
