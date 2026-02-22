@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, Upload } from "lucide-react";
+import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, Upload, ImagePlus } from "lucide-react";
 import { readJsonFile } from "@/utils/importCharacterJson";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +39,11 @@ const CreatePage = () => {
   const [bookOpen, setBookOpen] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const jsonInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Feature flag: set to true to show import button for all users
   const SHOW_IMPORT_FOR_ALL = false;
@@ -62,6 +66,18 @@ const CreatePage = () => {
 
   const updateData = (patch: Partial<TavernCardV2Data>) => {
     setCard((prev) => ({ ...prev, data: { ...prev.data, ...patch } }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Lỗi", description: "Ảnh quá lớn (tối đa 5MB).", variant: "destructive" });
+      return;
+    }
+    setAvatarFile(file);
+    const url = URL.createObjectURL(file);
+    setAvatarPreview(url);
   };
 
   // Tags
@@ -148,9 +164,24 @@ const CreatePage = () => {
         return;
       }
 
-      const saved = await createCharacter(card, session.session.user.id, isPublic);
+      let avatarUrl: string | null = null;
+      if (avatarFile) {
+        const userId = session.session.user.id;
+        const ext = avatarFile.name.split(".").pop() || "png";
+        const filePath = `${userId}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("character-avatars")
+          .upload(filePath, avatarFile, { upsert: true });
+        if (uploadErr) throw uploadErr;
+        const { data: urlData } = supabase.storage
+          .from("character-avatars")
+          .getPublicUrl(filePath);
+        avatarUrl = urlData.publicUrl;
+      }
+
+      const saved = await createCharacter(card, session.session.user.id, isPublic, undefined, avatarUrl);
       toast({ title: "Thành công! 🎉", description: "Tạo nhân vật thành công!" });
-      navigate(`/chat?characterId=${saved.id}`);
+      navigate(`/chat/${saved.id}`);
     } catch (err: any) {
       toast({ title: "Lỗi", description: err.message || "Không thể lưu nhân vật.", variant: "destructive" });
     } finally {
@@ -159,8 +190,7 @@ const CreatePage = () => {
   };
 
   const handlePreview = () => {
-    console.log("TavernCardV2 Preview:", JSON.stringify(card, null, 2));
-    toast({ title: "Xem trước", description: "Dữ liệu JSON đã được ghi ra Console." });
+    setShowPreview((prev) => !prev);
   };
 
   return (
@@ -220,6 +250,49 @@ const CreatePage = () => {
 
             {/* ===== BASIC TAB ===== */}
             <TabsContent value="basic" className="space-y-4 mt-4">
+              {/* Avatar Upload */}
+              <div className={sectionCard}>
+                <div className="flex items-center gap-2 mb-2">
+                  <ImagePlus size={14} className="text-neon-purple" />
+                  <span className="text-sm font-semibold text-foreground">Ảnh đại diện</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-border hover:border-neon-purple/50 bg-oled-elevated flex items-center justify-center cursor-pointer transition-colors overflow-hidden group"
+                  >
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-neon-purple transition-colors">
+                        <ImagePlus size={24} />
+                        <span className="text-[10px]">Tải ảnh</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">JPG, PNG, WebP — Tối đa 5MB</p>
+                    {avatarPreview && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setAvatarFile(null); setAvatarPreview(null); }}
+                        className="text-xs text-muted-foreground hover:text-destructive mt-1 h-7 px-2"
+                      >
+                        <X size={12} className="mr-1" /> Xóa ảnh
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className={sectionCard}>
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles size={14} className="text-neon-purple" />
@@ -524,6 +597,62 @@ const CreatePage = () => {
               )}
             </TabsContent>
           </Tabs>
+
+          {/* Live Preview Panel */}
+          <AnimatePresence>
+            {showPreview && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className={sectionCard}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Eye size={14} className="text-neon-blue" />
+                    <span className="text-sm font-semibold text-foreground">Xem trước Card</span>
+                  </div>
+                  <div className="max-w-xs mx-auto">
+                    <div className="bg-oled-surface rounded-2xl border border-gray-border overflow-hidden shadow-lg">
+                      {/* Image Section */}
+                      <div className="relative aspect-[4/3] w-full overflow-hidden">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-oled-elevated to-oled-base flex items-center justify-center">
+                            <span className="text-4xl font-bold text-secondary">
+                              {data.name?.charAt(0)?.toUpperCase() || "?"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Info Section */}
+                      <div className="p-4">
+                        <h3 className="text-lg font-bold text-foreground truncate">
+                          {data.name || "Tên nhân vật"}
+                        </h3>
+                        {data.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                            {data.description.slice(0, 200)}
+                          </p>
+                        )}
+                        {data.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {data.tags.slice(0, 5).map((tag) => (
+                              <span key={tag} className="text-xs bg-oled-elevated text-primary rounded-full px-2 py-1">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </div>
