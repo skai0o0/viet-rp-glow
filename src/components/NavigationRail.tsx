@@ -1,7 +1,8 @@
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -65,6 +66,7 @@ const NavItem = ({
 
 const NavigationRail = () => {
   const { user, logout } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -96,6 +98,36 @@ const NavigationRail = () => {
 
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
+        {/* Admin Hub - only for admins */}
+        {isAdmin && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <NavLink to="/admin" className="block">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
+                    location.pathname.startsWith("/admin")
+                      ? "text-neon-rose shadow-neon-rose bg-neon-rose/10"
+                      : "text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
+                  }`}
+                >
+                  <ShieldCheck size={20} />
+                  {location.pathname.startsWith("/admin") && (
+                    <motion.div
+                      layoutId="nav-indicator"
+                      className="absolute -left-[14px] w-[3px] h-5 rounded-r-full bg-neon-rose shadow-neon-rose"
+                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    />
+                  )}
+                </motion.div>
+              </NavLink>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
+              Admin Hub
+            </TooltipContent>
+          </Tooltip>
+        )}
         {/* Settings dropdown */}
         {user ? (
           <DropdownMenu>

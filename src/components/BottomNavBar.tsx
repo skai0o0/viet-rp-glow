@@ -1,7 +1,8 @@
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -22,6 +23,7 @@ const BottomNavBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isAdmin } = useIsAdmin();
 
   const handleLogout = async () => {
     await logout();
@@ -68,6 +70,33 @@ const BottomNavBar = () => {
           </NavLink>
         );
       })}
+
+      {/* Admin Hub - only for admins */}
+      {isAdmin && (
+        <NavLink to="/admin" className="flex-1">
+          <motion.div
+            whileTap={{ scale: 0.9 }}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div
+              className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
+                location.pathname.startsWith("/admin")
+                  ? "text-neon-rose bg-neon-rose/10"
+                  : "text-neon-rose/60"
+              }`}
+            >
+              <ShieldCheck size={20} />
+            </div>
+            <span
+              className={`text-[10px] transition-colors duration-200 ${
+                location.pathname.startsWith("/admin") ? "text-neon-rose font-medium" : "text-neon-rose/60"
+              }`}
+            >
+              Admin
+            </span>
+          </motion.div>
+        </NavLink>
+      )}
 
       {/* Settings dropdown */}
       {user ? (

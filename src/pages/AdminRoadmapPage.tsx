@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Navigate } from "react-router-dom";
 import { Loader2, Map, CheckCircle2, Circle, Clock, Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -50,26 +51,15 @@ const emptyItem: Omit<RoadmapItem, "id"> = {
 
 const AdminRoadmapPage = () => {
   const { user, isLoading: authLoading } = useAuth();
+  const { isAdmin, checking: checkingRole } = useIsAdmin();
   const [items, setItems] = useState<RoadmapItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [checkingRole, setCheckingRole] = useState(true);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Partial<RoadmapItem> & typeof emptyItem>(emptyItem);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-
-  // Check admin role
-  useEffect(() => {
-    if (!user) { setCheckingRole(false); return; }
-    supabase.rpc("has_role", { _user_id: user.id, _role: "admin" } as any)
-      .then(({ data }) => {
-        setIsAdmin(!!data);
-        setCheckingRole(false);
-      });
-  }, [user]);
 
   const fetchItems = useCallback(async () => {
     const { data, error } = await supabase
