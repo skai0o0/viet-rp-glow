@@ -1,22 +1,30 @@
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { Loader2, Map, CheckCircle2, Circle, Clock } from "lucide-react";
-import { motion } from "framer-motion";
+import { Loader2, Map, CheckCircle2, Circle, Clock, Plus, Pencil, Trash2, Save, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const ADMIN_EMAILS = ["hoangskai0o0nam2006@gmail.com"];
-function isAdmin(email?: string): boolean {
-  return !!email && ADMIN_EMAILS.includes(email);
-}
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type Status = "done" | "in-progress" | "planned";
 
 interface RoadmapItem {
+  id: string;
+  phase: string;
+  phase_label: string;
   title: string;
   description: string;
   status: Status;
+  sort_order: number;
 }
 
 interface RoadmapPhase {
@@ -25,80 +33,71 @@ interface RoadmapPhase {
   items: RoadmapItem[];
 }
 
-const roadmap: RoadmapPhase[] = [
-  {
-    phase: "Phase 1",
-    label: "Nền tảng cốt lõi",
-    items: [
-      { title: "Xác thực người dùng", description: "Đăng ký, đăng nhập, quản lý phiên với Supabase Auth", status: "done" },
-      { title: "Tạo nhân vật (TavernCardV2)", description: "Form tạo đầy đủ: tên, mô tả, personality, scenario, first message, alternate greetings", status: "done" },
-      { title: "Chỉnh sửa nhân vật", description: "Sửa mọi trường của nhân vật đã tạo, upload avatar", status: "done" },
-      { title: "Import nhân vật từ JSON", description: "Nhập file TavernCardV2 JSON để tạo nhân vật nhanh", status: "done" },
-      { title: "Chat AI qua OpenRouter", description: "Streaming chat, chọn model, cấu hình API key", status: "done" },
-      { title: "Lưu trữ dữ liệu cloud", description: "Nhân vật, chat sessions, messages lưu trên Supabase", status: "done" },
-    ],
-  },
-  {
-    phase: "Phase 2",
-    label: "Chat nâng cao",
-    items: [
-      { title: "Nhiều phiên chat", description: "Tạo, chuyển, xoá nhiều phiên chat cho mỗi nhân vật", status: "done" },
-      { title: "Sidebar lịch sử chat", description: "Danh sách phiên chat với tìm kiếm & quản lý", status: "done" },
-      { title: "Chỉnh sửa & xoá tin nhắn", description: "Sửa, xoá từng tin nhắn, regenerate phản hồi AI", status: "done" },
-      { title: "Branch chat session", description: "Tạo nhánh hội thoại mới từ một điểm bất kỳ", status: "done" },
-      { title: "Generation Settings", description: "Tuỳ chỉnh max tokens, phong cách trả lời, chọn model trong chat", status: "done" },
-      { title: "System prompt nâng cao", description: "Prompt builder tự động: persona, scenario, character book, macros {{user}}/{{char}}", status: "done" },
-      { title: "Character Book (Lorebook)", description: "Quản lý world info entries với keywords & conditions", status: "done" },
-    ],
-  },
-  {
-    phase: "Phase 3",
-    label: "Trải nghiệm người dùng",
-    items: [
-      { title: "Giao diện responsive", description: "Navigation rail (desktop), bottom nav (mobile), auto-fill grid layout", status: "done" },
-      { title: "Profile cá nhân", description: "Tên hiển thị, mô tả bản thân, quản lý nhân vật của tôi", status: "done" },
-      { title: "Cài đặt API & Model", description: "Nhập OpenRouter API key, verify key, chọn model mặc định", status: "done" },
-      { title: "NSFW Filter", description: "Lọc nhân vật NSFW theo tags & keywords, toggle NSFW mode", status: "done" },
-      { title: "Banner sự kiện", description: "Hiển thị banner quảng bá theo dịp đặc biệt từ database", status: "done" },
-      { title: "Tìm kiếm & lọc nhân vật", description: "Search bar, filter theo tags trên trang chủ", status: "done" },
-      { title: "Preview nhân vật", description: "Dialog xem trước thông tin nhân vật trước khi chat", status: "done" },
-    ],
-  },
-  {
-    phase: "Phase 4",
-    label: "Quản trị & Hệ thống",
-    items: [
-      { title: "Trang Admin", description: "Dashboard quản trị với kiểm soát truy cập theo email", status: "done" },
-      { title: "Global System Prompt", description: "Prompt âm thầm áp dụng cho mọi cuộc trò chuyện", status: "done" },
-      { title: "Admin import nhân vật", description: "Import JSON tạo nhân vật công khai từ admin", status: "done" },
-      { title: "Roadmap phát triển", description: "Trang hiển thị lộ trình tính năng cho admin", status: "done" },
-      { title: "Protected routes", description: "Bảo vệ trang Create, Settings, Profile, Admin", status: "done" },
-    ],
-  },
-  {
-    phase: "Phase 5",
-    label: "Dự kiến tương lai",
-    items: [
-      { title: "Hub nhân vật cộng đồng", description: "Duyệt, tìm kiếm & clone nhân vật từ cộng đồng", status: "in-progress" },
-      { title: "Chia sẻ nhân vật qua link", description: "Tạo link chia sẻ & cho phép clone nhân vật", status: "planned" },
-      { title: "Hệ thống thông báo", description: "Thông báo real-time cho người dùng", status: "planned" },
-      { title: "Đa ngôn ngữ (i18n)", description: "Hỗ trợ tiếng Anh & các ngôn ngữ khác", status: "planned" },
-      { title: "Nhóm chat & multi-character", description: "Chat với nhiều nhân vật trong cùng một phiên", status: "planned" },
-      { title: "Voice & TTS", description: "Đọc phản hồi AI bằng giọng nói", status: "planned" },
-    ],
-  },
-];
-
 const statusConfig: Record<Status, { icon: React.ElementType; label: string; color: string }> = {
   done: { icon: CheckCircle2, label: "Hoàn thành", color: "text-green-400" },
   "in-progress": { icon: Clock, label: "Đang làm", color: "text-yellow-400" },
   planned: { icon: Circle, label: "Dự kiến", color: "text-muted-foreground" },
 };
 
-const AdminRoadmapPage = () => {
-  const { user, isLoading } = useAuth();
+const emptyItem: Omit<RoadmapItem, "id"> = {
+  phase: "",
+  phase_label: "",
+  title: "",
+  description: "",
+  status: "planned",
+  sort_order: 0,
+};
 
-  if (isLoading) {
+const AdminRoadmapPage = () => {
+  const { user, isLoading: authLoading } = useAuth();
+  const [items, setItems] = useState<RoadmapItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingRole, setCheckingRole] = useState(true);
+
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Partial<RoadmapItem> & typeof emptyItem>(emptyItem);
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // Check admin role
+  useEffect(() => {
+    if (!user) { setCheckingRole(false); return; }
+    supabase.rpc("has_role", { _user_id: user.id, _role: "admin" } as any)
+      .then(({ data }) => {
+        setIsAdmin(!!data);
+        setCheckingRole(false);
+      });
+  }, [user]);
+
+  const fetchItems = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("roadmap_items")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    if (!error && data) {
+      setItems(data.map(d => ({ ...d, status: d.status as Status })));
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  // Group items by phase
+  const phases: RoadmapPhase[] = [];
+  const phaseMap: Record<string, RoadmapPhase> = {};
+  for (const item of items) {
+    let phase = phaseMap[item.phase];
+    if (!phase) {
+      phase = { phase: item.phase, label: item.phase_label, items: [] };
+      phaseMap[item.phase] = phase;
+      phases.push(phase);
+    }
+    phase.items.push(item);
+  }
+
+  if (authLoading || checkingRole) {
     return (
       <div className="flex-1 flex items-center justify-center bg-oled-base">
         <Loader2 size={24} className="animate-spin text-neon-purple" />
@@ -106,9 +105,94 @@ const AdminRoadmapPage = () => {
     );
   }
 
-  if (!user || !isAdmin(user.email)) {
+  if (!user || !isAdmin) {
     return <Navigate to="/" replace />;
   }
+
+  const openAdd = () => {
+    // Pre-fill phase from last item
+    const lastPhase = phases[phases.length - 1];
+    const maxOrder = items.length > 0 ? Math.max(...items.map(i => i.sort_order)) + 1 : 0;
+    setEditingItem({
+      ...emptyItem,
+      phase: lastPhase?.phase || "Phase 1",
+      phase_label: lastPhase?.label || "",
+      sort_order: maxOrder,
+    });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (item: RoadmapItem) => {
+    setEditingItem({ ...item });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editingItem.title.trim()) {
+      toast.error("Tiêu đề không được để trống");
+      return;
+    }
+    setSaving(true);
+    try {
+      if ("id" in editingItem && editingItem.id) {
+        // Update
+        const { error } = await supabase
+          .from("roadmap_items")
+          .update({
+            phase: editingItem.phase,
+            phase_label: editingItem.phase_label,
+            title: editingItem.title,
+            description: editingItem.description,
+            status: editingItem.status,
+            sort_order: editingItem.sort_order,
+          })
+          .eq("id", editingItem.id);
+        if (error) throw error;
+        toast.success("Đã cập nhật!");
+      } else {
+        // Insert
+        const { error } = await supabase
+          .from("roadmap_items")
+          .insert({
+            phase: editingItem.phase,
+            phase_label: editingItem.phase_label,
+            title: editingItem.title,
+            description: editingItem.description,
+            status: editingItem.status,
+            sort_order: editingItem.sort_order,
+          });
+        if (error) throw error;
+        toast.success("Đã thêm mục mới!");
+      }
+      setDialogOpen(false);
+      fetchItems();
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi lưu");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("roadmap_items").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Đã xoá!");
+      fetchItems();
+    }
+    setDeleteConfirm(null);
+  };
+
+  const handleStatusToggle = async (item: RoadmapItem) => {
+    const cycle: Status[] = ["planned", "in-progress", "done"];
+    const nextIdx = (cycle.indexOf(item.status) + 1) % cycle.length;
+    const { error } = await supabase
+      .from("roadmap_items")
+      .update({ status: cycle[nextIdx] })
+      .eq("id", item.id);
+    if (!error) fetchItems();
+  };
 
   return (
     <ScrollArea className="flex-1">
@@ -117,9 +201,14 @@ const AdminRoadmapPage = () => {
         animate={{ opacity: 1, y: 0 }}
         className="p-4 md:p-8 max-w-4xl mx-auto w-full space-y-8 pb-24"
       >
-        <div className="flex items-center gap-3">
-          <Map className="text-neon-blue" size={28} />
-          <h1 className="text-2xl font-bold text-foreground">Roadmap phát triển</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Map className="text-neon-blue" size={28} />
+            <h1 className="text-2xl font-bold text-foreground">Roadmap phát triển</h1>
+          </div>
+          <Button onClick={openAdd} size="sm" className="bg-neon-purple hover:bg-neon-purple/80 text-white">
+            <Plus size={14} className="mr-1" /> Thêm mục
+          </Button>
         </div>
 
         <div className="flex flex-wrap gap-4 text-sm">
@@ -130,39 +219,160 @@ const AdminRoadmapPage = () => {
           ))}
         </div>
 
-        {roadmap.map((phase, i) => (
-          <motion.div
-            key={phase.phase}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <Badge variant="outline" className="border-neon-purple text-neon-purple text-xs">
-                {phase.phase}
-              </Badge>
-              <span className="text-sm font-semibold text-foreground">{phase.label}</span>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 size={24} className="animate-spin text-neon-purple" />
+          </div>
+        ) : (
+          phases.map((phase, i) => (
+            <motion.div
+              key={phase.phase}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Badge variant="outline" className="border-neon-purple text-neon-purple text-xs">
+                  {phase.phase}
+                </Badge>
+                <span className="text-sm font-semibold text-foreground">{phase.label}</span>
+              </div>
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+                {phase.items.map((item) => {
+                  const { icon: StatusIcon, color } = statusConfig[item.status];
+                  return (
+                    <Card key={item.id} className="bg-oled-surface border-oled-border group relative">
+                      <CardHeader className="p-3 pb-1">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <button
+                            onClick={() => handleStatusToggle(item)}
+                            className="shrink-0 hover:scale-125 transition-transform"
+                            title="Click để đổi trạng thái"
+                          >
+                            <StatusIcon size={14} className={color} />
+                          </button>
+                          <span className="text-foreground flex-1">{item.title}</span>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <button onClick={() => openEdit(item)} className="text-muted-foreground hover:text-neon-blue">
+                              <Pencil size={12} />
+                            </button>
+                            <button onClick={() => setDeleteConfirm(item.id)} className="text-muted-foreground hover:text-red-400">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0">
+                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))
+        )}
+
+        {/* Edit/Add Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="bg-oled-surface border-oled-border max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">
+                {editingItem.id ? "Chỉnh sửa mục" : "Thêm mục mới"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Phase</Label>
+                  <Input
+                    value={editingItem.phase}
+                    onChange={e => setEditingItem(p => ({ ...p, phase: e.target.value }))}
+                    placeholder="Phase 1"
+                    className="bg-oled-base border-oled-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Nhãn Phase</Label>
+                  <Input
+                    value={editingItem.phase_label}
+                    onChange={e => setEditingItem(p => ({ ...p, phase_label: e.target.value }))}
+                    placeholder="Nền tảng cốt lõi"
+                    className="bg-oled-base border-oled-border text-foreground"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Tiêu đề</Label>
+                <Input
+                  value={editingItem.title}
+                  onChange={e => setEditingItem(p => ({ ...p, title: e.target.value }))}
+                  placeholder="Tên tính năng"
+                  className="bg-oled-base border-oled-border text-foreground"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Mô tả</Label>
+                <Textarea
+                  value={editingItem.description}
+                  onChange={e => setEditingItem(p => ({ ...p, description: e.target.value }))}
+                  placeholder="Mô tả chi tiết"
+                  className="bg-oled-base border-oled-border text-foreground min-h-[80px]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Trạng thái</Label>
+                  <Select
+                    value={editingItem.status}
+                    onValueChange={v => setEditingItem(p => ({ ...p, status: v as Status }))}
+                  >
+                    <SelectTrigger className="bg-oled-base border-oled-border text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="done">✅ Hoàn thành</SelectItem>
+                      <SelectItem value="in-progress">🔨 Đang làm</SelectItem>
+                      <SelectItem value="planned">⭕ Dự kiến</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Thứ tự</Label>
+                  <Input
+                    type="number"
+                    value={editingItem.sort_order}
+                    onChange={e => setEditingItem(p => ({ ...p, sort_order: parseInt(e.target.value) || 0 }))}
+                    className="bg-oled-base border-oled-border text-foreground"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-              {phase.items.map((item) => {
-                const { icon: StatusIcon, color } = statusConfig[item.status];
-                return (
-                  <Card key={item.title} className="bg-oled-surface border-oled-border">
-                    <CardHeader className="p-3 pb-1">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <StatusIcon size={14} className={color} />
-                        <span className="text-foreground">{item.title}</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      <p className="text-xs text-muted-foreground">{item.description}</p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </motion.div>
-        ))}
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setDialogOpen(false)}>Huỷ</Button>
+              <Button onClick={handleSave} disabled={saving} className="bg-neon-purple hover:bg-neon-purple/80 text-white">
+                {saving ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
+                Lưu
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirm Dialog */}
+        <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+          <DialogContent className="bg-oled-surface border-oled-border max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">Xác nhận xoá</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">Bạn có chắc muốn xoá mục này khỏi roadmap?</p>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>Huỷ</Button>
+              <Button variant="destructive" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>
+                <Trash2 size={14} className="mr-1" /> Xoá
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </motion.div>
     </ScrollArea>
   );
