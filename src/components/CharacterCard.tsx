@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
 import { CharacterSummary } from "@/services/characterDb";
+import { isCharacterNsfw } from "@/utils/nsfwFilter";
+import { Badge } from "@/components/ui/badge";
 
 interface CharacterCardProps {
   character: CharacterSummary;
@@ -8,6 +10,7 @@ interface CharacterCardProps {
 
 const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
   const initial = character.name?.charAt(0)?.toUpperCase() || "?";
+  const nsfw = isCharacterNsfw(character);
 
   return (
     <motion.div
@@ -29,6 +32,11 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
           <div className="w-full h-full bg-gradient-to-br from-oled-elevated to-oled-base flex items-center justify-center">
             <span className="text-4xl font-bold text-secondary">{initial}</span>
           </div>
+        )}
+        {nsfw && (
+          <Badge className="absolute bottom-2 right-2 bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
+            NSFW
+          </Badge>
         )}
       </div>
 
