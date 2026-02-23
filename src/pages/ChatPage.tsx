@@ -296,6 +296,9 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
+            } else {
+              // Remove empty assistant message if stream produced no content
+              setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
           },
           onError: (error) => {
