@@ -39,9 +39,17 @@ const ChatHeader = ({
   return (
     <header className="h-14 flex items-center justify-between pr-4 md:pr-6 bg-oled-base flex-shrink-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-oled-surface flex items-center justify-center text-neon-purple text-sm font-semibold border border-neon-purple/30">
-          {character.avatar}
-        </div>
+        {character.avatar && character.avatar.startsWith("http") ? (
+          <img
+            src={character.avatar}
+            alt={character.name}
+            className="w-8 h-8 rounded-full object-cover border border-neon-purple/30"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-oled-surface flex items-center justify-center text-neon-purple text-sm font-semibold border border-neon-purple/30">
+            {character.avatar || character.name?.charAt(0) || "AI"}
+          </div>
+        )}
         <div>
           <div className="flex items-center gap-1.5">
             <h2 className="text-sm font-semibold text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onNameClick}>{character.name}</h2>
