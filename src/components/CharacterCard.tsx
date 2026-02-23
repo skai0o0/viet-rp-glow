@@ -16,7 +16,7 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
     <motion.div
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="bg-oled-surface rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple hover:border-secondary hover:scale-[1.02] transition-all duration-200"
+      className="bg-oled-surface rounded-xl sm:rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple hover:border-secondary hover:scale-[1.02] transition-all duration-200"
       onClick={onClick}
     >
       {/* Image Section */}
@@ -41,21 +41,21 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
       </div>
 
       {/* Info Section */}
-      <div className="p-4">
-        <h3 className="text-lg font-bold text-foreground truncate">
+      <div className="p-2 sm:p-3">
+        <h3 className="text-sm sm:text-base font-bold text-foreground truncate">
           {character.name}
         </h3>
         {character.short_summary && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
             {character.short_summary}
           </p>
         )}
         {character.tags && character.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3">
-            {character.tags.slice(0, 5).map((tag) => (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {character.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="text-xs bg-oled-elevated text-primary rounded-full px-2 py-1"
+                className="text-[10px] sm:text-xs bg-oled-elevated text-primary rounded-full px-1.5 py-0.5"
               >
                 {tag}
               </span>
