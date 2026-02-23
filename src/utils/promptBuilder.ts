@@ -55,7 +55,7 @@ export function buildSystemPrompt(character: CharacterCard, userName: string = "
   }
 
   const combined = sections.join("\n\n");
-  return replaceMacros(combined, character.name, userName);
+  return combined;
 }
 
 /**
@@ -83,13 +83,13 @@ export function parseMesExample(mesExample: string, charName: string, userName: 
 
       if (userMatch) {
         if (currentRole && currentContent) {
-          messages.push({ role: currentRole, content: replaceMacros(currentContent.trim(), charName, userName) });
+          messages.push({ role: currentRole, content: currentContent.trim() });
         }
         currentRole = "user";
         currentContent = userMatch[1];
       } else if (charMatch) {
         if (currentRole && currentContent) {
-          messages.push({ role: currentRole, content: replaceMacros(currentContent.trim(), charName, userName) });
+          messages.push({ role: currentRole, content: currentContent.trim() });
         }
         currentRole = "assistant";
         currentContent = charMatch[1];
@@ -99,7 +99,7 @@ export function parseMesExample(mesExample: string, charName: string, userName: 
     }
 
     if (currentRole && currentContent) {
-      messages.push({ role: currentRole, content: replaceMacros(currentContent.trim(), charName, userName) });
+      messages.push({ role: currentRole, content: currentContent.trim() });
     }
   }
 
@@ -151,11 +151,7 @@ export function buildMessages(
 
   const stylePrompt = getResponseStylePrompt();
   if (stylePrompt) {
-    postParts.push(
-      stylePrompt
-        .replace(/\{\{char\}\}/gi, effectiveCharacter.name)
-        .replace(/\{\{user\}\}/gi, resolvedUserName)
-    );
+    postParts.push(stylePrompt);
   }
 
   // NSFW mode gate
