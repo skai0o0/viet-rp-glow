@@ -606,9 +606,17 @@ const ChatPage = () => {
                         }
                       }}
                     >
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold bg-oled-elevated text-neon-purple border border-neon-purple/20 flex-shrink-0">
-                        {initial}
-                      </div>
+                      {char?.avatar_url && char.avatar_url.startsWith("http") ? (
+                        <img
+                          src={char.avatar_url}
+                          alt={char.name}
+                          className="w-10 h-10 rounded-full object-cover border border-neon-purple/20 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold bg-oled-elevated text-neon-purple border border-neon-purple/20 flex-shrink-0">
+                          {initial}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground truncate">{displayTitle}</p>
                         <p className="text-[11px] text-muted-foreground truncate">
