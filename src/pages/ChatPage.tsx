@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { getCachedUserPersona } from "@/services/profileDb";
 import { Menu, Settings2, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
@@ -639,6 +640,7 @@ const ChatPage = () => {
                 {messages.map((msg, idx) => (
                   <MessageBubble key={msg.id} message={msg}
                     characterAvatar={activeCharacter.avatar} characterName={activeCharacter.name}
+                    userName={getCachedUserPersona().displayName}
                     isStreaming={isStreaming && msg.id === messages[messages.length - 1]?.id && msg.role === "assistant"}
                     isLastAssistant={idx === lastAssistantIdx}
                     isLastUser={idx === lastUserIdx}

@@ -1,4 +1,5 @@
 import React from "react";
+import { replaceMacros } from "@/utils/promptBuilder";
 
 interface Token {
   type: "dialogue" | "action" | "thought" | "text";
@@ -6,8 +7,8 @@ interface Token {
 }
 
 function tokenize(text: string): Token[] {
-  // Match: "..." or "..." (dialogue), *...* (action), (...) (thought)
-  const regex = /("(?:[^"\\]|\\.)*"|"[^"]*")|(\*(?:[^*\\]|\\.)*\*)|(\([^)]*\))/g;
+  // Match: "..." or \u201c...\u201d (dialogue), *...* (action), (...) (thought)
+  const regex = /("(?:[^"\\]|\\.)*"|\u201c[^\u201d]*\u201d)|(\*(?:[^*\\]|\\.)*\*)|(\([^)]*\))/g;
   const tokens: Token[] = [];
   let lastIndex = 0;
 
@@ -46,10 +47,14 @@ const styleMap: Record<Token["type"], string> = {
 
 interface RoleplayMessageProps {
   text: string;
+  charName?: string;
+  userName?: string;
 }
 
-const RoleplayMessage = ({ text }: RoleplayMessageProps) => {
-  const tokens = tokenize(text);
+const RoleplayMessage = ({ text, charName, userName }: RoleplayMessageProps) => {
+  // Replace {{user}} and {{char}} macros before rendering
+  const resolvedText = charName ? replaceMacros(text, charName, userName || "User") : text;
+  const tokens = tokenize(resolvedText);
 
   return (
     <>
