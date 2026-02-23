@@ -107,7 +107,7 @@ const ChatHeader = ({
               className="fill-neon-purple text-neon-purple shrink-0"
               style={{ filter: "drop-shadow(0 0 4px rgba(176, 38, 255, 0.6))" }}
             />
-            <span className="text-[10px] text-muted-foreground truncate">
+            <span className="text-[10px] text-muted-foreground truncate max-w-[120px] sm:max-w-[200px] md:max-w-[50vw]">
               {replaceMacros(character.description || "Đang hoạt động", character.name, getCachedUserPersona().displayName || "User")}
             </span>
           </div>
