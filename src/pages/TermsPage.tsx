@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { ShieldAlert, Baby, Bot, UserCog, Scale } from "lucide-react";
+import AppFooter from "@/components/AppFooter";
 
 const sections = [
   {
@@ -26,7 +27,7 @@ const sections = [
 
 const TermsPage = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex-1 flex flex-col bg-oled-base overflow-y-auto scrollbar-thin">
       <div className="max-w-3xl mx-auto px-4 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -69,6 +70,8 @@ const TermsPage = () => {
           })}
         </div>
       </div>
+
+      <AppFooter />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { Compass, ArrowRight, Sparkles, Search, Filter, X } from "lucide-react";
+import AppFooter from "@/components/AppFooter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -407,6 +408,8 @@ const HomePage = () => {
           }
         </div>
       </section>
+
+      <AppFooter />
 
       {previewChar && createPortal(
         <CharacterPreviewDialog character={previewChar} onClose={() => setPreviewChar(null)} />,
