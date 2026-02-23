@@ -108,6 +108,7 @@ const AdminPage = () => {
 
   const quickLinks = [
     { icon: Map, label: "Roadmap phát triển", description: "Xem & chỉnh sửa lộ trình tính năng", path: "/admin/roadmap", color: "text-neon-purple bg-neon-purple/10" },
+    { icon: Terminal, label: "Prompt Inspector", description: "Xem payload input token gửi tới LLM", path: "/admin/chatSettings", color: "text-neon-blue bg-neon-blue/10" },
   ];
 
   return (

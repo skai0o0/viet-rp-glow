@@ -15,6 +15,7 @@ import AuthPage from "@/pages/AuthPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminPage from "@/pages/AdminPage";
 import AdminRoadmapPage from "@/pages/AdminRoadmapPage";
+import AdminChatSettingsPage from "@/pages/AdminChatSettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
               <Route path="/admin/roadmap" element={<ProtectedRoute><AdminRoadmapPage /></ProtectedRoute>} />
+              <Route path="/admin/chatSettings" element={<ProtectedRoute><AdminChatSettingsPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
