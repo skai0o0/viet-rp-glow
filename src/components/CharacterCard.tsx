@@ -11,9 +11,9 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02, borderColor: "#B026FF" }}
+      whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="bg-oled-surface rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple"
+      className="bg-oled-surface rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple hover:border-secondary hover:scale-[1.02] transition-all duration-200"
       onClick={onClick}
     >
       {/* Image Section */}
