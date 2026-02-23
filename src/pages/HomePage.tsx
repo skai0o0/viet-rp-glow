@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { filterByNsfw } from "@/utils/nsfwFilter";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
@@ -24,14 +25,16 @@ const HomePage = () => {
   const navigate = useNavigate();
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
 
+  const visibleCharacters = useMemo(() => filterByNsfw(characters), [characters]);
+
   const allTags = useMemo(() => {
     const tags = new Set<string>();
-    characters.forEach((c) => c.tags?.forEach((t) => tags.add(t)));
+    visibleCharacters.forEach((c) => c.tags?.forEach((t) => tags.add(t)));
     return Array.from(tags).sort();
-  }, [characters]);
+  }, [visibleCharacters]);
 
   const filteredCharacters = useMemo(() => {
-    return characters.filter((c) => {
+    return visibleCharacters.filter((c) => {
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         !q ||
@@ -44,7 +47,7 @@ const HomePage = () => {
         selectedTags.every((st) => c.tags?.includes(st));
       return matchesSearch && matchesTags;
     });
-  }, [characters, searchQuery, selectedTags]);
+  }, [visibleCharacters, searchQuery, selectedTags]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
