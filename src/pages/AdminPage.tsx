@@ -9,14 +9,35 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Shield, Loader2, Upload, FileJson, Map, Terminal, Users, MessageSquare, Sparkles, ChevronRight } from "lucide-react";
+import {
+  Shield,
+  Loader2,
+  Upload,
+  FileJson,
+  Map,
+  Terminal,
+  Users,
+  MessageSquare,
+  Sparkles,
+  ChevronRight,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
 import { readJsonFile } from "@/utils/importCharacterJson";
 
 import { fetchGlobalSystemPrompt, saveGlobalSystemPrompt } from "@/services/globalSettingsDb";
 
-const StatCard = ({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string; color: string }) => (
+const StatCard = ({
+  icon: Icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  color: string;
+}) => (
   <Card className="bg-oled-surface border-oled-border">
     <CardContent className="p-4 flex items-center gap-3">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
@@ -107,8 +128,20 @@ const AdminPage = () => {
   };
 
   const quickLinks = [
-    { icon: Map, label: "Roadmap phát triển", description: "Xem & chỉnh sửa lộ trình tính năng", path: "/admin/roadmap", color: "text-neon-purple bg-neon-purple/10" },
-    { icon: Terminal, label: "Prompt Inspector", description: "Xem payload input token gửi tới LLM", path: "/admin/chatSettings", color: "text-neon-blue bg-neon-blue/10" },
+    {
+      icon: Map,
+      label: "Roadmap phát triển",
+      description: "Xem & chỉnh sửa lộ trình tính năng",
+      path: "/admin/roadmap",
+      color: "text-neon-purple bg-neon-purple/10",
+    },
+    {
+      icon: Terminal,
+      label: "Prompt Inspector",
+      description: "Xem payload input token gửi tới LLM",
+      path: "/admin/chatSettings",
+      color: "text-neon-blue bg-neon-blue/10",
+    },
   ];
 
   return (
@@ -131,15 +164,25 @@ const AdminPage = () => {
 
         {/* Stats Overview */}
         <div className="grid grid-cols-3 gap-3">
-          <StatCard icon={Sparkles} label="Nhân vật" value={stats.characters} color="text-neon-purple bg-neon-purple/10" />
+          <StatCard
+            icon={Sparkles}
+            label="Nhân vật"
+            value={stats.characters}
+            color="text-neon-purple bg-neon-purple/10"
+          />
           <StatCard icon={Users} label="Người dùng" value={stats.users} color="text-neon-blue bg-neon-blue/10" />
-          <StatCard icon={MessageSquare} label="Phiên chat" value={stats.sessions} color="text-neon-rose bg-neon-rose/10" />
+          <StatCard
+            icon={MessageSquare}
+            label="Phiên chat"
+            value={stats.sessions}
+            color="text-neon-rose bg-neon-rose/10"
+          />
         </div>
 
         {/* Quick Links */}
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Truy cập nhanh</h2>
-          {quickLinks.map(link => (
+          {quickLinks.map((link) => (
             <Link key={link.path} to={link.path}>
               <Card className="bg-oled-surface border-oled-border hover:border-neon-purple/40 transition-colors cursor-pointer group">
                 <CardContent className="p-4 flex items-center gap-3">
@@ -150,7 +193,10 @@ const AdminPage = () => {
                     <p className="text-sm font-medium text-foreground">{link.label}</p>
                     <p className="text-xs text-muted-foreground">{link.description}</p>
                   </div>
-                  <ChevronRight size={16} className="text-muted-foreground group-hover:text-neon-purple transition-colors" />
+                  <ChevronRight
+                    size={16}
+                    className="text-muted-foreground group-hover:text-neon-purple transition-colors"
+                  />
                 </CardContent>
               </Card>
             </Link>
@@ -177,10 +223,7 @@ const AdminPage = () => {
               placeholder="Nhập global system prompt tại đây..."
               className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[200px]"
             />
-            <Button
-              onClick={handleSave}
-              className="bg-neon-blue hover:bg-neon-blue/80 text-white font-semibold"
-            >
+            <Button onClick={handleSave} className="bg-neon-blue hover:bg-neon-blue/80 text-white font-semibold">
               Lưu cấu hình
             </Button>
           </CardContent>
@@ -191,17 +234,16 @@ const AdminPage = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <FileJson size={18} className="text-neon-rose" />
-              <CardTitle className="text-base">Import Character Card</CardTitle>
+              <CardTitle className="text-base">Import Character Cards</CardTitle>
             </div>
-            <CardDescription>
-              Upload file JSON theo chuẩn TavernCardV2 để tạo nhân vật công khai ngay lập tức.
-            </CardDescription>
+            <CardDescription>Chọn một hoặc nhiều file JSON TavernCardV2 để tạo nhân vật hàng loạt.</CardDescription>
           </CardHeader>
           <CardContent>
             <input
               ref={fileInputRef}
               type="file"
               accept=".json"
+              multiple
               className="hidden"
               onChange={handleFileChange}
             />
@@ -211,12 +253,8 @@ const AdminPage = () => {
               variant="outline"
               className="border-neon-rose/40 text-neon-rose hover:bg-neon-rose/10"
             >
-              {importing ? (
-                <Loader2 size={14} className="animate-spin mr-2" />
-              ) : (
-                <Upload size={14} className="mr-2" />
-              )}
-              {importing ? "Đang import..." : "Chọn file JSON"}
+              {importing ? <Loader2 size={14} className="animate-spin mr-2" /> : <Upload size={14} className="mr-2" />}
+              {importing ? "Đang xử lý..." : "Chọn các file JSON"}
             </Button>
           </CardContent>
         </Card>
