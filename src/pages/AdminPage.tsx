@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Shield, Loader2, Upload, FileJson } from "lucide-react";
+import { Shield, Loader2, Upload, FileJson, Map } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
 import { readJsonFile } from "@/utils/importCharacterJson";
@@ -148,6 +149,16 @@ const AdminPage = () => {
             <Upload size={14} className="mr-2" />
           )}
           {importing ? "Đang import..." : "Chọn file JSON"}
+        </Button>
+      </div>
+
+      {/* Roadmap Link */}
+      <div className="border-t border-gray-border pt-6">
+        <Button asChild variant="outline" className="border-neon-purple text-neon-purple hover:bg-neon-purple/10">
+          <Link to="/admin/roadmap">
+            <Map size={14} className="mr-2" />
+            Xem Roadmap phát triển
+          </Link>
         </Button>
       </div>
     </motion.div>
