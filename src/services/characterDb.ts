@@ -82,6 +82,27 @@ export async function getPublicCharacters(): Promise<CharacterSummary[]> {
   return (data ?? []) as CharacterSummary[];
 }
 
+const PAGE_SIZE = 20;
+
+/** Fetch public characters with pagination (for infinite scroll) */
+export async function getPublicCharactersPaginated(
+  page: number
+): Promise<{ data: CharacterSummary[]; hasMore: boolean }> {
+  const from = page * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  const { data, error } = await supabase
+    .from("characters")
+    .select("id, name, avatar_url, short_summary, tags, description")
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw error;
+  const items = (data ?? []) as CharacterSummary[];
+  return { data: items, hasMore: items.length === PAGE_SIZE };
+}
+
 /** Fetch full character data by ID (for chat session) */
 export async function getCharacterById(id: string): Promise<DbCharacter> {
   const { data, error } = await supabase

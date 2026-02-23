@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { CharacterSummary } from "@/services/characterDb";
 import { isCharacterNsfw } from "@/utils/nsfwFilter";
@@ -11,6 +12,7 @@ interface CharacterCardProps {
 const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
   const initial = character.name?.charAt(0)?.toUpperCase() || "?";
   const nsfw = isCharacterNsfw(character);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   return (
     <motion.div
@@ -20,16 +22,25 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
       onClick={onClick}
     >
       {/* Image Section */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden flex-shrink-0">
+      <div className="relative aspect-[4/3] w-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-oled-elevated to-oled-base">
         {character.avatar_url ? (
-          <img
-            src={character.avatar_url}
-            alt={character.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
+          <>
+            {/* Placeholder shown until image loads */}
+            {!imgLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-4xl font-bold text-secondary/30">{initial}</span>
+              </div>
+            )}
+            <img
+              src={character.avatar_url}
+              alt={character.name}
+              className={`w-full h-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+              loading="lazy"
+              onLoad={() => setImgLoaded(true)}
+            />
+          </>
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-oled-elevated to-oled-base flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center">
             <span className="text-4xl font-bold text-secondary">{initial}</span>
           </div>
         )}
