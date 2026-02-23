@@ -98,11 +98,54 @@ export async function getCharacterById(id: string): Promise<DbCharacter> {
 export async function getMyCharacters(): Promise<CharacterSummary[]> {
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags")
+    .select("id, name, avatar_url, short_summary, tags, description")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   return (data ?? []) as CharacterSummary[];
+}
+
+/** Update an existing character */
+export async function updateCharacter(
+  id: string,
+  card: TavernCardV2,
+  isPublic: boolean,
+  shortSummary?: string,
+  avatarUrl?: string | null
+) {
+  const d = card.data;
+  const updatePayload: Record<string, any> = {
+    is_public: isPublic,
+    name: d.name,
+    short_summary: shortSummary || d.description.slice(0, 200),
+    tags: d.tags,
+    description: d.description,
+    personality: d.personality,
+    scenario: d.scenario,
+    first_mes: d.first_mes,
+    mes_example: d.mes_example,
+    system_prompt: d.system_prompt,
+    post_history_instructions: d.post_history_instructions,
+    creator_notes: d.creator_notes,
+    alternate_greetings: d.alternate_greetings,
+    character_book: d.character_book as any,
+    extensions: d.extensions as any,
+    creator: d.creator,
+    character_version: d.character_version,
+  };
+  if (avatarUrl !== undefined) {
+    updatePayload.avatar_url = avatarUrl;
+  }
+
+  const { data, error } = await supabase
+    .from("characters")
+    .update(updatePayload)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as DbCharacter;
 }
 
 /** Convert a DbCharacter back to CharacterCard format for chat */

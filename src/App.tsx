@@ -8,6 +8,7 @@ import AppLayout from "@/layouts/AppLayout";
 import HomePage from "@/pages/HomePage";
 import ChatPage from "@/pages/ChatPage";
 import CreatePage from "@/pages/CreatePage";
+import EditCharacterPage from "@/pages/EditCharacterPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ProfilePage from "@/pages/ProfilePage";
 import AuthPage from "@/pages/AuthPage";
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/chat/:characterId" element={<ChatPage />} />
               <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
+              <Route path="/edit/:characterId" element={<ProtectedRoute><EditCharacterPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/auth" element={<AuthPage />} />

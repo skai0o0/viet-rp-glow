@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Trash2, Eye, EyeOff, Check, Loader2, ShieldCheck } from "lucide-react";
+import { User, Trash2, Eye, EyeOff, Check, Loader2, ShieldCheck, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,10 +39,11 @@ import {
 } from "@/services/openRouter";
 import CharacterCard from "@/components/CharacterCard";
 import ModelCombobox from "@/components/ModelCombobox";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const ProfilePage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Persona state
   const [displayName, setDisplayName] = useState("");
@@ -256,36 +257,41 @@ const ProfilePage = () => {
                   {characters.map((char) => (
                     <div key={char.id} className="relative group">
                       <CharacterCard character={char} />
-                      {/* Overlay actions */}
-                      <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <button className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-destructive/40 text-destructive hover:bg-destructive/20 transition-colors">
-                              <Trash2 size={14} />
-                            </button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-oled-surface border-gray-border">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-foreground">Xoá nhân vật?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Hành động này không thể hoàn tác. Nhân vật "{char.name}" sẽ bị xoá vĩnh viễn.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="bg-oled-elevated border-gray-border text-foreground">Huỷ</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteCharacter(char.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Xoá
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => navigate(`/edit/${char.id}`)}
+                            className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-neon-blue/40 text-neon-blue hover:bg-neon-blue/20 transition-colors"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-destructive/40 text-destructive hover:bg-destructive/20 transition-colors">
+                                <Trash2 size={14} />
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-oled-surface border-gray-border">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-foreground">Xoá nhân vật?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Hành động này không thể hoàn tác. Nhân vật "{char.name}" sẽ bị xoá vĩnh viễn.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="bg-oled-elevated border-gray-border text-foreground">Huỷ</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteCharacter(char.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Xoá
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
               )}
             </motion.div>
           </TabsContent>
