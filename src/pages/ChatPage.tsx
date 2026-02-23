@@ -27,6 +27,8 @@ import ChatInput from "@/components/ChatInput";
 import MessageBubble from "@/components/MessageBubble";
 import TypingIndicator from "@/components/TypingIndicator";
 import GenerationSettings from "@/components/GenerationSettings";
+import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -47,6 +49,7 @@ const ChatPage = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [charMap, setCharMap] = useState<Map<string, CharacterSummary>>(new Map());
   const [scenarioOverride, setScenarioOverride] = useState("");
+  const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -588,6 +591,7 @@ const ChatPage = () => {
   }
 
   return (
+    <>
     <div className="flex-1 flex overflow-hidden">
       <ChatSidebar
         open={sidebarOpen} onClose={() => setSidebarOpen(false)}
@@ -606,7 +610,13 @@ const ChatPage = () => {
           <div className="flex-1 min-w-0">
             <ChatHeader character={activeCharacter} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
               onNewChat={handleNewChat} sessions={charSessions} activeSessionId={activeSessionId}
-              onSelectSession={handleSelectSession} />
+              onSelectSession={handleSelectSession}
+              onNameClick={() => {
+                if (activeCharId) {
+                  const summary = charMap.get(activeCharId);
+                  if (summary) setPreviewChar(summary);
+                }
+              }} />
           </div>
           {/* Settings toggle button */}
           <button onClick={() => setSettingsOpen(!settingsOpen)}
@@ -686,6 +696,11 @@ const ChatPage = () => {
         </Sheet>
       )}
     </div>
+    {previewChar && createPortal(
+      <CharacterPreviewDialog character={previewChar} onClose={() => setPreviewChar(null)} />,
+      document.body
+    )}
+    </>
   );
 };
 
