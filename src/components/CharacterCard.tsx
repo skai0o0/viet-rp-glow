@@ -16,11 +16,11 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
     <motion.div
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="bg-oled-surface rounded-xl sm:rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple hover:border-secondary hover:scale-[1.02] transition-all duration-200"
+      className="bg-oled-surface rounded-xl sm:rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple hover:border-secondary hover:scale-[1.02] transition-all duration-200 h-[260px] sm:h-[280px] flex flex-col"
       onClick={onClick}
     >
       {/* Image Section */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
+      <div className="relative aspect-[4/3] w-full overflow-hidden flex-shrink-0">
         {character.avatar_url ? (
           <img
             src={character.avatar_url}
@@ -41,7 +41,7 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
       </div>
 
       {/* Info Section */}
-      <div className="p-2 sm:p-3">
+      <div className="p-2 sm:p-3 flex-1 min-h-0 overflow-hidden">
         <h3 className="text-sm sm:text-base font-bold text-foreground truncate">
           {character.name}
         </h3>
