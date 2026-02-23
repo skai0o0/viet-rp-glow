@@ -1,34 +1,61 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { filterByNsfw } from "@/utils/nsfwFilter";
 import { motion } from "framer-motion";
-import { Compass, Search } from "lucide-react";
+import { Compass, Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import CharacterCard from "@/components/CharacterCard";
 import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
-import { getPublicCharacters, CharacterSummary } from "@/services/characterDb";
+import { CharacterSummary, getPublicCharactersPaginated } from "@/services/characterDb";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInView } from "react-intersection-observer";
+import { useEffect } from "react";
 
 const HubPage = () => {
-  const [characters, setCharacters] = useState<CharacterSummary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
 
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ["public-characters"],
+    queryFn: ({ pageParam = 0 }) => getPublicCharactersPaginated(pageParam),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.length : undefined,
+    initialPageParam: 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const { ref: bottomRef, inView } = useInView({ threshold: 0 });
+
   useEffect(() => {
-    getPublicCharacters()
-      .then(setCharacters)
-      .catch(() => setCharacters([]))
-      .finally(() => setLoading(false));
-  }, []);
+    if (inView && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const visibleCharacters = useMemo(() => filterByNsfw(characters), [characters]);
-
-  const filtered = visibleCharacters.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.short_summary?.toLowerCase().includes(search.toLowerCase()) ||
-    c.tags?.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+  const allCharacters = useMemo(
+    () => data?.pages.flatMap((p) => p.data) ?? [],
+    [data]
   );
+
+  const visibleCharacters = useMemo(() => filterByNsfw(allCharacters), [allCharacters]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return visibleCharacters;
+    const q = search.toLowerCase();
+    return visibleCharacters.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.short_summary?.toLowerCase().includes(q) ||
+        c.tags?.some((t) => t.toLowerCase().includes(q))
+    );
+  }, [visibleCharacters, search]);
 
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-y-auto scrollbar-thin">
@@ -58,7 +85,7 @@ const HubPage = () => {
 
       {/* Grid */}
       <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {loading
+        {isLoading
           ? Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="bg-oled-surface rounded-2xl border border-gray-border overflow-hidden">
                 <Skeleton className="aspect-[4/3] w-full bg-oled-elevated" />
@@ -84,6 +111,15 @@ const HubPage = () => {
             ))
         }
       </div>
+
+      {/* Infinite scroll sentinel & loader */}
+      {!isLoading && hasNextPage && (
+        <div ref={bottomRef} className="flex justify-center py-6">
+          {isFetchingNextPage && (
+            <Loader2 size={24} className="animate-spin text-primary" />
+          )}
+        </div>
+      )}
 
       {previewChar && createPortal(
         <CharacterPreviewDialog character={previewChar} onClose={() => setPreviewChar(null)} />,
