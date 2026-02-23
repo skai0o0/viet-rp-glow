@@ -1,4 +1,4 @@
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -99,6 +99,25 @@ const NavigationRail = () => {
 
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
+        {/* Export Markdown - only for admins on chat pages */}
+        {isAdmin && location.pathname.startsWith("/chat/") && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => window.dispatchEvent(new CustomEvent("export-chat-markdown"))}
+                className="relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
+              >
+                <FileText size={20} />
+              </motion.button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
+              Copy Markdown
+            </TooltipContent>
+          </Tooltip>
+        )}
+
         {/* Admin Hub - only for admins */}
         {isAdmin && (
           <Tooltip>

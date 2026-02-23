@@ -1,4 +1,4 @@
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -70,6 +70,24 @@ const BottomNavBar = () => {
           </NavLink>
         );
       })}
+
+      {/* Export Markdown - only for admins on chat pages */}
+      {isAdmin && location.pathname.startsWith("/chat/") && (
+        <button
+          className="flex-1"
+          onClick={() => window.dispatchEvent(new CustomEvent("export-chat-markdown"))}
+        >
+          <motion.div
+            whileTap={{ scale: 0.9 }}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div className="flex items-center justify-center w-10 h-8 rounded-lg text-neon-rose/60 transition-colors duration-200">
+              <FileText size={20} />
+            </div>
+            <span className="text-[10px] text-neon-rose/60">MD</span>
+          </motion.div>
+        </button>
+      )}
 
       {/* Admin Hub - only for admins */}
       {isAdmin && (
