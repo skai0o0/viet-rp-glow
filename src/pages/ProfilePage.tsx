@@ -71,6 +71,7 @@ const ProfilePage = () => {
         setDisplayName(p.display_name);
         setUserDescription(p.user_description);
         setNsfwMode(p.nsfw_mode);
+        localStorage.setItem("vietrp_nsfw_mode", String(p.nsfw_mode));
       }
     });
 
@@ -391,6 +392,7 @@ const ProfilePage = () => {
                     checked={nsfwMode}
                     onCheckedChange={async (checked) => {
                       setNsfwMode(checked);
+                      localStorage.setItem("vietrp_nsfw_mode", String(checked));
                       if (user) {
                         await upsertProfile(user.id, { nsfw_mode: checked });
                         toast.success(checked ? "Đã bật NSFW" : "Đã tắt NSFW");
