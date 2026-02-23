@@ -100,7 +100,7 @@ const NavigationRail = () => {
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
         {/* Export Markdown - only for admins on chat pages */}
-        {isAdmin && location.pathname.startsWith("/chat/") && (
+        {isAdmin && (
           <Tooltip>
             <TooltipTrigger asChild>
               <motion.button

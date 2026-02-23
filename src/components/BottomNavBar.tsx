@@ -72,7 +72,7 @@ const BottomNavBar = () => {
       })}
 
       {/* Export Markdown - only for admins on chat pages */}
-      {isAdmin && location.pathname.startsWith("/chat/") && (
+      {isAdmin && (
         <button
           className="flex-1"
           onClick={() => window.dispatchEvent(new CustomEvent("export-chat-markdown"))}
