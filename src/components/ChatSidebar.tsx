@@ -130,15 +130,25 @@ const ChatSidebar = ({
                       onClose();
                     }}
                   >
-                    <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${
-                        isActive
-                          ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/30"
-                          : "bg-oled-elevated text-muted-foreground"
-                      }`}
-                    >
-                      {initial}
-                    </div>
+                    {char?.avatar_url && char.avatar_url.startsWith("http") ? (
+                      <img
+                        src={char.avatar_url}
+                        alt={char.name}
+                        className={`w-9 h-9 rounded-full object-cover flex-shrink-0 ${
+                          isActive ? "border border-neon-purple/30" : ""
+                        }`}
+                      />
+                    ) : (
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${
+                          isActive
+                            ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/30"
+                            : "bg-oled-elevated text-muted-foreground"
+                        }`}
+                      >
+                        {initial}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground truncate">
                         {displayTitle}
