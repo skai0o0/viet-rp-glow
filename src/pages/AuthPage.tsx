@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LogIn, UserPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ const AuthPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [agreedTerms, setAgreedTerms] = useState(false);
   const { user, login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -102,9 +103,25 @@ const AuthPage = () => {
                 minLength={6}
               />
             </div>
+            {!isLogin && (
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreedTerms}
+                  onChange={(e) => setAgreedTerms(e.target.checked)}
+                  className="mt-0.5 accent-neon-blue"
+                />
+                <span className="text-xs text-muted-foreground leading-snug">
+                  Tôi đã đọc và đồng ý với{" "}
+                  <Link to="/terms" target="_blank" className="text-neon-blue hover:underline">
+                    Điều khoản sử dụng & Miễn trừ trách nhiệm
+                  </Link>
+                </span>
+              </label>
+            )}
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!isLogin && !agreedTerms)}
               className="w-full bg-neon-blue hover:bg-neon-blue/80 text-black font-semibold shadow-[0_0_12px_rgba(0,240,255,0.3)] hover:shadow-[0_0_20px_rgba(0,240,255,0.5)] transition-all"
             >
               {loading && <Loader2 size={16} className="animate-spin mr-2" />}
