@@ -1,5 +1,7 @@
 import { Circle, Plus, ChevronDown, GitBranch } from "lucide-react";
 import { CharacterCard } from "@/types/character";
+import { replaceMacros } from "@/utils/promptBuilder";
+import { getCachedUserPersona } from "@/services/profileDb";
 import { DbChatSession } from "@/services/chatDb";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -106,7 +108,7 @@ const ChatHeader = ({
               style={{ filter: "drop-shadow(0 0 4px rgba(176, 38, 255, 0.6))" }}
             />
             <span className="text-[10px] text-muted-foreground truncate">
-              {character.description || "Đang hoạt động"}
+              {replaceMacros(character.description || "Đang hoạt động", character.name, getCachedUserPersona().displayName || "User")}
             </span>
           </div>
         </div>
