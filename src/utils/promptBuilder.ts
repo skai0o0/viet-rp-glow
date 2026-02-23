@@ -146,13 +146,28 @@ export function buildMessages(
     });
   }
 
-  // 4. Post-history instructions (response style)
+  // 4. Post-history instructions (response style + NSFW gate)
+  const postParts: string[] = [];
+
   const stylePrompt = getResponseStylePrompt();
   if (stylePrompt) {
-    const resolved = stylePrompt
-      .replace(/\{\{char\}\}/gi, effectiveCharacter.name)
-      .replace(/\{\{user\}\}/gi, resolvedUserName);
-    messages.push({ role: "system", content: resolved });
+    postParts.push(
+      stylePrompt
+        .replace(/\{\{char\}\}/gi, effectiveCharacter.name)
+        .replace(/\{\{user\}\}/gi, resolvedUserName)
+    );
+  }
+
+  // NSFW mode gate
+  const nsfwEnabled = localStorage.getItem("vietrp_nsfw_mode") === "true";
+  if (!nsfwEnabled) {
+    postParts.push(
+      "[System Note: NSFW/Sexual/Violence/Gore content is strictly forbidden. Keep all responses safe for work. Fade to black for any intimate scenes.]"
+    );
+  }
+
+  if (postParts.length > 0) {
+    messages.push({ role: "system", content: postParts.join("\n") });
   }
 
   return messages;
