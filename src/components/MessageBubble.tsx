@@ -10,6 +10,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
   characterAvatar?: string;
   characterName?: string;
+  userName?: string;
   isStreaming?: boolean;
   isLastAssistant?: boolean;
   isLastUser?: boolean;
@@ -23,6 +24,7 @@ const MessageBubble = ({
   message,
   characterAvatar,
   characterName,
+  userName,
   isStreaming,
   isLastAssistant,
   isLastUser,
@@ -146,7 +148,7 @@ const MessageBubble = ({
             </div>
           ) : (
             <>
-              <span className="whitespace-pre-wrap"><RoleplayMessage text={message.content} /></span>
+              <span className="whitespace-pre-wrap"><RoleplayMessage text={message.content} charName={characterName} userName={userName} /></span>
               {isStreaming && !isUser && (
                 <span className="text-neon-purple animate-blink font-mono ml-0.5">|</span>
               )}
