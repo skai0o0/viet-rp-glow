@@ -30,7 +30,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
 
   if (!user) {
     return (
-      <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border">
+      <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -45,7 +45,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   }
 
   return (
-    <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border">
+    <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
       <div
         className={`flex items-end gap-2 bg-oled-surface rounded-2xl px-4 py-2 border transition-all duration-300 ${
           focused

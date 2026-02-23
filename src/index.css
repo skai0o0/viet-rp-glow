@@ -63,6 +63,19 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+
+  /* Prevent iOS zoom on input focus (font-size < 16px triggers zoom) */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  @supports (font-size: max(16px, 1rem)) {
+    input, textarea, select {
+      font-size: max(16px, 1rem) !important;
+    }
   }
 
   code, .font-mono {

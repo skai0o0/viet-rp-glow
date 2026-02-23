@@ -30,7 +30,7 @@ const BottomNavBar = () => {
   };
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-oled-surface border-t border-gray-border flex items-center justify-around px-2">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-oled-surface border-t border-gray-border flex items-center justify-around px-2" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', height: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
       {navItems.map((item) => {
         const isActive = location.pathname === item.path;
         const Icon = item.icon;
