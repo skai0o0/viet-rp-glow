@@ -14,12 +14,6 @@ import { readJsonFile } from "@/utils/importCharacterJson";
 
 const STORAGE_KEY = "vietrp_global_system_prompt";
 
-const ADMIN_EMAILS = ["hoangskai0o0nam2006@gmail.com"];
-function isAdmin(email?: string): boolean {
-  if (!email) return false;
-  return ADMIN_EMAILS.includes(email);
-}
-
 export function getGlobalSystemPrompt(): string {
   return localStorage.getItem(STORAGE_KEY) || "";
 }
@@ -28,13 +22,24 @@ const AdminPage = () => {
   const { user, isLoading } = useAuth();
   const [prompt, setPrompt] = useState("");
   const [importing, setImporting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingRole, setCheckingRole] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPrompt(getGlobalSystemPrompt());
   }, []);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!user) { setCheckingRole(false); return; }
+    supabase.rpc("has_role", { _user_id: user.id, _role: "admin" } as any)
+      .then(({ data }) => {
+        setIsAdmin(!!data);
+        setCheckingRole(false);
+      });
+  }, [user]);
+
+  if (isLoading || checkingRole) {
     return (
       <div className="flex-1 flex items-center justify-center bg-oled-base">
         <Loader2 size={24} className="animate-spin text-neon-purple" />
@@ -42,7 +47,7 @@ const AdminPage = () => {
     );
   }
 
-  if (!user || !isAdmin(user.email)) {
+  if (!user || !isAdmin) {
     return <Navigate to="/" replace />;
   }
 
