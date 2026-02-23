@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getMyProfile, setCachedUserPersona } from "@/services/profileDb";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
@@ -19,11 +20,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const loadPersona = (u: User | null) => {
+      if (u) {
+        getMyProfile().then((p) => {
+          if (p) setCachedUserPersona(p.display_name, p.user_description);
+        }).catch(() => {});
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
+        loadPersona(session?.user ?? null);
       }
     );
 
@@ -31,6 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+      loadPersona(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
