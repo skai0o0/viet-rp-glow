@@ -59,6 +59,45 @@ const ChatPage = () => {
     [sessions, activeCharId]
   );
 
+  // Listen for admin markdown export event
+  useEffect(() => {
+    const handleExportMarkdown = () => {
+      if (!activeCharacter || messages.length === 0) {
+        toast.error("Không có tin nhắn để xuất");
+        return;
+      }
+      const persona = getCachedUserPersona();
+      const userName = persona.displayName || "User";
+      const charName = activeCharacter.name;
+      
+      const lines: string[] = [];
+      lines.push(`# ${charName}`);
+      lines.push(`> ${activeCharacter.description || ""}`);
+      lines.push("");
+      lines.push(`**Scenario:** ${activeCharacter.scenario || "N/A"}`);
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+      
+      for (const msg of messages) {
+        const name = msg.role === "user" ? userName : charName;
+        lines.push(`**${name}:**`);
+        lines.push(msg.content);
+        lines.push("");
+      }
+      
+      const md = lines.join("\n");
+      navigator.clipboard.writeText(md).then(() => {
+        toast.success("Đã copy markdown vào clipboard");
+      }).catch(() => {
+        toast.error("Không thể copy vào clipboard");
+      });
+    };
+
+    window.addEventListener("export-chat-markdown", handleExportMarkdown);
+    return () => window.removeEventListener("export-chat-markdown", handleExportMarkdown);
+  }, [activeCharacter, messages]);
+
   // Sync scenario when character loads
   useEffect(() => {
     if (activeCharacter) {
