@@ -4,7 +4,7 @@ import { getCachedUserPersona } from "@/services/profileDb";
 import { Menu, Settings2, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
-import { buildMessages } from "@/utils/promptBuilder";
+import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
 import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
 import {
@@ -633,7 +633,7 @@ const ChatPage = () => {
                 <div className="mx-4 md:mx-6 p-3 rounded-xl bg-oled-surface border border-gray-border">
                   <p className="text-[11px] text-muted-foreground">
                     <span className="text-neon-purple font-medium">Kịch bản:</span>{" "}
-                    {activeCharacter.scenario}
+                    {replaceMacros(activeCharacter.scenario, activeCharacter.name, getCachedUserPersona().displayName)}
                   </p>
                 </div>
               )}
@@ -641,7 +641,7 @@ const ChatPage = () => {
                 <div className="mx-4 md:mx-6 p-3 rounded-xl bg-oled-surface border border-gray-border">
                   <p className="text-[11px] text-muted-foreground">
                     <span className="text-neon-purple font-medium">Kịch bản:</span>{" "}
-                    {scenarioOverride}
+                    {replaceMacros(scenarioOverride, activeCharacter.name, getCachedUserPersona().displayName)}
                   </p>
                 </div>
               )}
