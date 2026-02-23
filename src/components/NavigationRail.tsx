@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import logoImg from "@/assets/logo.png";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -82,7 +83,7 @@ const NavigationRail = () => {
       <NavLink to="/" className="mb-6 block">
         <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
           <img
-            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ29FmznIurzWTiRoFHhR9CTJJWVTLAaV3gtw&s"
+            src={logoImg}
             alt="VietRP Logo"
             className="w-8 h-8 rounded-lg object-cover"
           />

@@ -9,12 +9,12 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ29FmznIurzWTiRoFHhR9CTJJWVTLAaV3gtw&s",
+      "src": "/logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ29FmznIurzWTiRoFHhR9CTJJWVTLAaV3gtw&s",
+      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }
