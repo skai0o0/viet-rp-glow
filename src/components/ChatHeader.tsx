@@ -19,6 +19,7 @@ interface ChatHeaderProps {
   sessions?: DbChatSession[];
   activeSessionId?: string | null;
   onSelectSession?: (sessionId: string) => void;
+  onNameClick?: () => void;
 }
 
 const ChatHeader = ({
@@ -27,6 +28,7 @@ const ChatHeader = ({
   sessions = [],
   activeSessionId,
   onSelectSession,
+  onNameClick,
 }: ChatHeaderProps) => {
   // Filter sessions for current character (already filtered in parent usually)
   const activeSession = sessions.find((s) => s.id === activeSessionId);
@@ -40,7 +42,7 @@ const ChatHeader = ({
         </div>
         <div>
           <div className="flex items-center gap-1.5">
-            <h2 className="text-sm font-semibold text-foreground">{character.name}</h2>
+            <h2 className="text-sm font-semibold text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onNameClick}>{character.name}</h2>
 
             {/* Branch switcher dropdown */}
             {sessionCount > 1 && onSelectSession && (
