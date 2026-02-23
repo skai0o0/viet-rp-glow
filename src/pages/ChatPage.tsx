@@ -110,7 +110,7 @@ const ChatPage = () => {
     });
   }, [sessions]);
 
-  // Auto-create or load session when character loaded
+  // Auto-load existing session or show first_mes locally (no DB creation yet)
   useEffect(() => {
     if (!user || !activeCharId || !activeCharacter) return;
     if (activeSessionId) return;
@@ -119,7 +119,15 @@ const ChatPage = () => {
     if (existing.length > 0) {
       loadSession(existing[0].id);
     } else {
-      handleNewChat();
+      // Show first message locally without creating a DB session
+      setMessages([
+        {
+          id: "pending-first-mes",
+          role: "assistant",
+          content: activeCharacter.first_mes,
+          timestamp: new Date(),
+        },
+      ]);
     }
   }, [user, activeCharId, activeCharacter, sessions.length]);
 
@@ -144,23 +152,32 @@ const ChatPage = () => {
     if (!user || !activeCharId || !activeCharacter) return;
     abortRef.current?.abort();
     setIsStreaming(false);
+    setActiveSessionId(null);
 
-    try {
-      const session = await createSession(user.id, activeCharId, activeCharacter.name);
-      const firstMsg = await addMessage(session.id, "assistant", activeCharacter.first_mes);
-      setActiveSessionId(session.id);
-      setMessages([
-        {
-          id: firstMsg.id,
-          role: "assistant",
-          content: activeCharacter.first_mes,
-          timestamp: new Date(firstMsg.created_at),
-        },
-      ]);
-      setSessions((prev) => [session, ...prev]);
-    } catch {
-      toast.error("Không thể tạo cuộc trò chuyện mới");
-    }
+    // Show first message locally without creating a DB session
+    setMessages([
+      {
+        id: "pending-first-mes",
+        role: "assistant",
+        content: activeCharacter.first_mes,
+        timestamp: new Date(),
+      },
+    ]);
+  };
+
+  // Helper: ensure a session exists in DB, creating one if needed (on first user message)
+  const ensureSession = async (): Promise<string> => {
+    if (activeSessionId) return activeSessionId;
+    if (!user || !activeCharId || !activeCharacter) throw new Error("Missing data");
+
+    const session = await createSession(user.id, activeCharId, activeCharacter.name);
+    await addMessage(session.id, "assistant", activeCharacter.first_mes);
+    setActiveSessionId(session.id);
+    setSessions((prev) => [session, ...prev]);
+    setMessages((prev) =>
+      prev.map((m) => (m.id === "pending-first-mes" ? { ...m, id: session.id + "-first" } : m))
+    );
+    return session.id;
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -218,9 +235,18 @@ const ChatPage = () => {
         });
         return;
       }
-      if (!activeSessionId || !activeCharacter) return;
+      if (!activeCharacter) return;
 
-      const savedUserMsg = await addMessage(activeSessionId, "user", content);
+      // Ensure session exists in DB (creates on first user message)
+      let sessionId: string;
+      try {
+        sessionId = await ensureSession();
+      } catch {
+        toast.error("Không thể tạo cuộc trò chuyện");
+        return;
+      }
+
+      const savedUserMsg = await addMessage(sessionId, "user", content);
       const userMsg: ChatMessage = {
         id: savedUserMsg.id, role: "user", content, timestamp: new Date(savedUserMsg.created_at),
       };
@@ -260,7 +286,7 @@ const ChatPage = () => {
             setIsStreaming(false);
             abortRef.current = null;
             if (assistantContent) {
-              const saved = await addMessage(activeSessionId, "assistant", assistantContent);
+              const saved = await addMessage(sessionId, "assistant", assistantContent);
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
@@ -280,7 +306,7 @@ const ChatPage = () => {
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, navigate, scenarioOverride]
+    [messages, activeCharacter, activeSessionId, activeCharId, user, navigate, scenarioOverride]
   );
 
   const handleRegenerate = useCallback(async () => {
@@ -526,7 +552,7 @@ const ChatPage = () => {
                       key={session.id}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-border bg-oled-surface hover:bg-oled-elevated hover:border-neon-purple/30 transition-all duration-200 cursor-pointer"
+                      className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-border bg-oled-surface hover:bg-oled-elevated hover:border-neon-purple/30 transition-all duration-200 cursor-pointer active:scale-[0.98]"
                       onClick={() => {
                         handleSelectSession(session.id);
                         if (!characterId) {
