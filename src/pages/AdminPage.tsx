@@ -14,11 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
 import { readJsonFile } from "@/utils/importCharacterJson";
 
-const STORAGE_KEY = "vietrp_global_system_prompt";
-
-export function getGlobalSystemPrompt(): string {
-  return localStorage.getItem(STORAGE_KEY) || "";
-}
+import { fetchGlobalSystemPrompt, saveGlobalSystemPrompt } from "@/services/globalSettingsDb";
 
 const StatCard = ({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string; color: string }) => (
   <Card className="bg-oled-surface border-oled-border">
@@ -45,7 +41,7 @@ const AdminPage = () => {
   const [stats, setStats] = useState({ characters: "—", users: "—", sessions: "—" });
 
   useEffect(() => {
-    setPrompt(getGlobalSystemPrompt());
+    fetchGlobalSystemPrompt().then(setPrompt);
   }, []);
 
   useEffect(() => {
@@ -76,9 +72,13 @@ const AdminPage = () => {
     return <Navigate to="/" replace />;
   }
 
-  const handleSave = () => {
-    localStorage.setItem(STORAGE_KEY, prompt);
-    toast.success("Đã lưu cấu hình thành công!");
+  const handleSave = async () => {
+    try {
+      await saveGlobalSystemPrompt(prompt);
+      toast.success("Đã lưu cấu hình thành công!");
+    } catch {
+      toast.error("Lưu cấu hình thất bại!");
+    }
   };
 
   const handleImportClick = () => {
