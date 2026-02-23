@@ -99,14 +99,14 @@ const ChatHeader = ({
               </DropdownMenu>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             <Circle
               size={6}
-              className="fill-neon-purple text-neon-purple"
+              className="fill-neon-purple text-neon-purple shrink-0"
               style={{ filter: "drop-shadow(0 0 4px rgba(176, 38, 255, 0.6))" }}
             />
-            <span className="text-[10px] text-muted-foreground">
-              {activeSession?.title || "Đang hoạt động"}
+            <span className="text-[10px] text-muted-foreground truncate">
+              {character.description || "Đang hoạt động"}
             </span>
           </div>
         </div>
