@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getCharacterById, updateCharacter } from "@/services/characterDb";
+import { compressAvatar } from "@/utils/imageOptimization";
 import {
   TavernCardV2,
   TavernCardV2Data,
@@ -89,15 +90,21 @@ const EditCharacterPage = () => {
     setCard((prev) => ({ ...prev, data: { ...prev.data, ...patch } }));
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: "Lỗi", description: "Ảnh quá lớn (tối đa 5MB).", variant: "destructive" });
       return;
     }
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    try {
+      const compressed = await compressAvatar(file);
+      setAvatarFile(compressed);
+      setAvatarPreview(URL.createObjectURL(compressed));
+    } catch {
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
+    }
   };
 
   const addTag = () => {
@@ -165,7 +172,7 @@ const EditCharacterPage = () => {
         const { data: session } = await supabase.auth.getSession();
         if (!session?.session?.user) throw new Error("Chưa đăng nhập");
         const userId = session.session.user.id;
-        const ext = avatarFile.name.split(".").pop() || "png";
+        const ext = "webp";
         const filePath = `${userId}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from("character-avatars")

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, Upload, ImagePlus } from "lucide-react";
 import { readJsonFile } from "@/utils/importCharacterJson";
+import { compressAvatar } from "@/utils/imageOptimization";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,16 +70,23 @@ const CreatePage = () => {
     setCard((prev) => ({ ...prev, data: { ...prev.data, ...patch } }));
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: "Lỗi", description: "Ảnh quá lớn (tối đa 5MB).", variant: "destructive" });
       return;
     }
-    setAvatarFile(file);
-    const url = URL.createObjectURL(file);
-    setAvatarPreview(url);
+    try {
+      const compressed = await compressAvatar(file);
+      setAvatarFile(compressed);
+      const url = URL.createObjectURL(compressed);
+      setAvatarPreview(url);
+    } catch {
+      setAvatarFile(file);
+      const url = URL.createObjectURL(file);
+      setAvatarPreview(url);
+    }
   };
 
   // Tags
@@ -168,7 +176,7 @@ const CreatePage = () => {
       let avatarUrl: string | null = null;
       if (avatarFile) {
         const userId = session.session.user.id;
-        const ext = avatarFile.name.split(".").pop() || "png";
+        const ext = "webp";
         const filePath = `${userId}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from("character-avatars")
