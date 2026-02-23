@@ -106,7 +106,18 @@ const NavigationRail = () => {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => window.dispatchEvent(new CustomEvent("export-chat-markdown"))}
+                onClick={() => {
+                  import("turndown").then(({ default: TurndownService }) => {
+                    const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+                    const main = document.querySelector("main") || document.body;
+                    const md = td.turndown(main.innerHTML);
+                    navigator.clipboard.writeText(md).then(() => {
+                      toast.success("Đã copy markdown vào clipboard");
+                    }).catch(() => {
+                      toast.error("Không thể copy vào clipboard");
+                    });
+                  });
+                }}
                 className="relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
               >
                 <FileText size={20} />

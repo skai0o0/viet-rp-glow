@@ -75,7 +75,18 @@ const BottomNavBar = () => {
       {isAdmin && (
         <button
           className="flex-1"
-          onClick={() => window.dispatchEvent(new CustomEvent("export-chat-markdown"))}
+          onClick={() => {
+            import("turndown").then(({ default: TurndownService }) => {
+              const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+              const main = document.querySelector("main") || document.body;
+              const md = td.turndown(main.innerHTML);
+              navigator.clipboard.writeText(md).then(() => {
+                toast.success("Đã copy markdown vào clipboard");
+              }).catch(() => {
+                toast.error("Không thể copy vào clipboard");
+              });
+            });
+          }}
         >
           <motion.div
             whileTap={{ scale: 0.9 }}
