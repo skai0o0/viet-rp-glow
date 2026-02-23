@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { filterByNsfw } from "@/utils/nsfwFilter";
 import { motion } from "framer-motion";
 import { Compass, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,9 @@ const HubPage = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = characters.filter((c) =>
+  const visibleCharacters = useMemo(() => filterByNsfw(characters), [characters]);
+
+  const filtered = visibleCharacters.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.short_summary?.toLowerCase().includes(search.toLowerCase()) ||
     c.tags?.some((t) => t.toLowerCase().includes(search.toLowerCase()))
