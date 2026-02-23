@@ -254,7 +254,7 @@ const ProfilePage = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
                   {characters.map((char) => (
                     <div key={char.id} className="relative group">
                       <CharacterCard character={char} />
