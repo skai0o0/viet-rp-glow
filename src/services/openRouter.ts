@@ -114,6 +114,10 @@ export async function streamChat(
         messages,
         stream: true,
         max_tokens: maxTokens,
+        temperature: 0.85,
+        frequency_penalty: 0.6,
+        presence_penalty: 0.4,
+        repetition_penalty: 1.1,
       }),
       signal,
     });
