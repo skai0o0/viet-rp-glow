@@ -1,6 +1,6 @@
 import { CharacterCard } from "@/types/character";
 import { getCachedUserPersona } from "@/services/profileDb";
-import { getGlobalSystemPrompt } from "@/pages/AdminPage";
+import { getGlobalSystemPrompt } from "@/services/globalSettingsDb";
 import { getResponseStylePrompt } from "@/components/GenerationSettings";
 
 export interface OpenRouterMessage {

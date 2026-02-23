@@ -18,8 +18,12 @@ import AdminRoadmapPage from "@/pages/AdminRoadmapPage";
 import AdminChatSettingsPage from "@/pages/AdminChatSettingsPage";
 import NotFound from "./pages/NotFound";
 import TermsPage from "@/pages/TermsPage";
+import { fetchGlobalSystemPrompt } from "@/services/globalSettingsDb";
 
 const queryClient = new QueryClient();
+
+// Pre-warm global system prompt cache
+fetchGlobalSystemPrompt();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
