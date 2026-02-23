@@ -89,11 +89,19 @@ const MessageBubble = ({
       {/* AI Avatar */}
       {!isUser && (
         <div className="flex-shrink-0 mt-1">
-          <div
-            className={`w-8 h-8 rounded-full bg-oled-surface flex items-center justify-center text-neon-purple text-sm font-semibold border border-neon-purple/30 ${isStreaming ? "animate-breathing" : ""}`}
-          >
-            {characterAvatar || "AI"}
-          </div>
+          {characterAvatar && characterAvatar.startsWith("http") ? (
+            <img
+              src={characterAvatar}
+              alt={characterName || "AI"}
+              className={`w-8 h-8 rounded-full object-cover border border-neon-purple/30 ${isStreaming ? "animate-breathing" : ""}`}
+            />
+          ) : (
+            <div
+              className={`w-8 h-8 rounded-full bg-oled-surface flex items-center justify-center text-neon-purple text-sm font-semibold border border-neon-purple/30 ${isStreaming ? "animate-breathing" : ""}`}
+            >
+              {characterAvatar || characterName?.charAt(0) || "AI"}
+            </div>
+          )}
         </div>
       )}
 
