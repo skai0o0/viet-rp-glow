@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send } from "lucide-react";
+import { replaceMacros } from "@/utils/promptBuilder";
+import { getCachedUserPersona } from "@/services/profileDb";
 import { CharacterSummary } from "@/services/characterDb";
 
 interface CharacterPreviewDialogProps {
@@ -61,7 +63,7 @@ const CharacterPreviewDialog = ({ character, onClose }: CharacterPreviewDialogPr
               <div>
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Mô tả</h4>
                 <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                  {character.description}
+                  {replaceMacros(character.description, character.name, getCachedUserPersona().displayName)}
                 </p>
               </div>
             )}
@@ -70,7 +72,7 @@ const CharacterPreviewDialog = ({ character, onClose }: CharacterPreviewDialogPr
               <div>
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tóm tắt</h4>
                 <p className="text-sm text-foreground/80 leading-relaxed">
-                  {character.short_summary}
+                  {replaceMacros(character.short_summary, character.name, getCachedUserPersona().displayName)}
                 </p>
               </div>
             )}
