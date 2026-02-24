@@ -206,9 +206,23 @@ export async function updateCharacter(
   return data as DbCharacter;
 }
 
-/** Atomically increment message_count for a character (fire-and-forget, safe if migration not applied) */
-export function incrementMessageCount(characterId: string) {
-  supabase.rpc("increment_character_message_count", { char_id: characterId }).catch(() => {});
+/** Increment message_count for a character (fire-and-forget, safe if column not yet added) */
+export async function incrementMessageCount(characterId: string) {
+  try {
+    const { data } = await supabase
+      .from("characters")
+      .select("message_count")
+      .eq("id", characterId)
+      .single();
+
+    const current = (data?.message_count as number) ?? 0;
+    await supabase
+      .from("characters")
+      .update({ message_count: current + 1 })
+      .eq("id", characterId);
+  } catch {
+    // silently ignore if column doesn't exist yet
+  }
 }
 
 /** Convert a DbCharacter back to CharacterCard format for chat */
