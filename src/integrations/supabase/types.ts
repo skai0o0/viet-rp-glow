@@ -62,9 +62,11 @@ export type Database = {
           id: string
           is_public: boolean
           mes_example: string
+          message_count: number
           name: string
           personality: string
           post_history_instructions: string
+          rating: number
           scenario: string
           short_summary: string | null
           system_prompt: string
@@ -86,9 +88,11 @@ export type Database = {
           id?: string
           is_public?: boolean
           mes_example?: string
+          message_count?: number
           name: string
           personality?: string
           post_history_instructions?: string
+          rating?: number
           scenario?: string
           short_summary?: string | null
           system_prompt?: string
@@ -110,9 +114,11 @@ export type Database = {
           id?: string
           is_public?: boolean
           mes_example?: string
+          message_count?: number
           name?: string
           personality?: string
           post_history_instructions?: string
+          rating?: number
           scenario?: string
           short_summary?: string | null
           system_prompt?: string
@@ -305,6 +311,12 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_character_message_count: {
+        Args: {
+          char_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

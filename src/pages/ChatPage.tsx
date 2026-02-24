@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
-import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
+import { getCharacterById, dbCharToCard, CharacterSummary, incrementMessageCount } from "@/services/characterDb";
 import {
   getUserSessions,
   createSession,
@@ -306,6 +306,7 @@ const ChatPage = () => {
       }
 
       const savedUserMsg = await addMessage(sessionId, "user", content);
+      if (activeCharId) incrementMessageCount(activeCharId);
       const userMsg: ChatMessage = {
         id: savedUserMsg.id, role: "user", content, timestamp: new Date(savedUserMsg.created_at),
       };
@@ -565,6 +566,7 @@ const ChatPage = () => {
       scenario={scenarioOverride}
       onScenarioChange={setScenarioOverride}
       onClose={isMobile ? () => setSettingsOpen(false) : undefined}
+      defaultScenario={activeCharacter.scenario || ""}
       customFirstMes={customFirstMes}
       onCustomFirstMesChange={handleCustomFirstMesChange}
       isPendingChat={isPendingChat}

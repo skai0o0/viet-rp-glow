@@ -22,13 +22,15 @@ export type DbCharacter = {
   extensions: Record<string, any>;
   creator: string;
   character_version: string;
+  message_count: number;
+  rating: number;
   created_at: string;
   updated_at: string;
 };
 
 export type CharacterSummary = Pick<
   DbCharacter,
-  "id" | "name" | "avatar_url" | "short_summary" | "tags" | "description"
+  "id" | "name" | "avatar_url" | "short_summary" | "tags" | "description" | "message_count" | "rating"
 >;
 
 /** Create a new character from TavernCardV2 form data */
@@ -74,7 +76,7 @@ export async function createCharacter(
 export async function getPublicCharacters(): Promise<CharacterSummary[]> {
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags, description")
+    .select("id, name, avatar_url, short_summary, tags, description, message_count, rating")
     .eq("is_public", true)
     .order("created_at", { ascending: false });
 
@@ -93,7 +95,7 @@ export async function getPublicCharactersPaginated(
 
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags, description")
+    .select("id, name, avatar_url, short_summary, tags, description, message_count, rating")
     .eq("is_public", true)
     .order("created_at", { ascending: false })
     .range(from, to);
@@ -119,7 +121,7 @@ export async function getCharacterById(id: string): Promise<DbCharacter> {
 export async function getMyCharacters(): Promise<CharacterSummary[]> {
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags, description")
+    .select("id, name, avatar_url, short_summary, tags, description, message_count, rating")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -167,6 +169,11 @@ export async function updateCharacter(
 
   if (error) throw error;
   return data as DbCharacter;
+}
+
+/** Atomically increment message_count for a character (fire-and-forget) */
+export function incrementMessageCount(characterId: string) {
+  supabase.rpc("increment_character_message_count", { char_id: characterId });
 }
 
 /** Convert a DbCharacter back to CharacterCard format for chat */

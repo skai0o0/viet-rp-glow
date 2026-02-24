@@ -66,6 +66,7 @@ interface GenerationSettingsProps {
   scenario: string;
   onScenarioChange: (val: string) => void;
   onClose?: () => void;
+  defaultScenario?: string;
   customFirstMes?: string;
   onCustomFirstMesChange?: (val: string) => void;
   isPendingChat?: boolean;
@@ -76,6 +77,7 @@ const GenerationSettings = ({
   scenario,
   onScenarioChange,
   onClose,
+  defaultScenario,
   customFirstMes,
   onCustomFirstMesChange,
   isPendingChat,
@@ -139,9 +141,20 @@ const GenerationSettings = ({
 
           {/* Scenario Editor */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-              Bối cảnh hiện tại (Scenario)
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                Bối cảnh hiện tại (Scenario)
+              </Label>
+              {defaultScenario !== undefined && scenario !== defaultScenario && (
+                <button
+                  onClick={() => onScenarioChange(defaultScenario)}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-neon-purple/70 hover:text-neon-purple hover:bg-neon-purple/10 border border-transparent hover:border-neon-purple/30 transition-all duration-200"
+                >
+                  <RotateCcw size={10} />
+                  Đặt lại
+                </button>
+              )}
+            </div>
             <Textarea
               value={scenario}
               onChange={(e) => onScenarioChange(e.target.value)}
@@ -182,13 +195,15 @@ const GenerationSettings = ({
                 <p className="text-[10px] text-muted-foreground/50 leading-tight">
                   Chỉnh sửa trước khi bắt đầu chat
                 </p>
-                <button
-                  onClick={() => onCustomFirstMesChange(defaultFirstMes || "")}
-                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-neon-rose transition-colors shrink-0"
-                >
-                  <RotateCcw size={10} />
-                  Đặt lại
-                </button>
+                {customFirstMes !== defaultFirstMes && (
+                  <button
+                    onClick={() => onCustomFirstMesChange!(defaultFirstMes || "")}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-neon-blue/70 hover:text-neon-blue hover:bg-neon-blue/10 border border-transparent hover:border-neon-blue/30 transition-all duration-200 shrink-0"
+                  >
+                    <RotateCcw size={10} />
+                    Đặt lại
+                  </button>
+                )}
               </div>
             </div>
           )}
