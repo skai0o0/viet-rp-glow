@@ -305,7 +305,13 @@ const ChatPage = () => {
         return;
       }
 
-      const savedUserMsg = await addMessage(sessionId, "user", content);
+      let savedUserMsg;
+      try {
+        savedUserMsg = await addMessage(sessionId, "user", content);
+      } catch {
+        toast.error("Không thể gửi tin nhắn");
+        return;
+      }
       if (activeCharId) incrementMessageCount(activeCharId);
       const userMsg: ChatMessage = {
         id: savedUserMsg.id, role: "user", content, timestamp: new Date(savedUserMsg.created_at),
