@@ -62,7 +62,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           placeholder="Nhập tin nhắn..."
           rows={1}
           disabled={disabled}
-          className="flex-1 bg-transparent text-foreground text-sm resize-none outline-none placeholder:text-muted-foreground py-1.5 max-h-32 scrollbar-thin"
+          className="flex-1 bg-transparent text-foreground text-base md:text-sm resize-none outline-none placeholder:text-muted-foreground py-1.5 max-h-32 scrollbar-thin"
           style={{ minHeight: "24px" }}
         />
         <motion.button

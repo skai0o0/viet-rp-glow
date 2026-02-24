@@ -78,7 +78,7 @@ const NavigationRail = () => {
   };
 
   return (
-    <nav className="hidden md:flex flex-col items-center w-16 h-screen bg-oled-surface border-r border-gray-border py-4 flex-shrink-0">
+    <nav className="hidden md:flex flex-col items-center w-16 h-[100dvh] bg-oled-surface border-r border-gray-border py-4 flex-shrink-0">
       {/* Brand */}
       <NavLink to="/" className="mb-6 block">
         <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>

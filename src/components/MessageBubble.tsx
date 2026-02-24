@@ -136,7 +136,7 @@ const MessageBubble = ({
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 onInput={handleTextareaInput}
-                className="w-full bg-oled-elevated border border-neon-blue/50 rounded-lg px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:border-neon-blue focus:shadow-[0_0_8px_rgba(0,170,255,0.3)] transition-all"
+                className="w-full bg-oled-elevated border border-neon-blue/50 rounded-lg px-3 py-2 text-base md:text-sm text-foreground resize-none focus:outline-none focus:border-neon-blue focus:shadow-[0_0_8px_rgba(0,170,255,0.3)] transition-all"
                 rows={2}
               />
               <div className="flex items-center gap-2 justify-end">
