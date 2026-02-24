@@ -72,16 +72,34 @@ export async function createCharacter(
   return data as DbCharacter;
 }
 
+const SUMMARY_COLS_FULL = "id, name, avatar_url, short_summary, tags, description, message_count, rating";
+const SUMMARY_COLS_BASE = "id, name, avatar_url, short_summary, tags, description";
+
+function withStatDefaults(rows: any[]): CharacterSummary[] {
+  return rows.map(r => ({
+    ...r,
+    message_count: r.message_count ?? 0,
+    rating: r.rating ?? 0,
+  }));
+}
+
 /** Fetch public characters (summary only, for the Hub) */
 export async function getPublicCharacters(): Promise<CharacterSummary[]> {
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags, description, message_count, rating")
+    .select(SUMMARY_COLS_FULL)
     .eq("is_public", true)
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return (data ?? []) as CharacterSummary[];
+  if (!error) return withStatDefaults(data ?? []);
+
+  const fb = await supabase
+    .from("characters")
+    .select(SUMMARY_COLS_BASE)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false });
+  if (fb.error) throw fb.error;
+  return withStatDefaults(fb.data ?? []);
 }
 
 const PAGE_SIZE = 20;
@@ -95,13 +113,24 @@ export async function getPublicCharactersPaginated(
 
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags, description, message_count, rating")
+    .select(SUMMARY_COLS_FULL)
     .eq("is_public", true)
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  if (error) throw error;
-  const items = (data ?? []) as CharacterSummary[];
+  if (!error) {
+    const items = withStatDefaults(data ?? []);
+    return { data: items, hasMore: items.length === PAGE_SIZE };
+  }
+
+  const fb = await supabase
+    .from("characters")
+    .select(SUMMARY_COLS_BASE)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+  if (fb.error) throw fb.error;
+  const items = withStatDefaults(fb.data ?? []);
   return { data: items, hasMore: items.length === PAGE_SIZE };
 }
 
@@ -114,18 +143,24 @@ export async function getCharacterById(id: string): Promise<DbCharacter> {
     .single();
 
   if (error) throw error;
-  return data as DbCharacter;
+  return { message_count: 0, rating: 0, ...data } as DbCharacter;
 }
 
 /** Fetch all characters owned by current user */
 export async function getMyCharacters(): Promise<CharacterSummary[]> {
   const { data, error } = await supabase
     .from("characters")
-    .select("id, name, avatar_url, short_summary, tags, description, message_count, rating")
+    .select(SUMMARY_COLS_FULL)
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return (data ?? []) as CharacterSummary[];
+  if (!error) return withStatDefaults(data ?? []);
+
+  const fb = await supabase
+    .from("characters")
+    .select(SUMMARY_COLS_BASE)
+    .order("created_at", { ascending: false });
+  if (fb.error) throw fb.error;
+  return withStatDefaults(fb.data ?? []);
 }
 
 /** Update an existing character */
@@ -171,9 +206,9 @@ export async function updateCharacter(
   return data as DbCharacter;
 }
 
-/** Atomically increment message_count for a character (fire-and-forget) */
+/** Atomically increment message_count for a character (fire-and-forget, safe if migration not applied) */
 export function incrementMessageCount(characterId: string) {
-  supabase.rpc("increment_character_message_count", { char_id: characterId });
+  supabase.rpc("increment_character_message_count", { char_id: characterId }).catch(() => {});
 }
 
 /** Convert a DbCharacter back to CharacterCard format for chat */
