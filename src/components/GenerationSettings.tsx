@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Settings2, X } from "lucide-react";
+import { useState } from "react";
+import { Settings2, X, RotateCcw } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
@@ -66,9 +66,21 @@ interface GenerationSettingsProps {
   scenario: string;
   onScenarioChange: (val: string) => void;
   onClose?: () => void;
+  customFirstMes?: string;
+  onCustomFirstMesChange?: (val: string) => void;
+  isPendingChat?: boolean;
+  defaultFirstMes?: string;
 }
 
-const GenerationSettings = ({ scenario, onScenarioChange, onClose }: GenerationSettingsProps) => {
+const GenerationSettings = ({
+  scenario,
+  onScenarioChange,
+  onClose,
+  customFirstMes,
+  onCustomFirstMesChange,
+  isPendingChat,
+  defaultFirstMes,
+}: GenerationSettingsProps) => {
   const [selectedModel, setSelectedModel] = useState(getModel());
   const [maxTokens, setMaxTokensState] = useState(getMaxTokens());
   const [responseStyle, setResponseStyleState] = useState(getResponseStyle());
@@ -137,6 +149,49 @@ const GenerationSettings = ({ scenario, onScenarioChange, onClose }: GenerationS
               className="bg-oled-elevated border-gray-border text-foreground text-xs min-h-[100px] resize-none focus:border-neon-purple focus:ring-neon-purple placeholder:text-muted-foreground/50"
             />
           </div>
+
+          {/* First Message Editor — only visible for pending (new) chats */}
+          {isPendingChat && onCustomFirstMesChange && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                Tùy chỉnh lời chào
+              </Label>
+              <div className="flex items-center gap-2">
+                <button className="px-2.5 py-1 text-[11px] rounded-lg bg-neon-blue/10 text-neon-blue border border-neon-blue/30 font-medium">
+                  Nhập tay
+                </button>
+                <div className="relative">
+                  <button
+                    disabled
+                    className="px-2.5 py-1 text-[11px] rounded-lg bg-oled-elevated text-muted-foreground/50 border border-gray-border cursor-not-allowed"
+                  >
+                    Tạo bằng AI
+                  </button>
+                  <span className="absolute -top-2 -right-2 text-[8px] px-1 py-0.5 rounded-full bg-neon-rose/20 text-neon-rose font-medium whitespace-nowrap leading-none">
+                    Sắp ra mắt
+                  </span>
+                </div>
+              </div>
+              <textarea
+                value={customFirstMes ?? ""}
+                onChange={(e) => onCustomFirstMesChange(e.target.value)}
+                className="w-full bg-oled-base border border-gray-border/30 focus:border-neon-blue text-foreground/90 rounded-lg p-3 text-base md:text-sm resize-none outline-none min-h-[120px] max-h-[300px] scrollbar-thin transition-colors duration-200 placeholder:text-muted-foreground/50"
+                placeholder="Nhập lời chào mở đầu tùy chỉnh..."
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-muted-foreground/50 leading-tight">
+                  Chỉnh sửa trước khi bắt đầu chat
+                </p>
+                <button
+                  onClick={() => onCustomFirstMesChange(defaultFirstMes || "")}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-neon-rose transition-colors shrink-0"
+                >
+                  <RotateCcw size={10} />
+                  Đặt lại
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Model Switcher */}
           <div className="space-y-2">

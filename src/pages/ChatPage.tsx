@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCachedUserPersona } from "@/services/profileDb";
-import { Menu, Settings2, Trash2, PenLine, ChevronDown, RotateCcw } from "lucide-react";
+import { Menu, Settings2, Trash2, PenLine } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
@@ -51,7 +51,6 @@ const ChatPage = () => {
   const [scenarioOverride, setScenarioOverride] = useState("");
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
   const [customFirstMes, setCustomFirstMes] = useState("");
-  const [firstMesEditorOpen, setFirstMesEditorOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -117,7 +116,6 @@ const ChatPage = () => {
       setScenarioOverride(activeCharacter.scenario || "");
       setCustomFirstMes(activeCharacter.first_mes || "");
       customFirstMesRef.current = activeCharacter.first_mes || "";
-      setFirstMesEditorOpen(false);
     }
   }, [activeCharacter]);
 
@@ -214,7 +212,6 @@ const ChatPage = () => {
     setActiveSessionId(null);
     setCustomFirstMes(activeCharacter.first_mes);
     customFirstMesRef.current = activeCharacter.first_mes;
-    setFirstMesEditorOpen(false);
 
     setMessages([
       {
@@ -568,6 +565,10 @@ const ChatPage = () => {
       scenario={scenarioOverride}
       onScenarioChange={setScenarioOverride}
       onClose={isMobile ? () => setSettingsOpen(false) : undefined}
+      customFirstMes={customFirstMes}
+      onCustomFirstMesChange={handleCustomFirstMesChange}
+      isPendingChat={isPendingChat}
+      defaultFirstMes={activeCharacter.first_mes}
     />
   ) : null;
 
@@ -715,69 +716,14 @@ const ChatPage = () => {
                 </div>
               )}
 
-              {isPendingChat && (
-                <div className="mx-4 md:mx-6">
-                  <button
-                    onClick={() => setFirstMesEditorOpen(!firstMesEditorOpen)}
-                    className="flex items-center gap-2 w-full text-left py-2 text-xs font-medium text-muted-foreground hover:text-neon-blue transition-colors group"
-                  >
-                    <PenLine size={14} className="text-neon-blue/60 group-hover:text-neon-blue transition-colors" />
-                    <span>Tùy chỉnh lời chào</span>
-                    <span className="text-[10px] text-muted-foreground/50 italic">(Tùy chọn)</span>
-                    <ChevronDown size={14} className={`ml-auto transition-transform duration-200 ${firstMesEditorOpen ? "rotate-180" : ""}`} />
-                  </button>
-
-                  <AnimatePresence>
-                    {firstMesEditorOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: "easeInOut" }}
-                        className="overflow-hidden"
-                      >
-                        <div className="rounded-xl bg-oled-surface border border-gray-border/50 p-4 space-y-3 mb-2">
-                          <div className="flex items-center gap-2">
-                            <button className="px-3 py-1.5 text-xs rounded-lg bg-neon-blue/10 text-neon-blue border border-neon-blue/30 font-medium">
-                              Nhập tay
-                            </button>
-                            <div className="relative">
-                              <button
-                                disabled
-                                className="px-3 py-1.5 text-xs rounded-lg bg-oled-elevated text-muted-foreground/50 border border-gray-border cursor-not-allowed"
-                              >
-                                Tạo bằng AI
-                              </button>
-                              <span className="absolute -top-2.5 -right-3 text-[9px] px-1.5 py-0.5 rounded-full bg-neon-rose/20 text-neon-rose font-medium whitespace-nowrap">
-                                Đang phát triển
-                              </span>
-                            </div>
-                          </div>
-
-                          <textarea
-                            value={customFirstMes}
-                            onChange={(e) => handleCustomFirstMesChange(e.target.value)}
-                            className="w-full bg-oled-base border border-gray-border/30 focus:border-neon-blue text-foreground/90 rounded-lg p-3 text-base md:text-sm resize-none outline-none min-h-[120px] max-h-[300px] scrollbar-thin transition-colors duration-200 placeholder:text-muted-foreground/50"
-                            placeholder="Nhập lời chào mở đầu tùy chỉnh..."
-                          />
-
-                          <div className="flex items-center justify-between">
-                            <p className="text-[10px] text-muted-foreground/50">
-                              Chỉnh sửa tin nhắn mở đầu trước khi bắt đầu trò chuyện
-                            </p>
-                            <button
-                              onClick={() => handleCustomFirstMesChange(activeCharacter?.first_mes || "")}
-                              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-neon-rose transition-colors"
-                            >
-                              <RotateCcw size={10} />
-                              Đặt lại
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+              {isPendingChat && !settingsOpen && (
+                <button
+                  onClick={() => setSettingsOpen(true)}
+                  className="mx-4 md:mx-6 flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-neon-blue/30 bg-neon-blue/5 text-[11px] text-neon-blue/80 hover:border-neon-blue/60 hover:text-neon-blue transition-colors"
+                >
+                  <PenLine size={12} />
+                  <span>Bấm vào đây hoặc biểu tượng ⚙️ để tùy chỉnh lời chào & bối cảnh</span>
+                </button>
               )}
 
               <AnimatePresence>
