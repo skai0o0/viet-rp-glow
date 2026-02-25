@@ -69,9 +69,9 @@ const CharacterPage = () => {
   if (notFound || !character) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-oled-base text-muted-foreground gap-4">
-        <p className="text-lg">Nhan vat khong ton tai hoac khong cong khai.</p>
+        <p className="text-lg">Nhân vật không tồn tại hoặc không công khai.</p>
         <Button variant="outline" onClick={() => navigate("/")} className="border-gray-border">
-          <ArrowLeft size={14} className="mr-2" /> Ve trang chu
+          <ArrowLeft size={14} className="mr-2" /> Về trang chủ
         </Button>
       </div>
     );
@@ -85,15 +85,15 @@ const CharacterPage = () => {
     const url = window.location.href;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Da copy link chia se!");
+      toast.success("Đã copy link chia sẻ!");
     } catch {
-      toast.error("Khong the copy link");
+      toast.error("Không thể copy link");
     }
   };
 
   const handleFav = async () => {
     if (!user) {
-      toast.error("Dang nhap de yeu thich nhan vat");
+      toast.error("Đăng nhập để yêu thích nhân vật");
       return;
     }
     const newState = await toggleFavorite(character.id);
@@ -102,12 +102,12 @@ const CharacterPage = () => {
 
   const handleRate = async (value: number) => {
     if (!user) {
-      toast.error("Dang nhap de danh gia");
+      toast.error("Đăng nhập để đánh giá");
       return;
     }
     await rateCharacter(character.id, value);
     setMyRating(value);
-    toast.success("Da danh gia!");
+    toast.success("Đã đánh giá!");
   };
 
   return (
@@ -147,7 +147,7 @@ const CharacterPage = () => {
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{character.name}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              boi {character.creator || "Unknown"} · v{character.character_version || "1.0"}
+              bởi {character.creator || "Unknown"} · v{character.character_version || "1.0"}
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
@@ -185,7 +185,7 @@ const CharacterPage = () => {
             </button>
           ))}
           <span className="text-xs text-muted-foreground ml-2">
-            {myRating > 0 ? `Ban da danh gia ${myRating} sao` : "Danh gia nhan vat nay"}
+            {myRating > 0 ? `Bạn đã đánh giá ${myRating} sao` : "Đánh giá nhân vật này"}
           </span>
         </div>
 
@@ -207,7 +207,7 @@ const CharacterPage = () => {
         {character.description && (
           <div className="bg-oled-surface border border-gray-border rounded-2xl p-5">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Mo ta
+              Mô tả
             </h3>
             <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
               {replaceMacros(character.description, character.name, persona)}
@@ -219,7 +219,7 @@ const CharacterPage = () => {
         {character.personality && (
           <div className="bg-oled-surface border border-gray-border rounded-2xl p-5">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Tinh cach
+              Tính cách
             </h3>
             <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
               {replaceMacros(character.personality, character.name, persona)}
@@ -231,7 +231,7 @@ const CharacterPage = () => {
         {character.scenario && (
           <div className="bg-oled-surface border border-gray-border rounded-2xl p-5">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Boi canh
+              Bối cảnh
             </h3>
             <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
               {replaceMacros(character.scenario, character.name, persona)}

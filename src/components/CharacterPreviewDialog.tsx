@@ -169,7 +169,7 @@ const CharacterPreviewDialog = ({
 
             {character.description && (
               <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Mo ta</h4>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Mô tả</h4>
                 <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
                   {replaceMacros(character.description, character.name, getCachedUserPersona().displayName)}
                 </p>
@@ -178,7 +178,7 @@ const CharacterPreviewDialog = ({
 
             {character.short_summary && (
               <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tom tat</h4>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tóm tắt</h4>
                 <p className="text-sm text-foreground/80 leading-relaxed">
                   {replaceMacros(character.short_summary, character.name, getCachedUserPersona().displayName)}
                 </p>

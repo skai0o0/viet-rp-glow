@@ -60,19 +60,19 @@ $$;`;
 
 const PRESET_QUERIES = [
   {
-    label: "Tat ca nhan vat (top 20)",
+    label: "Tất cả nhân vật (top 20)",
     sql: "SELECT id, name, message_count, rating, is_public, created_at FROM characters ORDER BY created_at DESC LIMIT 20",
   },
   {
-    label: "Thong ke nguoi dung",
+    label: "Thống kê người dùng",
     sql: "SELECT id, display_name, nsfw_mode, created_at FROM profiles ORDER BY created_at DESC LIMIT 20",
   },
   {
-    label: "Chat sessions gan day",
+    label: "Chat sessions gần đây",
     sql: "SELECT id, character_id, user_id, title, created_at, updated_at FROM chat_sessions ORDER BY updated_at DESC LIMIT 20",
   },
   {
-    label: "Top nhan vat theo tin nhan",
+    label: "Top nhân vật theo tin nhắn",
     sql: "SELECT id, name, message_count, rating FROM characters WHERE is_public = true ORDER BY message_count DESC LIMIT 10",
   },
   {
@@ -176,7 +176,7 @@ const AdminSqlEditorPage = () => {
 
   const copySetupSql = async () => {
     await navigator.clipboard.writeText(SETUP_SQL);
-    toast.success("Da copy SQL setup!");
+    toast.success("Đã copy SQL setup!");
   };
 
   if (isLoading || checking) {
@@ -207,7 +207,7 @@ const AdminSqlEditorPage = () => {
           <div>
             <h1 className="text-xl font-bold text-foreground">SQL Editor</h1>
             <p className="text-xs text-muted-foreground">
-              Thuc thi truy van SQL truc tiep tren Supabase
+              Thực thi truy vấn SQL trực tiếp trên Supabase
             </p>
           </div>
         </div>
@@ -217,11 +217,11 @@ const AdminSqlEditorPage = () => {
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
             <div className="flex items-center gap-2 text-amber-400">
               <AlertTriangle size={16} />
-              <span className="text-sm font-semibold">Can cai dat ham exec_sql</span>
+              <span className="text-sm font-semibold">Cần cài đặt hàm exec_sql</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Hay chay doan SQL ben duoi trong Supabase SQL Editor (trang web Supabase) de kich hoat
-              tinh nang nay. Chi can chay mot lan duy nhat.
+              Hãy chạy đoạn SQL bên dưới trong Supabase SQL Editor (trang web Supabase) để kích hoạt
+              tính năng này. Chỉ cần chạy một lần duy nhất.
             </p>
             <div className="relative">
               <pre className="text-[11px] text-foreground/80 bg-oled-base border border-gray-border rounded-lg p-3 overflow-x-auto max-h-64 scrollbar-thin font-mono">
@@ -278,7 +278,7 @@ const AdminSqlEditorPage = () => {
               className="border-gray-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 text-xs gap-1"
             >
               <Clock size={12} />
-              Lich su ({history.length})
+              Lịch sử ({history.length})
               <ChevronDown size={12} />
             </Button>
             {showHistory && history.length > 0 && (
@@ -306,7 +306,7 @@ const AdminSqlEditorPage = () => {
             className="border-gray-border text-muted-foreground hover:text-neon-rose hover:border-neon-rose/40 text-xs gap-1"
           >
             <Trash2 size={12} />
-            Xoa
+            Xoá
           </Button>
 
           <div className="flex-1" />
@@ -325,7 +325,7 @@ const AdminSqlEditorPage = () => {
             value={sql}
             onChange={(e) => setSql(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="-- Nhap SQL tai day... (Ctrl+Enter de chay)"
+            placeholder="-- Nhập SQL tại đây... (Ctrl+Enter để chạy)"
             spellCheck={false}
             rows={8}
             className="w-full bg-oled-base border border-gray-border rounded-xl p-4 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-neon-blue/50 resize-y min-h-[120px] scrollbar-thin"
@@ -336,7 +336,7 @@ const AdminSqlEditorPage = () => {
             className="absolute bottom-3 right-3 bg-neon-blue hover:bg-neon-blue/80 text-white h-8 px-3 text-xs gap-1.5"
           >
             {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            {running ? "Dang chay..." : "Chay (Ctrl+Enter)"}
+            {running ? "Đang chạy..." : "Chạy (Ctrl+Enter)"}
           </Button>
         </div>
 
@@ -345,7 +345,7 @@ const AdminSqlEditorPage = () => {
           <div className="rounded-xl border border-neon-rose/30 bg-neon-rose/5 p-4">
             <div className="flex items-center gap-2 text-neon-rose mb-1">
               <AlertTriangle size={14} />
-              <span className="text-sm font-semibold">Loi</span>
+              <span className="text-sm font-semibold">Lỗi</span>
             </div>
             <pre className="text-xs text-neon-rose/80 font-mono whitespace-pre-wrap">
               {error}
@@ -359,16 +359,16 @@ const AdminSqlEditorPage = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {isArray
-                  ? `${result.length} dong`
+                  ? `${result.length} dòng`
                   : result?.affected_rows !== undefined
-                    ? `${result.affected_rows} dong bi anh huong`
-                    : "Hoan thanh"}
+                    ? `${result.affected_rows} dòng bị ảnh hưởng`
+                    : "Hoàn thành"}
               </span>
               {isArray && result.length > 0 && (
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-                    toast.success("Da copy JSON!");
+                    toast.success("Đã copy JSON!");
                   }}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                 >
@@ -421,7 +421,7 @@ const AdminSqlEditorPage = () => {
               </div>
             ) : isArray && result.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                Khong co ket qua
+                Không có kết quả
               </div>
             ) : (
               <pre className="text-xs text-foreground/80 bg-oled-base border border-gray-border rounded-xl p-4 font-mono">
