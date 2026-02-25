@@ -274,7 +274,7 @@ const AdminKnowledgePage = () => {
             <FileText size={40} className="mx-auto mb-3 opacity-30" />
             <p className="text-sm">
               {items.length === 0
-                ? "Chưa có mục nào. Bấm "Thêm mục" để bắt đầu."
+                ? "Chưa có mục nào. Bấm 'Thêm mục' để bắt đầu!"
                 : "Không tìm thấy kết quả."}
             </p>
           </div>
