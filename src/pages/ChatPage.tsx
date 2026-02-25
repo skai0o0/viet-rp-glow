@@ -154,6 +154,8 @@ const ChatPage = () => {
             short_summary: dbChar.short_summary,
             tags: dbChar.tags,
             description: dbChar.description,
+            message_count: dbChar.message_count,
+            rating: dbChar.rating,
           });
           return next;
         });
@@ -178,7 +180,7 @@ const ChatPage = () => {
       setCharMap((prev) => {
         const next = new Map(prev);
         chars.forEach((c) => {
-          if (c) next.set(c.id, { id: c.id, name: c.name, avatar_url: c.avatar_url, short_summary: c.short_summary, tags: c.tags, description: c.description });
+          if (c) next.set(c.id, { id: c.id, name: c.name, avatar_url: c.avatar_url, short_summary: c.short_summary, tags: c.tags, description: c.description, message_count: c.message_count, rating: c.rating });
         });
         return next;
       });
@@ -572,6 +574,7 @@ const ChatPage = () => {
             next.set(dbChar.id, {
               id: dbChar.id, name: dbChar.name, avatar_url: dbChar.avatar_url,
               short_summary: dbChar.short_summary, tags: dbChar.tags, description: dbChar.description,
+              message_count: dbChar.message_count, rating: dbChar.rating,
             });
             return next;
           });
@@ -743,7 +746,7 @@ const ChatPage = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setSearchIdx(0); }}
-                  placeholder="Tim kiem tin nhan..."
+                  placeholder="Tìm kiếm tin nhắn..."
                   className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && searchMatches.length > 0) {
