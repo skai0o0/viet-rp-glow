@@ -22,6 +22,8 @@ const AdminPage = lazy(() => import("@/pages/AdminPage"));
 const AdminRoadmapPage = lazy(() => import("@/pages/AdminRoadmapPage"));
 const AdminChatSettingsPage = lazy(() => import("@/pages/AdminChatSettingsPage"));
 const AdminKnowledgePage = lazy(() => import("@/pages/AdminKnowledgePage"));
+const AdminSqlEditorPage = lazy(() => import("@/pages/AdminSqlEditorPage"));
+const CharacterPage = lazy(() => import("@/pages/CharacterPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const TermsPage = lazy(() => import("@/pages/TermsPage"));
 
@@ -56,11 +58,13 @@ const App = () => (
                 <Route path="/edit/:characterId" element={<ProtectedRoute><EditCharacterPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                <Route path="/character/:id" element={<CharacterPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
                 <Route path="/admin/roadmap" element={<ProtectedRoute><AdminRoadmapPage /></ProtectedRoute>} />
                 <Route path="/admin/chatSettings" element={<ProtectedRoute><AdminChatSettingsPage /></ProtectedRoute>} />
                 <Route path="/admin/knowledge" element={<ProtectedRoute><AdminKnowledgePage /></ProtectedRoute>} />
+                <Route path="/admin/sql" element={<ProtectedRoute><AdminSqlEditorPage /></ProtectedRoute>} />
                 <Route path="/terms" element={<TermsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />

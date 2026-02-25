@@ -195,6 +195,67 @@ export type Database = {
           },
         ]
       }
+      character_ratings: {
+        Row: {
+          id: string
+          user_id: string
+          character_id: string
+          value: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          character_id: string
+          value: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          character_id?: string
+          value?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_ratings_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_favorites: {
+        Row: {
+          id: string
+          user_id: string
+          character_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          character_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          character_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_favorites_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base: {
         Row: {
           id: string

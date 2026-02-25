@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { MessageSquare, Star } from "lucide-react";
+import { MessageSquare, Star, Heart } from "lucide-react";
 import { CharacterSummary } from "@/services/characterDb";
 import { isCharacterNsfw } from "@/utils/nsfwFilter";
 import { Badge } from "@/components/ui/badge";
+import { toggleFavorite } from "@/services/favoriteDb";
+import { toast } from "sonner";
 
 function formatCount(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -14,12 +16,29 @@ function formatCount(n: number): string {
 interface CharacterCardProps {
   character: CharacterSummary;
   onClick?: () => void;
+  isFavorited?: boolean;
+  onFavoriteToggle?: (id: string, newState: boolean) => void;
 }
 
-const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
+const CharacterCard = ({ character, onClick, isFavorited, onFavoriteToggle }: CharacterCardProps) => {
   const initial = character.name?.charAt(0)?.toUpperCase() || "?";
   const nsfw = isCharacterNsfw(character);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
+
+  const handleFav = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (favLoading) return;
+    setFavLoading(true);
+    try {
+      const newState = await toggleFavorite(character.id);
+      onFavoriteToggle?.(character.id, newState);
+    } catch {
+      toast.error("Đăng nhập để yêu thích nhân vật");
+    } finally {
+      setFavLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -32,7 +51,6 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
       <div className="relative aspect-[4/3] w-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-oled-elevated to-oled-base">
         {character.avatar_url ? (
           <>
-            {/* Placeholder shown until image loads */}
             {!imgLoaded && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-4xl font-bold text-secondary/30">{initial}</span>
@@ -51,6 +69,20 @@ const CharacterCard = ({ character, onClick }: CharacterCardProps) => {
             <span className="text-4xl font-bold text-secondary">{initial}</span>
           </div>
         )}
+
+        {/* Favorite button */}
+        {onFavoriteToggle && (
+          <button
+            onClick={handleFav}
+            className="absolute top-2 left-2 w-7 h-7 rounded-full bg-oled-base/70 backdrop-blur flex items-center justify-center transition-colors hover:bg-oled-base/90"
+          >
+            <Heart
+              size={14}
+              className={isFavorited ? "fill-neon-rose text-neon-rose" : "text-white/70"}
+            />
+          </button>
+        )}
+
         {nsfw && (
           <Badge className="absolute bottom-2 right-2 bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
             NSFW

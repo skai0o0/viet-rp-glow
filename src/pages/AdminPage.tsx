@@ -21,6 +21,7 @@ import {
   Sparkles,
   ChevronRight,
   BookOpen,
+  Database,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
@@ -149,6 +150,13 @@ const AdminPage = () => {
       description: "Kho kiến thức, prompt & template hệ thống",
       path: "/admin/knowledge",
       color: "text-green-400 bg-green-400/10",
+    },
+    {
+      icon: Database,
+      label: "SQL Editor",
+      description: "Thực thi truy vấn SQL trực tiếp trên Supabase",
+      path: "/admin/sql",
+      color: "text-amber-400 bg-amber-400/10",
     },
   ];
 

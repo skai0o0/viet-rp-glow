@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -49,11 +49,14 @@ const AuthPage = () => {
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + from,
+      },
     });
     if (error) {
-      toast.error("Đăng nhập Google thất bại.");
+      toast.error("Đăng nhập Google thất bại: " + error.message);
     }
   };
 

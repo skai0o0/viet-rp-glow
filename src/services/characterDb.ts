@@ -225,6 +225,27 @@ export async function incrementMessageCount(characterId: string) {
   }
 }
 
+/** Fetch top characters by message_count (trending) */
+export async function getTrendingCharacters(limit = 10): Promise<CharacterSummary[]> {
+  const { data, error } = await supabase
+    .from("characters")
+    .select(SUMMARY_COLS_FULL)
+    .eq("is_public", true)
+    .order("message_count", { ascending: false })
+    .limit(limit);
+
+  if (!error) return withStatDefaults(data ?? []);
+
+  const fb = await supabase
+    .from("characters")
+    .select(SUMMARY_COLS_BASE)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (fb.error) return [];
+  return withStatDefaults(fb.data ?? []);
+}
+
 /** Convert a DbCharacter back to CharacterCard format for chat */
 export function dbCharToCard(char: DbCharacter) {
   return {

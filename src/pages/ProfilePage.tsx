@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Trash2, Eye, EyeOff, Check, Loader2, ShieldCheck, Pencil } from "lucide-react";
+import { User, Trash2, Eye, EyeOff, Check, Loader2, ShieldCheck, Pencil, Heart } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getMyProfile, upsertProfile, setCachedUserPersona } from "@/services/profileDb";
 import { getMyCharacters, CharacterSummary } from "@/services/characterDb";
+import { getMyFavorites, toggleFavorite } from "@/services/favoriteDb";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getApiKey,
@@ -55,6 +56,10 @@ const ProfilePage = () => {
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loadingChars, setLoadingChars] = useState(true);
 
+  // Favorites state
+  const [favorites, setFavorites] = useState<CharacterSummary[]>([]);
+  const [loadingFavs, setLoadingFavs] = useState(true);
+
   // Settings state
   const [apiKeyVal, setApiKeyVal] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -80,6 +85,12 @@ const ProfilePage = () => {
       .then(setCharacters)
       .catch(() => setCharacters([]))
       .finally(() => setLoadingChars(false));
+
+    // Load favorites
+    getMyFavorites()
+      .then(setFavorites)
+      .catch(() => setFavorites([]))
+      .finally(() => setLoadingFavs(false));
 
     // Load settings
     setApiKeyVal(getApiKey());
@@ -175,10 +186,16 @@ const ProfilePage = () => {
               Hồ sơ Roleplay
             </TabsTrigger>
             <TabsTrigger
+              value="favorites"
+              className="flex-1 data-[state=active]:bg-neon-purple/15 data-[state=active]:text-neon-purple rounded-lg text-sm"
+            >
+              Yêu thích
+            </TabsTrigger>
+            <TabsTrigger
               value="characters"
               className="flex-1 data-[state=active]:bg-neon-purple/15 data-[state=active]:text-neon-purple rounded-lg text-sm"
             >
-              Nhân vật của tôi
+              Nhân vật
             </TabsTrigger>
             <TabsTrigger
               value="settings"
@@ -235,6 +252,39 @@ const ProfilePage = () => {
                 {savingPersona ? <Loader2 size={16} className="animate-spin mr-2" /> : <Check size={16} className="mr-2" />}
                 Lưu Persona
               </Button>
+            </motion.div>
+          </TabsContent>
+
+          {/* TAB: Favorites */}
+          <TabsContent value="favorites" className="mt-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              {loadingFavs ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 size={24} className="animate-spin text-neon-rose" />
+                </div>
+              ) : favorites.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <Heart size={48} className="mx-auto mb-4 opacity-30" />
+                  <p>Chưa yêu thích nhân vật nào.</p>
+                  <p className="text-xs mt-1">Bấm vào biểu tượng tim trên card nhân vật để thêm vào danh sách yêu thích.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+                  {favorites.map((char) => (
+                    <div key={char.id} className="relative group">
+                      <CharacterCard
+                        character={char}
+                        onClick={() => navigate(`/chat/${char.id}`)}
+                        isFavorited={true}
+                        onFavoriteToggle={async (id) => {
+                          await toggleFavorite(id);
+                          setFavorites((prev) => prev.filter((c) => c.id !== id));
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </TabsContent>
 

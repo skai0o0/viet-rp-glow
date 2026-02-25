@@ -3,7 +3,7 @@ import { filterByNsfw } from "@/utils/nsfwFilter";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { Compass, ArrowRight, Sparkles, Search, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Compass, ArrowRight, Sparkles, Search, Filter, X, ChevronLeft, ChevronRight, TrendingUp, MessageSquare } from "lucide-react";
 import AppFooter from "@/components/AppFooter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,9 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CharacterCard from "@/components/CharacterCard";
 import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
-import { getPublicCharacters, CharacterSummary } from "@/services/characterDb";
+import { getPublicCharacters, getTrendingCharacters, CharacterSummary } from "@/services/characterDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { getActiveBanner, BannerData } from "@/services/bannerDb";
+import { getFavoritedIds } from "@/services/favoriteDb";
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(n);
+}
 
 const HomePage = () => {
   const [tagFilter, setTagFilter] = useState("");
@@ -25,6 +32,8 @@ const HomePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
+  const [trending, setTrending] = useState<CharacterSummary[]>([]);
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(18);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -64,10 +73,14 @@ const HomePage = () => {
       .then(setCharacters)
       .catch(() => setCharacters([]))
       .finally(() => setLoading(false));
+    getTrendingCharacters(10).then(setTrending).catch(() => {});
     getActiveBanner()
       .then(setBanner)
       .catch(() => setBanner(null));
-  }, []);
+    if (user) {
+      getFavoritedIds().then(setFavIds).catch(() => {});
+    }
+  }, [user]);
 
   // Dynamically calculate items per page based on grid width + screen size
   useEffect(() => {
@@ -100,6 +113,15 @@ const HomePage = () => {
   const goToPage = useCallback((p: number) => {
     setPage(Math.max(1, Math.min(p, totalPages)));
   }, [totalPages]);
+
+  const handleFavToggle = useCallback((id: string, newState: boolean) => {
+    setFavIds((prev) => {
+      const next = new Set(prev);
+      if (newState) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   const handleStartNow = () => {
     if (user) {
@@ -272,6 +294,53 @@ const HomePage = () => {
         </motion.div>
       </section>
 
+      {/* Trending Section */}
+      {trending.length > 0 && (
+        <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-8">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.45 }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="text-neon-rose" size={20} />
+              <h2 className="text-lg font-bold text-foreground">
+                Trending
+              </h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2">
+              {trending.map((char) => {
+                const initial = char.name?.charAt(0)?.toUpperCase() || "?";
+                return (
+                  <button
+                    key={char.id}
+                    onClick={() => setPreviewChar(char)}
+                    className="shrink-0 w-28 flex flex-col items-center gap-1.5 p-2 rounded-xl bg-oled-surface border border-gray-border hover:border-neon-purple/40 hover:scale-[1.03] transition-all duration-200"
+                  >
+                    <div className="w-16 h-16 rounded-full overflow-hidden bg-oled-elevated border border-gray-border">
+                      {char.avatar_url ? (
+                        <img src={char.avatar_url} alt={char.name} className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-lg font-bold text-secondary">
+                          {initial}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-foreground truncate w-full text-center">
+                      {char.name}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                      <MessageSquare size={9} className="text-neon-blue/60" />
+                      {formatCount(char.message_count ?? 0)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </section>
+      )}
+
       {/* Discover Section */}
       <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-16 pb-10">
         <motion.div
@@ -441,7 +510,12 @@ const HomePage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.25, delay: i * 0.02 }}
                 >
-                  <CharacterCard character={char} onClick={() => setPreviewChar(char)} />
+                  <CharacterCard
+                    character={char}
+                    onClick={() => setPreviewChar(char)}
+                    isFavorited={favIds.has(char.id)}
+                    onFavoriteToggle={user ? handleFavToggle : undefined}
+                  />
                 </motion.div>
               ))
           }
@@ -514,7 +588,12 @@ const HomePage = () => {
       <AppFooter />
 
       {previewChar && createPortal(
-        <CharacterPreviewDialog character={previewChar} onClose={() => setPreviewChar(null)} />,
+        <CharacterPreviewDialog
+          character={previewChar}
+          onClose={() => setPreviewChar(null)}
+          isFavorited={favIds.has(previewChar.id)}
+          onFavoriteToggle={user ? handleFavToggle : undefined}
+        />,
         document.body
       )}
     </div>

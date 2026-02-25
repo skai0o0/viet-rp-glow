@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { filterByNsfw } from "@/utils/nsfwFilter";
 import { motion } from "framer-motion";
@@ -10,11 +10,27 @@ import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
 import { CharacterSummary, getPublicCharactersPaginated } from "@/services/characterDb";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
-import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getFavoritedIds } from "@/services/favoriteDb";
 
 const HubPage = () => {
   const [search, setSearch] = useState("");
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
+  const { user } = useAuth();
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (user) getFavoritedIds().then(setFavIds).catch(() => {});
+  }, [user]);
+
+  const handleFavToggle = useCallback((id: string, newState: boolean) => {
+    setFavIds((prev) => {
+      const next = new Set(prev);
+      if (newState) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   const {
     data,
@@ -107,7 +123,13 @@ const HubPage = () => {
               </div>
             )
           : filtered.map((char) => (
-              <CharacterCard key={char.id} character={char} onClick={() => setPreviewChar(char)} />
+              <CharacterCard
+                key={char.id}
+                character={char}
+                onClick={() => setPreviewChar(char)}
+                isFavorited={favIds.has(char.id)}
+                onFavoriteToggle={user ? handleFavToggle : undefined}
+              />
             ))
         }
       </div>
@@ -122,7 +144,12 @@ const HubPage = () => {
       )}
 
       {previewChar && createPortal(
-        <CharacterPreviewDialog character={previewChar} onClose={() => setPreviewChar(null)} />,
+        <CharacterPreviewDialog
+          character={previewChar}
+          onClose={() => setPreviewChar(null)}
+          isFavorited={favIds.has(previewChar.id)}
+          onFavoriteToggle={user ? handleFavToggle : undefined}
+        />,
         document.body
       )}
     </div>

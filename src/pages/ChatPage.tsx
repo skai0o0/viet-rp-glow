@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCachedUserPersona } from "@/services/profileDb";
-import { Menu, Settings2, Trash2, PenLine } from "lucide-react";
+import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
@@ -55,6 +55,24 @@ const ChatPage = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const customFirstMesRef = useRef("");
+
+  // Message search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchIdx, setSearchIdx] = useState(0);
+
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return messages
+      .map((m, i) => (m.content.toLowerCase().includes(q) ? i : -1))
+      .filter((i) => i !== -1);
+  }, [messages, searchQuery]);
+
+  const searchMatchIds = useMemo(
+    () => new Set(searchMatches.map((i) => messages[i]?.id)),
+    [searchMatches, messages],
+  );
 
   const charSessions = useMemo(
     () => (activeCharId ? sessions.filter((s) => s.character_id === activeCharId) : []),
@@ -696,12 +714,84 @@ const ChatPage = () => {
                 }
               }} />
           </div>
+          {/* Search toggle */}
+          <button onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(""); setSearchIdx(0); }}
+            className={`p-2 transition-colors ${searchOpen ? "text-neon-blue" : "text-muted-foreground hover:text-foreground"}`}>
+            <Search size={18} />
+          </button>
           {/* Settings toggle button */}
           <button onClick={() => setSettingsOpen(!settingsOpen)}
-            className={`p-4 transition-colors ${settingsOpen ? "text-neon-purple" : "text-muted-foreground hover:text-foreground"}`}>
+            className={`p-4 pl-1 transition-colors ${settingsOpen ? "text-neon-purple" : "text-muted-foreground hover:text-foreground"}`}>
             <Settings2 size={20} />
           </button>
         </div>
+
+        {/* Search bar */}
+        <AnimatePresence>
+          {searchOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="overflow-hidden border-b border-gray-border bg-oled-surface"
+            >
+              <div className="flex items-center gap-2 px-4 py-2">
+                <Search size={14} className="text-muted-foreground shrink-0" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSearchIdx(0); }}
+                  placeholder="Tim kiem tin nhan..."
+                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchMatches.length > 0) {
+                      const next = (searchIdx + 1) % searchMatches.length;
+                      setSearchIdx(next);
+                      document.getElementById(`msg-${messages[searchMatches[next]]?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    } else if (e.key === "Escape") {
+                      setSearchOpen(false);
+                      setSearchQuery("");
+                    }
+                  }}
+                />
+                {searchQuery && (
+                  <span className="text-[11px] text-muted-foreground shrink-0">
+                    {searchMatches.length > 0 ? `${searchIdx + 1}/${searchMatches.length}` : "0"}
+                  </span>
+                )}
+                {searchMatches.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => {
+                        const prev = (searchIdx - 1 + searchMatches.length) % searchMatches.length;
+                        setSearchIdx(prev);
+                        document.getElementById(`msg-${messages[searchMatches[prev]]?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
+                      className="p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const next = (searchIdx + 1) % searchMatches.length;
+                        setSearchIdx(next);
+                        document.getElementById(`msg-${messages[searchMatches[next]]?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
+                      className="p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </>
+                )}
+                <button onClick={() => { setSearchOpen(false); setSearchQuery(""); }} className="p-1 text-muted-foreground hover:text-foreground">
+                  <X size={14} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex-1 flex overflow-hidden">
           {/* Chat messages area */}
@@ -736,7 +826,8 @@ const ChatPage = () => {
 
               <AnimatePresence>
                 {messages.map((msg, idx) => (
-                  <MessageBubble key={msg.id} message={msg}
+                  <div key={msg.id} id={`msg-${msg.id}`} className={searchMatchIds.has(msg.id) ? "ring-1 ring-neon-blue/50 rounded-xl mx-2" : ""}>
+                  <MessageBubble message={msg}
                     characterAvatar={activeCharacter.avatar} characterName={activeCharacter.name}
                     userName={getCachedUserPersona().displayName}
                     isStreaming={isStreaming && msg.id === messages[messages.length - 1]?.id && msg.role === "assistant"}
@@ -745,6 +836,7 @@ const ChatPage = () => {
                     onRegenerate={handleRegenerate} onBranch={() => handleBranch(idx)}
                     onDelete={() => handleDeleteMessage(msg.id)}
                     onEdit={(newContent) => handleEditAndResend(idx, newContent)} />
+                  </div>
                 ))}
               </AnimatePresence>
 
