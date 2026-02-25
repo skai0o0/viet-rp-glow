@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Sparkles,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
@@ -141,6 +142,13 @@ const AdminPage = () => {
       description: "Xem payload input token gửi tới LLM",
       path: "/admin/chatSettings",
       color: "text-neon-blue bg-neon-blue/10",
+    },
+    {
+      icon: BookOpen,
+      label: "Knowledge Base",
+      description: "Kho kiến thức, prompt & template hệ thống",
+      path: "/admin/knowledge",
+      color: "text-green-400 bg-green-400/10",
     },
   ];
 

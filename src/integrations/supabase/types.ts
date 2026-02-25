@@ -195,6 +195,36 @@ export type Database = {
           },
         ]
       }
+      knowledge_base: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          content: string
+          category: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string
+          content: string
+          category?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string
+          content?: string
+          category?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       global_settings: {
         Row: {
           id: string

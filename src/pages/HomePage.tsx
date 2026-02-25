@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { filterByNsfw } from "@/utils/nsfwFilter";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { Compass, ArrowRight, Sparkles, Search, Filter, X } from "lucide-react";
+import { Compass, ArrowRight, Sparkles, Search, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
 import AppFooter from "@/components/AppFooter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +25,9 @@ const HomePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(18);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const visibleCharacters = useMemo(() => filterByNsfw(characters), [characters]);
 
@@ -65,6 +68,38 @@ const HomePage = () => {
       .then(setBanner)
       .catch(() => setBanner(null));
   }, []);
+
+  // Dynamically calculate items per page based on grid width + screen size
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const calc = () => {
+      const w = el.clientWidth;
+      const gap = window.innerWidth >= 640 ? 16 : 12;
+      const minCol = 160;
+      const cols = Math.max(Math.floor((w + gap) / (minCol + gap)), 2);
+      const rows = window.innerWidth >= 1024 ? 3 : 5;
+      setPerPage(cols * rows);
+    };
+    const observer = new ResizeObserver(calc);
+    observer.observe(el);
+    calc();
+    return () => observer.disconnect();
+  }, []);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1); }, [searchQuery, selectedTags]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCharacters.length / perPage));
+  const safePage = Math.min(page, totalPages);
+  const pageChars = filteredCharacters.slice(
+    (safePage - 1) * perPage,
+    safePage * perPage,
+  );
+
+  const goToPage = useCallback((p: number) => {
+    setPage(Math.max(1, Math.min(p, totalPages)));
+  }, [totalPages]);
 
   const handleStartNow = () => {
     if (user) {
@@ -363,9 +398,13 @@ const HomePage = () => {
           </div>
         )}
 
-        <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+        <div
+          ref={gridRef}
+          className="grid gap-3 sm:gap-4"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}
+        >
           {loading
-            ? Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: perPage }).map((_, i) => (
                 <div
                   key={i}
                   className="bg-oled-surface rounded-2xl border border-gray-border overflow-hidden"
@@ -395,18 +434,81 @@ const HomePage = () => {
                   </p>
                 </div>
               )
-              : filteredCharacters.map((char, i) => (
+              : pageChars.map((char, i) => (
                 <motion.div
                   key={char.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: 0.55 + i * 0.07 }}
+                  transition={{ duration: 0.25, delay: i * 0.02 }}
                 >
                   <CharacterCard character={char} onClick={() => setPreviewChar(char)} />
                 </motion.div>
               ))
           }
         </div>
+
+        {/* Pagination */}
+        {!loading && filteredCharacters.length > perPage && (
+          <div className="flex items-center justify-center gap-1.5 mt-8">
+            <button
+              onClick={() => goToPage(safePage - 1)}
+              disabled={safePage <= 1}
+              className="w-9 h-9 rounded-lg flex items-center justify-center border border-gray-border text-muted-foreground hover:border-neon-purple hover:text-neon-purple disabled:opacity-30 disabled:pointer-events-none transition-colors bg-oled-surface"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            {(() => {
+              const pages: (number | "...")[] = [];
+              if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+              } else {
+                pages.push(1);
+                if (safePage > 3) pages.push("...");
+                const start = Math.max(2, safePage - 1);
+                const end = Math.min(totalPages - 1, safePage + 1);
+                for (let i = start; i <= end; i++) pages.push(i);
+                if (safePage < totalPages - 2) pages.push("...");
+                pages.push(totalPages);
+              }
+              return pages.map((p, idx) =>
+                p === "..." ? (
+                  <span
+                    key={`dots-${idx}`}
+                    className="w-9 h-9 flex items-center justify-center text-xs text-muted-foreground"
+                  >
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => goToPage(p)}
+                    className={`w-9 h-9 rounded-lg text-xs font-medium flex items-center justify-center border transition-colors ${
+                      p === safePage
+                        ? "bg-neon-purple/20 border-neon-purple text-neon-purple"
+                        : "border-gray-border text-muted-foreground hover:border-neon-purple/40 hover:text-foreground bg-oled-surface"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              );
+            })()}
+
+            <button
+              onClick={() => goToPage(safePage + 1)}
+              disabled={safePage >= totalPages}
+              className="w-9 h-9 rounded-lg flex items-center justify-center border border-gray-border text-muted-foreground hover:border-neon-purple hover:text-neon-purple disabled:opacity-30 disabled:pointer-events-none transition-colors bg-oled-surface"
+            >
+              <ChevronRight size={16} />
+            </button>
+
+            <span className="ml-3 text-xs text-muted-foreground">
+              {(safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, filteredCharacters.length)}{" "}
+              / {filteredCharacters.length}
+            </span>
+          </div>
+        )}
       </section>
 
       <AppFooter />

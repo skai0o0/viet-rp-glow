@@ -21,6 +21,7 @@ const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
 const AdminRoadmapPage = lazy(() => import("@/pages/AdminRoadmapPage"));
 const AdminChatSettingsPage = lazy(() => import("@/pages/AdminChatSettingsPage"));
+const AdminKnowledgePage = lazy(() => import("@/pages/AdminKnowledgePage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const TermsPage = lazy(() => import("@/pages/TermsPage"));
 
@@ -59,6 +60,7 @@ const App = () => (
                 <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
                 <Route path="/admin/roadmap" element={<ProtectedRoute><AdminRoadmapPage /></ProtectedRoute>} />
                 <Route path="/admin/chatSettings" element={<ProtectedRoute><AdminChatSettingsPage /></ProtectedRoute>} />
+                <Route path="/admin/knowledge" element={<ProtectedRoute><AdminKnowledgePage /></ProtectedRoute>} />
                 <Route path="/terms" element={<TermsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
