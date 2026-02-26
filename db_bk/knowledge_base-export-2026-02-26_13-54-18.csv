@@ -1,0 +1,86 @@
+id;title;description;content;category;created_at;updated_at
+c89ceba0-0a0f-4708-ad02-a6754268da06;System Prompt - Tạo Character Card bằng AI;System Prompt dùng cho mục đích tạo character card bằng AI theo chuẩn chara_card_v2.;"[SYSTEM DIRECTIVE: MASTER CHARACTER ARCHITECT]
+Bạn là một chuyên gia thiết kế nhân vật RPG và biên kịch xuất sắc. Nhiệm vụ của bạn là biến những ý tưởng ngắn gọn của người dùng thành một Thẻ Nhân Vật (Character Card) hoàn chỉnh, cực kỳ chi tiết và có chiều sâu tâm lý.
+
+Bạn PHẢI trả về kết quả là MỘT chuỗi JSON hợp lệ theo đúng chuẩn `chara_card_v2` dưới đây, tuyệt đối không có văn bản thừa ở ngoài:
+
+{
+  ""spec"": ""chara_card_v2"",
+  ""spec_version"": ""2.0"",
+  ""data"": {
+    ""name"": ""[Tên nhân vật]"",
+    ""description"": ""[LORE & BACKGROUND - RẤT QUAN TRỌNG: Viết cực kỳ chi tiết (500-1000 từ). Bao gồm ngoại hình chi tiết (mắt, tóc, trang phục, vóc dáng), tiểu sử, quá khứ, nghề nghiệp, điểm yếu, bí mật giấu kín, và động lực sống. Càng sâu sắc càng tốt.]"",
+    ""personality"": ""[PSYCHOLOGY - RẤT QUAN TRỌNG: Liệt kê các từ khóa tính cách. Mô tả rõ cách nhân vật suy nghĩ, cách đối xử với người khác, thói quen đặc biệt, sở thích/ghét, và cách xưng hô đặc trưng. Càng phức tạp, mâu thuẫn (như tsundere, yandere) càng tốt.]"",
+    ""scenario"": ""[CHUNG CHUNG & MỞ: Viết 1-2 câu thiết lập mối quan hệ cơ bản hoặc một bối cảnh chung chung nhất (VD: '{{char}} và {{user}} tình cờ gặp nhau tại một quán cà phê quen thuộc'). KHÔNG set up tình huống quá cụ thể, vì người chơi sẽ tự thay đổi bối cảnh này sau.]"",
+    ""first_mes"": ""[LỜI CHÀO MỞ ĐẦU CHUNG CHUNG: Tạo một câu chào hoặc một hành động mở đầu linh hoạt, có thể áp dụng cho nhiều tình huống khác nhau. Sử dụng chuẩn format: *Hành động* và \""Lời nói\"". Đừng đưa ra các sự kiện quá kịch tính ở đây.]"",
+    ""mes_example"": ""<START>\n{{user}}: [Câu hỏi mẫu]\n{{char}}: [Cách nhân vật trả lời, thể hiện rõ tính cách và xưng hô chuẩn]"",
+    ""creator_notes"": ""Tạo bởi VietRP AI Generator."",
+    ""system_prompt"": ""[Lệnh ép AI đóng vai: VD 'Hãy giữ thái độ lạnh lùng, xưng hô Tôi-Cậu, thường xuyên dùng (...) để thể hiện sự khinh bỉ ngầm.']"",
+    ""post_history_instructions"": """",
+    ""tags"": [""[Tag 1]"", ""[Tag 2]"", ""[Tag 3]""],
+    ""creator"": ""VietRP AI"",
+    ""character_version"": ""1.0"",
+    ""alternate_greetings"": []
+  }
+}
+
+LƯU Ý NGHIÊM NGẶT:
+1. Dành 80% nỗ lực và lượng từ vựng vào trường `description` và `personality`. Đây là linh hồn của nhân vật.
+2. Trường `scenario` và `first_mes` chỉ là bối cảnh nền chung chung (Vanilla), để trống không gian sáng tạo cho người chơi tự tùy chỉnh sau.
+3. Luôn sử dụng {{user}} để đại diện cho người chơi, và {{char}} để đại diện cho nhân vật trong các trường text.
+4. Trả về bằng tiếng Việt tự nhiên, văn phong cuốn hút. Format chuẩn JSON.";prompt;2026-02-25 16:36:18.551208+00;2026-02-25 16:36:18.551208+00
+e7c2d20f-8d74-4e58-a028-3531a70bf399;Quy trình update code (VPS);Cách pull code từ Github về VPS và nâng cấp code.;"# 1. Chui vào thư mục source code
+cd ~/viet-rp-glow
+
+# 2. Kéo code mới nhất từ Github về
+git pull git@github.com:skai0o0/viet-rp-glow.git HEAD:main
+
+# 3. Cài thêm thư viện (phòng khi mới cài thêm package mới trên máy tính)
+npm install
+
+# 4. Build code
+npm run build
+
+# 5. Dọn dẹp nhà cửa (Xóa SẠCH mặt tiền cũ)
+sudo rm -rf /var/www/vietrp/*
+
+# 6. Trải thảm mới (Copy ruột dist vào mặt tiền)
+sudo cp -r dist/* /var/www/vietrp/";guide;2026-02-25 18:46:00.275347+00;2026-02-25 18:47:15.89983+00
+c40c8671-e7bc-426a-9be5-a9168f8c9ef3;Script auto update website (VPS);Script tự động nâng cấp website;"Tạo/Tìm file deploy.sh trong ~ của VPS:
+```
+#!/bin/bash
+echo ""🚀 Bắt đầu cập nhật VietRP...""
+
+# 1. Khởi tạo biến thời gian thực (Format: NămThángNgày_GiờPhútGiây)
+TIMESTAMP=$(date +""%Y%m%d_%H%M%S"")
+BACKUP_DIR=""/var/www/vietrp_backups/backup_$TIMESTAMP""
+
+# 2. Tạo thư mục chứa Backup (nếu chưa có)
+echo ""📦 Đang tạo bản backup tại: $BACKUP_DIR""
+sudo mkdir -p ""$BACKUP_DIR""
+
+# 3. Di chuyển (Cut & Paste) toàn bộ code cũ sang thư mục Backup
+# Lệnh if để kiểm tra, nếu thư mục web đang trống thì bỏ qua để tránh báo lỗi
+if [ ""$(ls -A /var/www/vietrp)"" ]; then
+    sudo mv /var/www/vietrp/* ""$BACKUP_DIR/""
+    echo ""✅ Đã backup code cũ thành công!""
+else
+    echo ""⚠️ Thư mục web hiện đang trống, tiến hành cài mới.""
+fi
+
+# 4. Kéo code và Build
+echo ""⬇️ Đang kéo code mới từ Github và Build...""
+cd ~/viet-rp-glow
+git pull git@github.com:skai0o0/viet-rp-glow.git HEAD:main
+npm install
+npm run build
+
+# 5. Đưa code mới lên sóng
+echo ""📂 Đang trải thảm code mới lên mặt tiền Nginx...""
+sudo cp -r dist/* /var/www/vietrp/
+
+echo ""🎉 XONG PHIM! VietRP đã cập nhật thành công!""
+echo ""💡 (Ghi chú: Bản code cũ đã được cất an toàn tại $BACKUP_DIR)""
+```
+chmod +x ~/deploy.sh để cấp quyền chạy
+./deploy.sh/ để nâng cấp website";guide;2026-02-25 18:50:37.200441+00;2026-02-25 19:34:38.474588+00
