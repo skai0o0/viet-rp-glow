@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
-import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
+import { getCharacterById, dbCharToCard, CharacterSummary, incrementMessageCount } from "@/services/characterDb";
 import {
   getUserSessions,
   createSession,
@@ -377,6 +377,7 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
+              if (activeCharId) incrementMessageCount(activeCharId);
             } else {
               // Remove empty assistant message if stream produced no content
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
@@ -441,6 +442,7 @@ const ChatPage = () => {
                 m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
               )
             );
+            if (activeCharId) incrementMessageCount(activeCharId);
           }
         },
         onError: (error) => {
@@ -543,6 +545,7 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
+              if (activeCharId) incrementMessageCount(activeCharId);
             }
           },
           onError: (error) => {
