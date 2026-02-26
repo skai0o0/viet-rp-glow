@@ -278,7 +278,7 @@ const AdminSqlEditorPage = () => {
               className="border-gray-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 text-xs gap-1"
             >
               <Clock size={12} />
-              Lich su ({history.length})
+              Lịch sử ({history.length})
               <ChevronDown size={12} />
             </Button>
             {showHistory && history.length > 0 && (
@@ -325,7 +325,7 @@ const AdminSqlEditorPage = () => {
             value={sql}
             onChange={(e) => setSql(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="-- Nhap SQL tai day... (Ctrl+Enter de chay)"
+            placeholder="-- Nhập SQL tại đây... (Ctrl+Enter để chạy)"
             spellCheck={false}
             rows={8}
             className="w-full bg-oled-base border border-gray-border rounded-xl p-4 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-neon-blue/50 resize-y min-h-[120px] scrollbar-thin"
@@ -336,7 +336,7 @@ const AdminSqlEditorPage = () => {
             className="absolute bottom-3 right-3 bg-neon-blue hover:bg-neon-blue/80 text-white h-8 px-3 text-xs gap-1.5"
           >
             {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            {running ? "Dang chay..." : "Chay (Ctrl+Enter)"}
+            {running ? "Đang chạy..." : "Chạy (Ctrl+Enter)"}
           </Button>
         </div>
 
@@ -359,21 +359,21 @@ const AdminSqlEditorPage = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {isArray
-                  ? `${result.length} dong`
+                  ? `${result.length} dòng`
                   : result?.affected_rows !== undefined
-                    ? `${result.affected_rows} dong bi anh huong`
-                    : "Hoan thanh"}
+                    ? `${result.affected_rows} dòng bị ảnh hưởng`
+                    : "Hoàn thành"}
               </span>
               {isArray && result.length > 0 && (
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-                    toast.success("Da copy JSON!");
+                    toast.success("Đã copy JSON!");
                   }}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                 >
                   <Copy size={10} />
-                  Copy JSON
+                  Copy JSON lại
                 </button>
               )}
             </div>
@@ -421,7 +421,7 @@ const AdminSqlEditorPage = () => {
               </div>
             ) : isArray && result.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                Khong co ket qua
+                Không có kết quả
               </div>
             ) : (
               <pre className="text-xs text-foreground/80 bg-oled-base border border-gray-border rounded-xl p-4 font-mono">
