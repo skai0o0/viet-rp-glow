@@ -25,15 +25,22 @@ const CharacterCard = ({ character, onClick, isFavorited, onFavoriteToggle }: Ch
   const nsfw = isCharacterNsfw(character);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
+  const [localFav, setLocalFav] = useState<boolean | null>(null);
+
+  const faved = localFav ?? isFavorited ?? false;
 
   const handleFav = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (favLoading) return;
     setFavLoading(true);
+    const optimistic = !faved;
+    setLocalFav(optimistic);
     try {
       const newState = await toggleFavorite(character.id);
+      setLocalFav(newState);
       onFavoriteToggle?.(character.id, newState);
     } catch (err: any) {
+      setLocalFav(!optimistic);
       const msg = err?.message || "";
       if (msg.includes("Not authenticated")) {
         toast.error("Đăng nhập để yêu thích nhân vật");
@@ -80,11 +87,15 @@ const CharacterCard = ({ character, onClick, isFavorited, onFavoriteToggle }: Ch
         {onFavoriteToggle && (
           <button
             onClick={handleFav}
-            className="absolute top-1.5 left-1.5 z-20 w-8 h-8 rounded-full bg-oled-base/80 backdrop-blur-sm flex items-center justify-center transition-all active:scale-90 hover:bg-neon-rose/20"
+            className={`absolute top-1.5 left-1.5 z-20 w-8 h-8 rounded-full backdrop-blur-sm flex items-center justify-center transition-all duration-200 active:scale-90 ${
+              faved ? "bg-neon-rose/25" : "bg-oled-base/80 hover:bg-neon-rose/20"
+            }`}
           >
             <Heart
               size={15}
-              className={isFavorited ? "fill-neon-rose text-neon-rose" : "text-white/70 hover:text-neon-rose/60"}
+              className={`transition-colors duration-200 ${
+                faved ? "fill-neon-rose text-neon-rose" : "text-white/70"
+              }`}
             />
           </button>
         )}

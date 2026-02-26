@@ -251,6 +251,54 @@ export async function getTrendingCharacters(limit = 10): Promise<CharacterSummar
   return withStatDefaults(fb.data ?? []);
 }
 
+/** Fetch characters trending in last 7 days (by recent message volume) */
+export async function getWeeklyTrendingCharacters(limit = 10): Promise<CharacterSummary[]> {
+  try {
+    const { data, error } = await (supabase.rpc as any)("get_weekly_trending", { lim: limit });
+    if (error || !data) return [];
+    const ids: string[] = data.map((r: any) => r.character_id);
+    if (ids.length === 0) return [];
+
+    const { data: chars, error: cErr } = await supabase
+      .from("characters")
+      .select(SUMMARY_COLS_FULL)
+      .eq("is_public", true)
+      .in("id", ids);
+
+    if (cErr || !chars) return [];
+    const sorted = ids
+      .map((id) => chars.find((c: any) => c.id === id))
+      .filter(Boolean);
+    return withStatDefaults(sorted);
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch most favorited characters (all time) */
+export async function getMostFavoritedCharacters(limit = 10): Promise<CharacterSummary[]> {
+  try {
+    const { data, error } = await (supabase.rpc as any)("get_most_favorited", { lim: limit });
+    if (error || !data) return [];
+    const ids: string[] = data.map((r: any) => r.character_id);
+    if (ids.length === 0) return [];
+
+    const { data: chars, error: cErr } = await supabase
+      .from("characters")
+      .select(SUMMARY_COLS_FULL)
+      .eq("is_public", true)
+      .in("id", ids);
+
+    if (cErr || !chars) return [];
+    const sorted = ids
+      .map((id) => chars.find((c: any) => c.id === id))
+      .filter(Boolean);
+    return withStatDefaults(sorted);
+  } catch {
+    return [];
+  }
+}
+
 /** Convert a DbCharacter back to CharacterCard format for chat */
 export function dbCharToCard(char: DbCharacter) {
   return {

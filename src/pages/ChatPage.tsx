@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
-import { getCharacterById, dbCharToCard, CharacterSummary, incrementMessageCount } from "@/services/characterDb";
+import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
 import {
   getUserSessions,
   createSession,
@@ -332,7 +332,6 @@ const ChatPage = () => {
         toast.error("Không thể gửi tin nhắn");
         return;
       }
-      if (activeCharId) incrementMessageCount(activeCharId);
       const userMsg: ChatMessage = {
         id: savedUserMsg.id, role: "user", content, timestamp: new Date(savedUserMsg.created_at),
       };

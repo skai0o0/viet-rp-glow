@@ -3,7 +3,7 @@ import { filterByNsfw } from "@/utils/nsfwFilter";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { Compass, ArrowRight, Sparkles, Search, Filter, X, ChevronLeft, ChevronRight, TrendingUp, MessageSquare } from "lucide-react";
+import { Compass, ArrowRight, Sparkles, Search, Filter, X, ChevronLeft, ChevronRight, MessageSquare, Heart, Crown, Flame } from "lucide-react";
 import AppFooter from "@/components/AppFooter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CharacterCard from "@/components/CharacterCard";
 import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
-import { getPublicCharacters, getTrendingCharacters, CharacterSummary } from "@/services/characterDb";
+import { getPublicCharacters, getTrendingCharacters, getWeeklyTrendingCharacters, getMostFavoritedCharacters, CharacterSummary } from "@/services/characterDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { getActiveBanner, BannerData } from "@/services/bannerDb";
 import { getFavoritedIds } from "@/services/favoriteDb";
@@ -33,6 +33,9 @@ const HomePage = () => {
   const navigate = useNavigate();
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
   const [trending, setTrending] = useState<CharacterSummary[]>([]);
+  const [weeklyTrending, setWeeklyTrending] = useState<CharacterSummary[]>([]);
+  const [mostFavorited, setMostFavorited] = useState<CharacterSummary[]>([]);
+  const [showcaseTab, setShowcaseTab] = useState<"hall" | "trending" | "favorites">("hall");
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(18);
@@ -74,6 +77,8 @@ const HomePage = () => {
       .catch(() => setCharacters([]))
       .finally(() => setLoading(false));
     getTrendingCharacters(10).then(setTrending).catch(() => {});
+    getWeeklyTrendingCharacters(10).then(setWeeklyTrending).catch(() => {});
+    getMostFavoritedCharacters(10).then(setMostFavorited).catch(() => {});
     getActiveBanner()
       .then(setBanner)
       .catch(() => setBanner(null));
@@ -294,52 +299,113 @@ const HomePage = () => {
         </motion.div>
       </section>
 
-      {/* Trending Section */}
-      {trending.length > 0 && (
-        <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-8">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.45 }}
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="text-neon-rose" size={20} />
-              <h2 className="text-lg font-bold text-foreground">
-                Trending
-              </h2>
-            </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2">
-              {trending.map((char) => {
-                const initial = char.name?.charAt(0)?.toUpperCase() || "?";
-                return (
-                  <button
-                    key={char.id}
-                    onClick={() => setPreviewChar(char)}
-                    className="shrink-0 w-28 flex flex-col items-center gap-1.5 p-2 rounded-xl bg-oled-surface border border-gray-border hover:border-neon-purple/40 hover:scale-[1.03] transition-all duration-200"
-                  >
-                    <div className="w-16 h-16 rounded-full overflow-hidden bg-oled-elevated border border-gray-border">
-                      {char.avatar_url ? (
-                        <img src={char.avatar_url} alt={char.name} className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-lg font-bold text-secondary">
-                          {initial}
-                        </div>
+      {/* Showcase Tabs: Bảng danh vọng / Xu hướng / Yêu thích */}
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-8">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.45 }}
+        >
+          {/* Tab buttons */}
+          <div className="flex items-center gap-1 mb-4 overflow-x-auto scrollbar-thin pb-1">
+            <button
+              onClick={() => setShowcaseTab("hall")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                showcaseTab === "hall"
+                  ? "bg-neon-purple/15 text-neon-purple border border-neon-purple/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-oled-surface border border-transparent"
+              }`}
+            >
+              <Crown size={15} />
+              Bảng danh vọng
+            </button>
+            <button
+              onClick={() => setShowcaseTab("trending")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                showcaseTab === "trending"
+                  ? "bg-neon-rose/15 text-neon-rose border border-neon-rose/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-oled-surface border border-transparent"
+              }`}
+            >
+              <Flame size={15} />
+              Xu hướng
+            </button>
+            <button
+              onClick={() => setShowcaseTab("favorites")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                showcaseTab === "favorites"
+                  ? "bg-neon-blue/15 text-neon-blue border border-neon-blue/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-oled-surface border border-transparent"
+              }`}
+            >
+              <Heart size={15} />
+              Yêu thích nhất
+            </button>
+          </div>
+
+          {/* Tab content */}
+          {(() => {
+            const list =
+              showcaseTab === "hall" ? trending
+              : showcaseTab === "trending" ? weeklyTrending
+              : mostFavorited;
+
+            if (list.length === 0) return (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                {showcaseTab === "trending" ? "Chưa có dữ liệu xu hướng tuần này" : "Chưa có dữ liệu"}
+              </div>
+            );
+
+            return (
+              <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2">
+                {list.map((char, idx) => {
+                  const ini = char.name?.charAt(0)?.toUpperCase() || "?";
+                  return (
+                    <button
+                      key={char.id}
+                      onClick={() => setPreviewChar(char)}
+                      className="shrink-0 w-28 flex flex-col items-center gap-1.5 p-2 rounded-xl bg-oled-surface border border-gray-border hover:border-neon-purple/40 hover:scale-[1.03] transition-all duration-200 relative"
+                    >
+                      {idx < 3 && showcaseTab === "hall" && (
+                        <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          idx === 0 ? "bg-yellow-500 text-black" : idx === 1 ? "bg-gray-400 text-black" : "bg-amber-700 text-white"
+                        }`}>
+                          {idx + 1}
+                        </span>
                       )}
-                    </div>
-                    <span className="text-xs font-medium text-foreground truncate w-full text-center">
-                      {char.name}
-                    </span>
-                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                      <MessageSquare size={9} className="text-neon-blue/60" />
-                      {formatCount(char.message_count ?? 0)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
-        </section>
-      )}
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-oled-elevated border border-gray-border">
+                        {char.avatar_url ? (
+                          <img src={char.avatar_url} alt={char.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-lg font-bold text-secondary">
+                            {ini}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-foreground truncate w-full text-center">
+                        {char.name}
+                      </span>
+                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                        {showcaseTab === "favorites" ? (
+                          <>
+                            <Heart size={9} className="text-neon-rose/60" />
+                            Yêu thích
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare size={9} className="text-neon-blue/60" />
+                            {formatCount(char.message_count ?? 0)}
+                          </>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </motion.div>
+      </section>
 
       {/* Discover Section */}
       <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-16 pb-10">
