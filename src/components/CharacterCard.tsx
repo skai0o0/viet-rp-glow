@@ -58,14 +58,14 @@ const CharacterCard = ({ character, onClick, isFavorited, onFavoriteToggle }: Ch
         {character.avatar_url ? (
           <>
             {!imgLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <span className="text-4xl font-bold text-secondary/30">{initial}</span>
               </div>
             )}
             <img
               src={character.avatar_url}
               alt={character.name}
-              className={`w-full h-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+              className={`w-full h-full object-cover transition-opacity duration-500 pointer-events-none ${imgLoaded ? "opacity-100" : "opacity-0"}`}
               loading="lazy"
               onLoad={() => setImgLoaded(true)}
             />
@@ -80,11 +80,11 @@ const CharacterCard = ({ character, onClick, isFavorited, onFavoriteToggle }: Ch
         {onFavoriteToggle && (
           <button
             onClick={handleFav}
-            className="absolute top-2 left-2 w-7 h-7 rounded-full bg-oled-base/70 backdrop-blur flex items-center justify-center transition-colors hover:bg-oled-base/90"
+            className="absolute top-1.5 left-1.5 z-20 w-8 h-8 rounded-full bg-oled-base/80 backdrop-blur-sm flex items-center justify-center transition-all active:scale-90 hover:bg-neon-rose/20"
           >
             <Heart
-              size={14}
-              className={isFavorited ? "fill-neon-rose text-neon-rose" : "text-white/70"}
+              size={15}
+              className={isFavorited ? "fill-neon-rose text-neon-rose" : "text-white/70 hover:text-neon-rose/60"}
             />
           </button>
         )}

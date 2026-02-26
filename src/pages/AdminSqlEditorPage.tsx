@@ -123,7 +123,7 @@ const AdminSqlEditorPage = () => {
   }, []);
 
   const executeQuery = useCallback(async () => {
-    const trimmed = sql.trim();
+    const trimmed = sql.trim().replace(/;\s*$/, "");
     if (!trimmed || running) return;
 
     setRunning(true);
