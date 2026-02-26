@@ -357,17 +357,17 @@ const HomePage = () => {
             );
 
             return (
-              <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2">
+              <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2 pt-6">
                 {list.map((char, idx) => {
                   const ini = char.name?.charAt(0)?.toUpperCase() || "?";
                   return (
                     <button
                       key={char.id}
                       onClick={() => setPreviewChar(char)}
-                      className="shrink-0 w-28 flex flex-col items-center gap-1.5 p-2 rounded-xl bg-oled-surface border border-gray-border hover:border-neon-purple/40 hover:scale-[1.03] transition-all duration-200 relative"
+                      className="shrink-0 w-32 flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-oled-surface border border-gray-border hover:border-neon-purple/40 hover:scale-[1.03] transition-all duration-200 relative overflow-visible"
                     >
                       {idx < 3 && showcaseTab === "hall" && (
-                        <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        <span className={`absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-oled-base ${
                           idx === 0 ? "bg-yellow-500 text-black" : idx === 1 ? "bg-gray-400 text-black" : "bg-amber-700 text-white"
                         }`}>
                           {idx + 1}
