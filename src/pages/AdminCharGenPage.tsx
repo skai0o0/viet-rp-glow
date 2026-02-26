@@ -1,0 +1,724 @@
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { Navigate, Link, useNavigate } from "react-router-dom";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Loader2,
+  ArrowLeft,
+  Wand2,
+  Send,
+  ImagePlus,
+  Trash2,
+  Eye,
+  EyeOff,
+  Save,
+  CheckCircle2,
+  X,
+  RotateCcw,
+  Sparkles,
+  User,
+  Bot,
+  Upload,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { createCharacter } from "@/services/characterDb";
+import { compressAvatar } from "@/utils/imageOptimization";
+import { getApiKey, getModel, streamChat, type StreamCallbacks } from "@/services/openRouter";
+import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+const CHAR_GEN_SYSTEM_PROMPT = `[SYSTEM DIRECTIVE: MASTER CHARACTER ARCHITECT]
+Bạn là một chuyên gia thiết kế nhân vật RPG và biên kịch xuất sắc. Nhiệm vụ của bạn là biến những ý tưởng ngắn gọn của người dùng thành một Thẻ Nhân Vật (Character Card) hoàn chỉnh, cực kỳ chi tiết và có chiều sâu tâm lý.
+
+Bạn PHẢI trả về kết quả là MỘT chuỗi JSON hợp lệ theo đúng chuẩn \`chara_card_v2\` dưới đây, tuyệt đối không có văn bản thừa ở ngoài:
+
+{
+  "spec": "chara_card_v2",
+  "spec_version": "2.0",
+  "data": {
+    "name": "[Tên nhân vật]",
+    "description": "[LORE & BACKGROUND - RẤT QUAN TRỌNG: Viết cực kỳ chi tiết (500-1000 từ). Bao gồm ngoại hình chi tiết (mắt, tóc, trang phục, vóc dáng), tiểu sử, quá khứ, nghề nghiệp, điểm yếu, bí mật giấu kín, và động lực sống. Càng sâu sắc càng tốt.]",
+    "personality": "[PSYCHOLOGY - RẤT QUAN TRỌNG: Liệt kê các từ khóa tính cách. Mô tả rõ cách nhân vật suy nghĩ, cách đối xử với người khác, thói quen đặc biệt, sở thích/ghét, và cách xưng hô đặc trưng. Càng phức tạp, mâu thuẫn (như tsundere, yandere) càng tốt.]",
+    "scenario": "[CHUNG CHUNG & MỞ: Viết 1-2 câu thiết lập mối quan hệ cơ bản hoặc một bối cảnh chung chung nhất (VD: '{{char}} và {{user}} tình cờ gặp nhau tại một quán cà phê quen thuộc'). KHÔNG set up tình huống quá cụ thể, vì người chơi sẽ tự thay đổi bối cảnh này sau.]",
+    "first_mes": "[LỜI CHÀO MỞ ĐẦU CHUNG CHUNG: Tạo một câu chào hoặc một hành động mở đầu linh hoạt, có thể áp dụng cho nhiều tình huống khác nhau. Sử dụng chuẩn format: *Hành động* và \\"Lời nói\\". Đừng đưa ra các sự kiện quá kịch tính ở đây.]",
+    "mes_example": "<START>\\n{{user}}: [Câu hỏi mẫu]\\n{{char}}: [Cách nhân vật trả lời, thể hiện rõ tính cách và xưng hô chuẩn]",
+    "creator_notes": "Tạo bởi VietRP AI Generator.",
+    "system_prompt": "[Lệnh ép AI đóng vai: VD 'Hãy giữ thái độ lạnh lùng, xưng hô Tôi-Cậu, thường xuyên dùng (...) để thể hiện sự khinh bỉ ngầm.']",
+    "post_history_instructions": "",
+    "tags": ["[Tag 1]", "[Tag 2]", "[Tag 3]"],
+    "creator": "VietRP AI",
+    "character_version": "1.0",
+    "alternate_greetings": []
+  }
+}
+
+LƯU Ý NGHIÊM NGẶT:
+1. Dành 80% nỗ lực và lượng từ vựng vào trường \`description\` và \`personality\`. Đây là linh hồn của nhân vật.
+2. Trường \`scenario\` và \`first_mes\` chỉ là bối cảnh nền chung chung (Vanilla), để trống không gian sáng tạo cho người chơi tự tùy chỉnh sau.
+3. Luôn sử dụng {{user}} để đại diện cho người chơi, và {{char}} để đại diện cho nhân vật trong các trường text.
+4. Trả về bằng tiếng Việt tự nhiên, văn phong cuốn hút. Format chuẩn code JSON theo SillyTavern spec card v2 để phần mềm nhận file.
+5. Card có thể SFW hoặc NSFW nhẹ do website luôn yêu cầu đủ 18 tuổi khi tham gia.
+6. GIỚI HẠN TOKEN: Toàn bộ output JSON phải nằm trong khoảng 2000-3500 token. Viết súc tích nhưng đủ sâu. Trường \`description\` tối đa ~300 từ, \`personality\` tối đa ~150 từ, các trường còn lại ngắn gọn. TUYỆT ĐỐI phải hoàn thành JSON đầy đủ, đóng ngoặc đúng chuẩn, không được bị cắt giữa chừng.
+7. Quy chuẩn về cách trả lời như sau: *Hành động*, (Suy nghĩ) và "Lời nói". Ví dụ: *{{char}} nhún vai, ánh mắt lướt qua {{user}} một cách lạnh lùng* và "Ồ, lại là cậu à. Có chuyện gì nữa không?".`;
+
+type ChatMsg = { role: "user" | "assistant"; content: string };
+
+/* ------------------------------------------------------------------ */
+/*  Helper: extract JSON from LLM response                            */
+/* ------------------------------------------------------------------ */
+function extractCardJson(raw: string): TavernCardV2 | null {
+  function normalize(obj: any): TavernCardV2 | null {
+    if (obj?.spec === "chara_card_v2" && obj?.data?.name) {
+      const d = obj.data;
+      return {
+        spec: "chara_card_v2",
+        spec_version: "2.0",
+        data: {
+          name: d.name || "",
+          description: d.description || "",
+          personality: d.personality || "",
+          scenario: d.scenario || "",
+          first_mes: d.first_mes || "",
+          mes_example: d.mes_example || "",
+          creator_notes: d.creator_notes || "Tạo bởi VietRP AI Generator.",
+          system_prompt: d.system_prompt || "",
+          post_history_instructions: d.post_history_instructions || "",
+          alternate_greetings: d.alternate_greetings || [],
+          tags: d.tags || [],
+          creator: d.creator || "VietRP AI",
+          character_version: d.character_version || "1.0",
+          extensions: d.extensions || {},
+        },
+      };
+    }
+    return null;
+  }
+
+  // Try direct parse first
+  try {
+    return normalize(JSON.parse(raw));
+  } catch { /* continue */ }
+
+  // Try to find JSON block in markdown fences or raw text
+  const patterns = [
+    /```json\s*\n?([\s\S]*?)```/,
+    /```\s*\n?([\s\S]*?)```/,
+    /(\{[\s\S]*"spec"\s*:\s*"chara_card_v2"[\s\S]*\})/,
+  ];
+
+  for (const pat of patterns) {
+    const m = raw.match(pat);
+    if (m?.[1]) {
+      try {
+        return normalize(JSON.parse(m[1].trim()));
+      } catch { /* continue */ }
+    }
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+const AdminCharGenPage = () => {
+  const { user, isLoading } = useAuth();
+  const { isAdmin, checking } = useIsAdmin();
+  const navigate = useNavigate();
+
+  // Chat state
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const [streamBuffer, setStreamBuffer] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Generated card
+  const [generatedCard, setGeneratedCard] = useState<TavernCardV2 | null>(null);
+  const [showReview, setShowReview] = useState(false);
+
+  // Avatar
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Publishing
+  const [isPublic, setIsPublic] = useState(true);
+  const [publishing, setPublishing] = useState(false);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamBuffer]);
+
+  /* ---------- Send message to LLM ---------- */
+  const handleSend = useCallback(async () => {
+    const text = input.trim();
+    if (!text || streaming) return;
+
+    if (!getApiKey()) {
+      toast.error("Chưa nhập API Key. Vào Cài Đặt để thêm.");
+      return;
+    }
+
+    const userMsg: ChatMsg = { role: "user", content: text };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    setInput("");
+    setStreaming(true);
+    setStreamBuffer("");
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Build messages payload with system prompt
+    const apiMessages = [
+      { role: "system" as const, content: CHAR_GEN_SYSTEM_PROMPT },
+      ...newMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+    ];
+
+    let fullResponse = "";
+
+    const callbacks: StreamCallbacks = {
+      onDelta: (delta) => {
+        fullResponse += delta;
+        setStreamBuffer(fullResponse);
+      },
+      onDone: () => {
+        const assistantMsg: ChatMsg = { role: "assistant", content: fullResponse };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setStreamBuffer("");
+        setStreaming(false);
+
+        // Try to extract card
+        const card = extractCardJson(fullResponse);
+        if (card) {
+          setGeneratedCard(card);
+          toast.success(`Đã tạo card: ${card.data.name}`, { description: "Nhấn 'Duyệt & Xuất bản' để xem chi tiết." });
+        }
+      },
+      onError: (error) => {
+        toast.error(error);
+        setStreaming(false);
+        setStreamBuffer("");
+      },
+    };
+
+    await streamChat(apiMessages, callbacks, controller.signal, 4096);
+  }, [input, streaming, messages]);
+
+  const handleStop = () => {
+    abortRef.current?.abort();
+    if (streamBuffer) {
+      setMessages((prev) => [...prev, { role: "assistant", content: streamBuffer }]);
+      const card = extractCardJson(streamBuffer);
+      if (card) setGeneratedCard(card);
+    }
+    setStreamBuffer("");
+    setStreaming(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  /* ---------- Avatar ---------- */
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ảnh quá lớn (tối đa 5MB).");
+      return;
+    }
+    try {
+      const compressed = await compressAvatar(file);
+      setAvatarFile(compressed);
+      setAvatarPreview(URL.createObjectURL(compressed));
+    } catch {
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const clearAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+  };
+
+  /* ---------- Edit generated card fields ---------- */
+  const updateCardData = (patch: Partial<TavernCardV2Data>) => {
+    if (!generatedCard) return;
+    setGeneratedCard({ ...generatedCard, data: { ...generatedCard.data, ...patch } });
+  };
+
+  /* ---------- Publish ---------- */
+  const handlePublish = async () => {
+    if (!generatedCard || !user) return;
+    if (!generatedCard.data.name.trim()) {
+      toast.error("Nhân vật thiếu tên!");
+      return;
+    }
+
+    setPublishing(true);
+    try {
+      let avatarUrl: string | null = null;
+      if (avatarFile) {
+        const filePath = `${user.id}/${Date.now()}.webp`;
+        const { error: uploadErr } = await supabase.storage
+          .from("character-avatars")
+          .upload(filePath, avatarFile, { upsert: true });
+        if (uploadErr) throw uploadErr;
+        const { data: urlData } = supabase.storage
+          .from("character-avatars")
+          .getPublicUrl(filePath);
+        avatarUrl = urlData.publicUrl;
+      }
+
+      const saved = await createCharacter(generatedCard, user.id, isPublic, undefined, avatarUrl);
+      toast.success(`Đã xuất bản: ${saved.name}`, { description: "Đang chuyển tới trang nhân vật..." });
+      // Navigate to the new character page so admin can see it immediately
+      navigate(`/character/${saved.id}`);
+    } catch (err: any) {
+      toast.error(err.message || "Xuất bản thất bại!");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  /* ---------- Reset all ---------- */
+  const handleReset = () => {
+    setMessages([]);
+    setStreamBuffer("");
+    setGeneratedCard(null);
+    setShowReview(false);
+    clearAvatar();
+    setInput("");
+  };
+
+  /* ---------- Guards ---------- */
+  if (isLoading || checking) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-oled-base">
+        <Loader2 size={24} className="animate-spin text-neon-purple" />
+      </div>
+    );
+  }
+  if (!user || !isAdmin) return <Navigate to="/" replace />;
+
+  const cardFieldLabel = "text-xs font-medium text-muted-foreground uppercase tracking-wider";
+  const cardTextarea =
+    "bg-oled-base border-oled-border text-foreground font-mono text-xs resize-y min-h-[80px]";
+
+  /* ---------- Render ---------- */
+  return (
+    <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
+      {/* Header */}
+      <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/admin">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+              <ArrowLeft size={20} />
+            </Button>
+          </Link>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-neon-purple to-neon-rose flex items-center justify-center">
+            <Wand2 className="text-white" size={18} />
+          </div>
+          <div>
+            <h1 className="text-base font-bold text-foreground">AI Card Generator</h1>
+            <p className="text-xs text-muted-foreground">Tạo Character Card bằng LLM</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {generatedCard && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowReview(!showReview)}
+              className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10 text-xs"
+            >
+              {showReview ? <EyeOff size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
+              {showReview ? "Chat" : "Duyệt & Xuất bản"}
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={handleReset} className="text-muted-foreground hover:text-neon-rose">
+            <RotateCcw size={16} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-hidden">
+        <AnimatePresence mode="wait">
+          {!showReview ? (
+            /* ═══════════ CHAT VIEW ═══════════ */
+            <motion.div
+              key="chat"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col h-full"
+            >
+              {/* Messages */}
+              <ScrollArea className="flex-1 px-4 py-4">
+                <div className="max-w-3xl mx-auto space-y-4 pb-4">
+                  {/* Empty state */}
+                  {messages.length === 0 && !streamBuffer && (
+                    <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-neon-purple/20 to-neon-rose/20 flex items-center justify-center">
+                        <Wand2 size={28} className="text-neon-purple" />
+                      </div>
+                      <div>
+                        <p className="text-foreground font-semibold text-lg">Mô tả nhân vật bạn muốn tạo</p>
+                        <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+                          Ví dụ: "Tạo một nữ sát thủ lạnh lùng kiểu tsundere, tóc bạch kim, làm việc cho mafia"
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-center mt-2">
+                        {[
+                          "Nữ chiến binh Samurai trầm lặng",
+                          "Tiểu thư yandere giàu có",
+                          "Bác sĩ ma cà rồng 500 tuổi",
+                          "Thám tử tư lạnh lùng Sài Gòn",
+                        ].map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => setInput(s)}
+                            className="px-3 py-1.5 rounded-full text-xs bg-oled-surface border border-oled-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 transition-colors"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chat bubbles */}
+                  {messages.map((msg, i) => (
+                    <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      {msg.role === "assistant" && (
+                        <div className="w-8 h-8 rounded-lg bg-neon-purple/10 flex items-center justify-center shrink-0 mt-1">
+                          <Bot size={14} className="text-neon-purple" />
+                        </div>
+                      )}
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                          msg.role === "user"
+                            ? "bg-neon-blue/15 text-foreground rounded-br-md"
+                            : "bg-oled-surface border border-oled-border text-foreground rounded-bl-md"
+                        }`}
+                      >
+                        {msg.role === "assistant" ? (
+                          <pre className="whitespace-pre-wrap break-words font-sans text-sm">{msg.content}</pre>
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
+                      </div>
+                      {msg.role === "user" && (
+                        <div className="w-8 h-8 rounded-lg bg-neon-blue/10 flex items-center justify-center shrink-0 mt-1">
+                          <User size={14} className="text-neon-blue" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Streaming bubble */}
+                  {streamBuffer && (
+                    <div className="flex gap-3 justify-start">
+                      <div className="w-8 h-8 rounded-lg bg-neon-purple/10 flex items-center justify-center shrink-0 mt-1">
+                        <Bot size={14} className="text-neon-purple animate-pulse" />
+                      </div>
+                      <div className="max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-oled-surface border border-oled-border">
+                        <pre className="whitespace-pre-wrap break-words font-sans text-sm text-foreground">{streamBuffer}<span className="animate-pulse text-neon-purple">▊</span></pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card detected badge */}
+                  {generatedCard && !showReview && (
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex justify-center">
+                      <button
+                        onClick={() => setShowReview(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-sm hover:bg-green-500/20 transition-colors"
+                      >
+                        <CheckCircle2 size={16} />
+                        Card đã sẵn sàng — Nhấn để duyệt "{generatedCard.data.name}"
+                      </button>
+                    </motion.div>
+                  )}
+
+                  <div ref={chatEndRef} />
+                </div>
+              </ScrollArea>
+
+              {/* Input bar */}
+              <div className="shrink-0 px-4 py-3 border-t border-gray-border bg-oled-surface/60 backdrop-blur-sm">
+                <div className="max-w-3xl mx-auto flex gap-2">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Mô tả ý tưởng nhân vật..."
+                    disabled={streaming}
+                    className="bg-oled-base border-oled-border text-foreground text-sm min-h-[44px] max-h-[120px] resize-none flex-1"
+                    rows={1}
+                  />
+                  {streaming ? (
+                    <Button onClick={handleStop} variant="outline" size="icon" className="shrink-0 border-neon-rose/40 text-neon-rose hover:bg-neon-rose/10">
+                      <X size={18} />
+                    </Button>
+                  ) : (
+                    <Button onClick={handleSend} size="icon" disabled={!input.trim()} className="shrink-0 bg-neon-purple hover:bg-neon-purple/80 text-white">
+                      <Send size={18} />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            /* ═══════════ REVIEW VIEW ═══════════ */
+            <motion.div
+              key="review"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full overflow-y-auto scrollbar-thin"
+            >
+              <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5 pb-24">
+                {generatedCard && (
+                  <>
+                    {/* Avatar upload + Name */}
+                    <Card className="bg-oled-surface border-oled-border">
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex items-start gap-4">
+                          {/* Avatar */}
+                          <div className="shrink-0">
+                            <input
+                              ref={avatarInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleAvatarChange}
+                            />
+                            <button
+                              onClick={() => avatarInputRef.current?.click()}
+                              className="w-24 h-24 rounded-2xl bg-oled-base border-2 border-dashed border-oled-border hover:border-neon-purple/50 transition-colors flex items-center justify-center overflow-hidden group"
+                            >
+                              {avatarPreview ? (
+                                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-neon-purple transition-colors">
+                                  <ImagePlus size={24} />
+                                  <span className="text-[10px]">Avatar</span>
+                                </div>
+                              )}
+                            </button>
+                            {avatarPreview && (
+                              <button
+                                onClick={clearAvatar}
+                                className="mt-1 text-[10px] text-neon-rose hover:underline w-full text-center"
+                              >
+                                Xoá ảnh
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Name + tags */}
+                          <div className="flex-1 space-y-3">
+                            <div>
+                              <Label className={cardFieldLabel}>Tên nhân vật</Label>
+                              <Input
+                                value={generatedCard.data.name}
+                                onChange={(e) => updateCardData({ name: e.target.value })}
+                                className="bg-oled-base border-oled-border text-foreground text-lg font-bold mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className={cardFieldLabel}>Tags</Label>
+                              <div className="flex flex-wrap gap-1.5 mt-1">
+                                {generatedCard.data.tags.map((tag, i) => (
+                                  <Badge
+                                    key={i}
+                                    variant="outline"
+                                    className="border-oled-border text-muted-foreground text-xs group cursor-default"
+                                  >
+                                    {tag}
+                                    <button
+                                      onClick={() =>
+                                        updateCardData({ tags: generatedCard.data.tags.filter((_, idx) => idx !== i) })
+                                      }
+                                      className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Tabbed card fields */}
+                    <Tabs defaultValue="core" className="w-full">
+                      <TabsList className="w-full bg-oled-surface border border-oled-border h-auto flex-wrap">
+                        <TabsTrigger
+                          value="core"
+                          className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1"
+                        >
+                          Cốt lõi
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="rp"
+                          className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1"
+                        >
+                          RP Setup
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="meta"
+                          className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1"
+                        >
+                          Meta
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {/* Core tab */}
+                      <TabsContent value="core" className="space-y-4 mt-4">
+                        <div>
+                          <Label className={cardFieldLabel}>Description (Lore & Background)</Label>
+                          <Textarea
+                            value={generatedCard.data.description}
+                            onChange={(e) => updateCardData({ description: e.target.value })}
+                            className={`${cardTextarea} min-h-[200px] mt-1`}
+                          />
+                        </div>
+                        <div>
+                          <Label className={cardFieldLabel}>Personality (Tâm lý)</Label>
+                          <Textarea
+                            value={generatedCard.data.personality}
+                            onChange={(e) => updateCardData({ personality: e.target.value })}
+                            className={`${cardTextarea} min-h-[150px] mt-1`}
+                          />
+                        </div>
+                      </TabsContent>
+
+                      {/* RP Setup tab */}
+                      <TabsContent value="rp" className="space-y-4 mt-4">
+                        <div>
+                          <Label className={cardFieldLabel}>Scenario (Bối cảnh)</Label>
+                          <Textarea
+                            value={generatedCard.data.scenario}
+                            onChange={(e) => updateCardData({ scenario: e.target.value })}
+                            className={`${cardTextarea} mt-1`}
+                          />
+                        </div>
+                        <div>
+                          <Label className={cardFieldLabel}>First Message (Lời chào)</Label>
+                          <Textarea
+                            value={generatedCard.data.first_mes}
+                            onChange={(e) => updateCardData({ first_mes: e.target.value })}
+                            className={`${cardTextarea} min-h-[120px] mt-1`}
+                          />
+                        </div>
+                        <div>
+                          <Label className={cardFieldLabel}>Message Examples</Label>
+                          <Textarea
+                            value={generatedCard.data.mes_example}
+                            onChange={(e) => updateCardData({ mes_example: e.target.value })}
+                            className={`${cardTextarea} mt-1`}
+                          />
+                        </div>
+                      </TabsContent>
+
+                      {/* Meta tab */}
+                      <TabsContent value="meta" className="space-y-4 mt-4">
+                        <div>
+                          <Label className={cardFieldLabel}>System Prompt</Label>
+                          <Textarea
+                            value={generatedCard.data.system_prompt}
+                            onChange={(e) => updateCardData({ system_prompt: e.target.value })}
+                            className={`${cardTextarea} mt-1`}
+                          />
+                        </div>
+                        <div>
+                          <Label className={cardFieldLabel}>Creator Notes</Label>
+                          <Textarea
+                            value={generatedCard.data.creator_notes}
+                            onChange={(e) => updateCardData({ creator_notes: e.target.value })}
+                            className={`${cardTextarea} mt-1`}
+                          />
+                        </div>
+                        <div>
+                          <Label className={cardFieldLabel}>Post History Instructions</Label>
+                          <Textarea
+                            value={generatedCard.data.post_history_instructions}
+                            onChange={(e) => updateCardData({ post_history_instructions: e.target.value })}
+                            className={`${cardTextarea} mt-1`}
+                          />
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+
+                    {/* Publish controls */}
+                    <Card className="bg-oled-surface border-oled-border">
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Công khai</p>
+                            <p className="text-xs text-muted-foreground">Hiển thị trên Hub cho tất cả người dùng</p>
+                          </div>
+                          <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={handlePublish}
+                            disabled={publishing}
+                            className="flex-1 bg-gradient-to-r from-neon-purple to-neon-blue hover:opacity-90 text-white font-semibold"
+                          >
+                            {publishing ? (
+                              <Loader2 size={16} className="animate-spin mr-2" />
+                            ) : (
+                              <Upload size={16} className="mr-2" />
+                            )}
+                            {publishing ? "Đang xuất bản..." : "Xuất bản lên VietRP"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowReview(false)}
+                            className="border-oled-border text-muted-foreground hover:text-foreground"
+                          >
+                            Quay lại Chat
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+export default AdminCharGenPage;

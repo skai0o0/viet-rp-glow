@@ -24,6 +24,8 @@ import {
   Database,
   ClipboardPaste,
   Save,
+  BarChart3,
+  Wand2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
@@ -165,6 +167,20 @@ const AdminPage = () => {
   };
 
   const quickLinks = [
+    {
+      icon: BarChart3,
+      label: "Dashboard thống kê",
+      description: "Xem tổng quan số liệu hệ thống",
+      path: "/admin/dashboard",
+      color: "text-neon-blue bg-neon-blue/10",
+    },
+    {
+      icon: Wand2,
+      label: "AI Card Generator",
+      description: "Tạo Character Card bằng LLM, duyệt & xuất bản",
+      path: "/admin/chargen",
+      color: "text-neon-rose bg-neon-rose/10",
+    },
     {
       icon: Map,
       label: "Roadmap phát triển",

@@ -89,7 +89,8 @@ export interface StreamCallbacks {
 export async function streamChat(
   messages: OpenRouterMessage[],
   callbacks: StreamCallbacks,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxTokensOverride?: number
 ) {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -98,7 +99,7 @@ export async function streamChat(
   }
 
   const model = getModel();
-  const maxTokens = parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
+  const maxTokens = maxTokensOverride ?? parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
 
   try {
     const response = await fetch(OPENROUTER_API_URL, {
