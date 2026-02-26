@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Trash2, Eye, EyeOff, Check, Loader2, ShieldCheck, Pencil, Heart } from "lucide-react";
+import { User, Trash2, Check, Loader2, Pencil, Heart } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,16 +30,7 @@ import { getMyProfile, upsertProfile, setCachedUserPersona } from "@/services/pr
 import { getMyCharacters, CharacterSummary } from "@/services/characterDb";
 import { getMyFavorites, toggleFavorite } from "@/services/favoriteDb";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  getApiKey,
-  setApiKey,
-  getModel,
-  setModel,
-  AVAILABLE_MODELS,
-  verifyApiKey,
-} from "@/services/openRouter";
 import CharacterCard from "@/components/CharacterCard";
-import ModelCombobox from "@/components/ModelCombobox";
 import { Link, useNavigate } from "react-router-dom";
 
 const ProfilePage = () => {
@@ -59,13 +50,6 @@ const ProfilePage = () => {
   // Favorites state
   const [favorites, setFavorites] = useState<CharacterSummary[]>([]);
   const [loadingFavs, setLoadingFavs] = useState(true);
-
-  // Settings state
-  const [apiKeyVal, setApiKeyVal] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [model, setModelState] = useState<string>(AVAILABLE_MODELS[0].id);
-  const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -91,10 +75,6 @@ const ProfilePage = () => {
       .then(setFavorites)
       .catch(() => setFavorites([]))
       .finally(() => setLoadingFavs(false));
-
-    // Load settings
-    setApiKeyVal(getApiKey());
-    setModelState(getModel());
   }, [user]);
 
   const handleSavePersona = async () => {
@@ -125,33 +105,6 @@ const ProfilePage = () => {
     toast.success("Đã xoá nhân vật.");
   };
 
-
-  const handleVerifyKey = async () => {
-    if (!apiKeyVal.trim()) {
-      toast.error("Vui lòng nhập API Key trước.");
-      return;
-    }
-    setVerifying(true);
-    setVerified(null);
-    const result = await verifyApiKey(apiKeyVal);
-    setVerifying(false);
-    setVerified(result.valid);
-    if (result.valid) {
-      toast.success("API Key hợp lệ! ✓");
-    } else {
-      toast.error(result.error || "API Key không hợp lệ.");
-    }
-  };
-
-  const handleSaveKey = () => {
-    setApiKey(apiKeyVal);
-    toast.success("Đã lưu API Key!");
-  };
-
-  const handleModelChange = (value: string) => {
-    setModelState(value);
-    setModel(value);
-  };
 
   const avatarInitial = (user?.email?.charAt(0) || "U").toUpperCase();
 
@@ -354,78 +307,6 @@ const ProfilePage = () => {
               animate={{ opacity: 1 }}
               className="space-y-6"
             >
-              {/* API Key */}
-              <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-neon-purple shadow-neon-purple" />
-                  <h2 className="text-sm font-semibold text-foreground">Kết nối AI</h2>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">OpenRouter API Key</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        type={showKey ? "text" : "password"}
-                        value={apiKeyVal}
-                        onChange={(e) => {
-                          setApiKeyVal(e.target.value);
-                          setVerified(null);
-                        }}
-                        placeholder="sk-or-v1-..."
-                        className="bg-oled-elevated border-gray-border text-foreground pr-10 focus:border-neon-purple focus:ring-neon-purple/30"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowKey(!showKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    <button
-                      onClick={handleVerifyKey}
-                      disabled={verifying}
-                      className={`px-3 rounded-xl border text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
-                        verified === true
-                          ? "bg-green-500/10 border-green-500/30 text-green-400"
-                          : verified === false
-                          ? "bg-destructive/10 border-destructive/30 text-destructive"
-                          : "bg-neon-blue/10 border-neon-blue/30 text-neon-blue hover:shadow-neon-blue"
-                      }`}
-                    >
-                      {verifying ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <ShieldCheck size={14} />
-                      )}
-                      {verified === true ? "OK" : "Verify"}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Lấy API Key tại{" "}
-                    <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline">
-                      openrouter.ai/keys
-                    </a>
-                    . Key được lưu trữ cục bộ.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Model AI</label>
-                  <ModelCombobox value={model} onValueChange={handleModelChange} />
-                </div>
-
-                {/* Save button at bottom */}
-                <Button
-                  onClick={handleSaveKey}
-                  className="w-full bg-neon-purple text-primary-foreground hover:shadow-neon-purple hover:scale-[1.02] transition-all duration-200"
-                >
-                  <Check size={16} className="mr-2" />
-                  Lưu cài đặt
-                </Button>
-              </div>
-
               {/* Toggles */}
               <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-5">
                 <div className="flex items-center gap-2">

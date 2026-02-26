@@ -1,10 +1,8 @@
-import { Circle, Plus, ChevronDown, GitBranch } from "lucide-react";
+import { Circle, ChevronDown, GitBranch } from "lucide-react";
 import { CharacterCard } from "@/types/character";
 import { replaceMacros } from "@/utils/promptBuilder";
 import { getCachedUserPersona } from "@/services/profileDb";
 import { DbChatSession } from "@/services/chatDb";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +35,7 @@ const ChatHeader = ({
   const sessionCount = sessions.length;
 
   return (
-    <header className="h-14 flex items-center justify-between pr-4 md:pr-6 bg-oled-base flex-shrink-0">
+    <header className="h-14 flex items-center bg-oled-base flex-shrink-0">
       <div className="flex items-center gap-3">
         {character.avatar && character.avatar.startsWith("http") ? (
           <img
@@ -122,23 +120,6 @@ const ChatHeader = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
-        {onNewChat && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onNewChat}
-                className="text-muted-foreground hover:text-neon-purple hover:bg-oled-surface h-8 w-8"
-              >
-                <Plus size={18} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Chat mới</TooltipContent>
-          </Tooltip>
-        )}
-      </div>
     </header>
   );
 };

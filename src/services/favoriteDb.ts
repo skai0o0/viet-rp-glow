@@ -20,20 +20,36 @@ export async function toggleFavorite(characterId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data: existing } = await supabase
+  const { data: existing, error: selectErr } = await supabase
     .from("user_favorites")
     .select("id")
     .eq("user_id", user.id)
     .eq("character_id", characterId)
     .maybeSingle();
 
+  if (selectErr) {
+    console.error("[favoriteDb] select error:", selectErr);
+    throw selectErr;
+  }
+
   if (existing) {
-    await supabase.from("user_favorites").delete().eq("id", existing.id);
+    const { error: delErr } = await supabase
+      .from("user_favorites")
+      .delete()
+      .eq("id", existing.id);
+    if (delErr) {
+      console.error("[favoriteDb] delete error:", delErr);
+      throw delErr;
+    }
     return false;
   } else {
-    await supabase
+    const { error: insErr } = await supabase
       .from("user_favorites")
       .insert({ user_id: user.id, character_id: characterId });
+    if (insErr) {
+      console.error("[favoriteDb] insert error:", insErr);
+      throw insErr;
+    }
     return true;
   }
 }

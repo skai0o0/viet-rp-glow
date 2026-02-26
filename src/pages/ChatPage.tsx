@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCachedUserPersona } from "@/services/profileDb";
-import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
@@ -592,7 +592,7 @@ const ChatPage = () => {
     <GenerationSettings
       scenario={scenarioOverride}
       onScenarioChange={setScenarioOverride}
-      onClose={isMobile ? () => setSettingsOpen(false) : undefined}
+      onClose={undefined}
       defaultScenario={activeCharacter.scenario || ""}
       customFirstMes={customFirstMes}
       onCustomFirstMesChange={handleCustomFirstMesChange}
@@ -717,16 +717,23 @@ const ChatPage = () => {
                 }
               }} />
           </div>
-          {/* Search toggle */}
-          <button onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(""); setSearchIdx(0); }}
-            className={`p-2 transition-colors ${searchOpen ? "text-neon-blue" : "text-muted-foreground hover:text-foreground"}`}>
-            <Search size={18} />
-          </button>
-          {/* Settings toggle button */}
-          <button onClick={() => setSettingsOpen(!settingsOpen)}
-            className={`p-4 pl-1 transition-colors ${settingsOpen ? "text-neon-purple" : "text-muted-foreground hover:text-foreground"}`}>
-            <Settings2 size={20} />
-          </button>
+          <div className="flex items-center gap-1 pr-2 shrink-0">
+            {/* New chat */}
+            <button onClick={handleNewChat}
+              className="p-2 text-muted-foreground hover:text-neon-purple transition-colors">
+              <Plus size={18} />
+            </button>
+            {/* Search toggle */}
+            <button onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(""); setSearchIdx(0); }}
+              className={`p-2 transition-colors ${searchOpen ? "text-neon-blue" : "text-muted-foreground hover:text-foreground"}`}>
+              <Search size={18} />
+            </button>
+            {/* Settings toggle */}
+            <button onClick={() => setSettingsOpen(!settingsOpen)}
+              className={`p-2 transition-colors ${settingsOpen ? "text-neon-purple" : "text-muted-foreground hover:text-foreground"}`}>
+              <Settings2 size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Search bar */}

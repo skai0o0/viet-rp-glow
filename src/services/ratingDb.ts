@@ -18,14 +18,22 @@ export async function rateCharacter(
     .maybeSingle();
 
   if (existing) {
-    await supabase
+    const { error } = await supabase
       .from("character_ratings")
       .update({ value: clamped })
       .eq("id", existing.id);
+    if (error) {
+      console.error("[ratingDb] update error:", error);
+      throw error;
+    }
   } else {
-    await supabase
+    const { error } = await supabase
       .from("character_ratings")
       .insert({ user_id: user.id, character_id: characterId, value: clamped });
+    if (error) {
+      console.error("[ratingDb] insert error:", error);
+      throw error;
+    }
   }
 
   return getAverageRating(characterId);

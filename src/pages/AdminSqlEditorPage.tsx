@@ -60,19 +60,19 @@ $$;`;
 
 const PRESET_QUERIES = [
   {
-    label: "Tất cả nhân vật (top 20)",
+    label: "Tat ca nhan vat (top 20)",
     sql: "SELECT id, name, message_count, rating, is_public, created_at FROM characters ORDER BY created_at DESC LIMIT 20",
   },
   {
-    label: "Thống kê người dùng",
+    label: "Thong ke nguoi dung",
     sql: "SELECT id, display_name, nsfw_mode, created_at FROM profiles ORDER BY created_at DESC LIMIT 20",
   },
   {
-    label: "Chat sessions gần đây",
+    label: "Chat sessions gan day",
     sql: "SELECT id, character_id, user_id, title, created_at, updated_at FROM chat_sessions ORDER BY updated_at DESC LIMIT 20",
   },
   {
-    label: "Top nhân vật theo tin nhắn",
+    label: "Top nhan vat theo tin nhan",
     sql: "SELECT id, name, message_count, rating FROM characters WHERE is_public = true ORDER BY message_count DESC LIMIT 10",
   },
   {
@@ -114,9 +114,8 @@ const AdminSqlEditorPage = () => {
 
   useEffect(() => {
     // Test if exec_sql function exists
-    supabase
-      .rpc("exec_sql", { query: "SELECT 1 as test" } as any)
-      .then(({ error: err }) => {
+    (supabase.rpc as any)("exec_sql", { query: "SELECT 1 as test" })
+      .then(({ error: err }: { error: any }) => {
         if (err && (err.message.includes("could not find") || err.message.includes("function") || err.code === "PGRST202")) {
           setSetupNeeded(true);
         }
@@ -135,9 +134,9 @@ const AdminSqlEditorPage = () => {
     const start = performance.now();
 
     try {
-      const { data, error: rpcError } = await supabase.rpc("exec_sql", {
+      const { data, error: rpcError } = await (supabase.rpc as any)("exec_sql", {
         query: trimmed,
-      } as any);
+      });
 
       const ms = Math.round(performance.now() - start);
       setElapsed(ms);
@@ -147,8 +146,9 @@ const AdminSqlEditorPage = () => {
         return;
       }
 
-      if (data && typeof data === "object" && "error" in data) {
-        setError(`${data.error}${data.detail ? ` [${data.detail}]` : ""}`);
+      if (data != null && typeof data === "object" && "error" in (data as Record<string, unknown>)) {
+        const d = data as Record<string, unknown>;
+        setError(`${d.error}${d.detail ? ` [${d.detail}]` : ""}`);
         return;
       }
 
@@ -176,7 +176,7 @@ const AdminSqlEditorPage = () => {
 
   const copySetupSql = async () => {
     await navigator.clipboard.writeText(SETUP_SQL);
-    toast.success("Đã copy SQL setup!");
+    toast.success("Da copy SQL setup!");
   };
 
   if (isLoading || checking) {
@@ -207,7 +207,7 @@ const AdminSqlEditorPage = () => {
           <div>
             <h1 className="text-xl font-bold text-foreground">SQL Editor</h1>
             <p className="text-xs text-muted-foreground">
-              Thực thi truy vấn SQL trực tiếp trên Supabase
+              Truy vấn Database từ Supabase trực tiếp từ website 
             </p>
           </div>
         </div>
@@ -278,7 +278,7 @@ const AdminSqlEditorPage = () => {
               className="border-gray-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 text-xs gap-1"
             >
               <Clock size={12} />
-              Lịch sử ({history.length})
+              Lich su ({history.length})
               <ChevronDown size={12} />
             </Button>
             {showHistory && history.length > 0 && (
@@ -306,7 +306,7 @@ const AdminSqlEditorPage = () => {
             className="border-gray-border text-muted-foreground hover:text-neon-rose hover:border-neon-rose/40 text-xs gap-1"
           >
             <Trash2 size={12} />
-            Xoá
+            Xoa
           </Button>
 
           <div className="flex-1" />
@@ -325,7 +325,7 @@ const AdminSqlEditorPage = () => {
             value={sql}
             onChange={(e) => setSql(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="-- Nhập SQL tại đây... (Ctrl+Enter để chạy)"
+            placeholder="-- Nhap SQL tai day... (Ctrl+Enter de chay)"
             spellCheck={false}
             rows={8}
             className="w-full bg-oled-base border border-gray-border rounded-xl p-4 font-mono text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-neon-blue/50 resize-y min-h-[120px] scrollbar-thin"
@@ -336,7 +336,7 @@ const AdminSqlEditorPage = () => {
             className="absolute bottom-3 right-3 bg-neon-blue hover:bg-neon-blue/80 text-white h-8 px-3 text-xs gap-1.5"
           >
             {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            {running ? "Đang chạy..." : "Chạy (Ctrl+Enter)"}
+            {running ? "Dang chay..." : "Chay (Ctrl+Enter)"}
           </Button>
         </div>
 
@@ -359,16 +359,16 @@ const AdminSqlEditorPage = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {isArray
-                  ? `${result.length} dòng`
+                  ? `${result.length} dong`
                   : result?.affected_rows !== undefined
-                    ? `${result.affected_rows} dòng bị ảnh hưởng`
-                    : "Hoàn thành"}
+                    ? `${result.affected_rows} dong bi anh huong`
+                    : "Hoan thanh"}
               </span>
               {isArray && result.length > 0 && (
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-                    toast.success("Đã copy JSON!");
+                    toast.success("Da copy JSON!");
                   }}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                 >
@@ -421,7 +421,7 @@ const AdminSqlEditorPage = () => {
               </div>
             ) : isArray && result.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                Không có kết quả
+                Khong co ket qua
               </div>
             ) : (
               <pre className="text-xs text-foreground/80 bg-oled-base border border-gray-border rounded-xl p-4 font-mono">

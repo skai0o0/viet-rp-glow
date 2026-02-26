@@ -33,8 +33,14 @@ const CharacterCard = ({ character, onClick, isFavorited, onFavoriteToggle }: Ch
     try {
       const newState = await toggleFavorite(character.id);
       onFavoriteToggle?.(character.id, newState);
-    } catch {
-      toast.error("Đăng nhập để yêu thích nhân vật");
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("Not authenticated")) {
+        toast.error("Đăng nhập để yêu thích nhân vật");
+      } else {
+        toast.error("Không thể thực hiện. Kiểm tra console để biết thêm chi tiết.");
+        console.error("[CharacterCard] favorite error:", err);
+      }
     } finally {
       setFavLoading(false);
     }
