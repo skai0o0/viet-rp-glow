@@ -30,9 +30,14 @@ import {
   User,
   Bot,
   Upload,
+  History,
+  Clock,
+  ExternalLink,
+  Pencil,
+  Trash,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { createCharacter } from "@/services/characterDb";
+import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKey, getModel, streamChat, type StreamCallbacks } from "@/services/openRouter";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
@@ -138,6 +143,10 @@ const AdminCharGenPage = () => {
   const { isAdmin, checking } = useIsAdmin();
   const navigate = useNavigate();
 
+  // View mode: 'chat' | 'review' | 'history'
+  type ViewMode = "chat" | "review" | "history";
+  const [viewMode, setViewMode] = useState<ViewMode>("chat");
+
   // Chat state
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -148,7 +157,50 @@ const AdminCharGenPage = () => {
 
   // Generated card
   const [generatedCard, setGeneratedCard] = useState<TavernCardV2 | null>(null);
-  const [showReview, setShowReview] = useState(false);
+
+  // History
+  const [historyChars, setHistoryChars] = useState<DbCharacter[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("characters")
+        .select("*")
+        .eq("creator", "VietRP AI")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setHistoryChars((data ?? []) as DbCharacter[]);
+    } catch (err) {
+      console.error("[CharGen] history fetch error:", err);
+      toast.error("Không thể tải lịch sử.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const handleDeleteChar = async (id: string, name: string) => {
+    if (!confirm(`Xoá nhân vật "${name}"? Hành động này không thể hoàn tác.`)) return;
+    setDeletingId(id);
+    try {
+      const { error } = await supabase.from("characters").delete().eq("id", id);
+      if (error) throw error;
+      setHistoryChars((prev) => prev.filter((c) => c.id !== id));
+      toast.success(`Đã xoá: ${name}`);
+    } catch (err: any) {
+      toast.error(err.message || "Xoá thất bại!");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Fetch history when switching to history view
+  useEffect(() => {
+    if (viewMode === "history") fetchHistory();
+  }, [viewMode, fetchHistory]);
 
   // Avatar
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -209,6 +261,8 @@ const AdminCharGenPage = () => {
           setGeneratedCard(card);
           toast.success(`Đã tạo card: ${card.data.name}`, { description: "Nhấn 'Duyệt & Xuất bản' để xem chi tiết." });
         }
+        // Auto-refresh history cache
+        fetchHistory();
       },
       onError: (error) => {
         toast.error(error);
@@ -307,7 +361,7 @@ const AdminCharGenPage = () => {
     setMessages([]);
     setStreamBuffer("");
     setGeneratedCard(null);
-    setShowReview(false);
+    setViewMode("chat");
     clearAvatar();
     setInput("");
   };
@@ -346,17 +400,37 @@ const AdminCharGenPage = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {generatedCard && (
+          {generatedCard && viewMode !== "review" && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowReview(!showReview)}
+              onClick={() => setViewMode("review")}
               className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10 text-xs"
             >
-              {showReview ? <EyeOff size={14} className="mr-1" /> : <Eye size={14} className="mr-1" />}
-              {showReview ? "Chat" : "Duyệt & Xuất bản"}
+              <Eye size={14} className="mr-1" />
+              Duyệt & Xuất bản
             </Button>
           )}
+          {viewMode === "review" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setViewMode("chat")}
+              className="border-oled-border text-muted-foreground hover:text-foreground text-xs"
+            >
+              <EyeOff size={14} className="mr-1" />
+              Chat
+            </Button>
+          )}
+          <Button
+            variant={viewMode === "history" ? "default" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode(viewMode === "history" ? "chat" : "history")}
+            className={viewMode === "history" ? "bg-neon-blue/20 text-neon-blue" : "text-muted-foreground hover:text-neon-blue"}
+            title="Lịch sử card đã tạo"
+          >
+            <History size={16} />
+          </Button>
           <Button variant="ghost" size="icon" onClick={handleReset} className="text-muted-foreground hover:text-neon-rose">
             <RotateCcw size={16} />
           </Button>
@@ -366,7 +440,7 @@ const AdminCharGenPage = () => {
       {/* Body */}
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
-          {!showReview ? (
+          {viewMode === "chat" ? (
             /* ═══════════ CHAT VIEW ═══════════ */
             <motion.div
               key="chat"
@@ -451,10 +525,10 @@ const AdminCharGenPage = () => {
                   )}
 
                   {/* Card detected badge */}
-                  {generatedCard && !showReview && (
+                  {generatedCard && viewMode === "chat" && (
                     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex justify-center">
                       <button
-                        onClick={() => setShowReview(true)}
+                        onClick={() => setViewMode("review")}
                         className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-sm hover:bg-green-500/20 transition-colors"
                       >
                         <CheckCircle2 size={16} />
@@ -491,7 +565,7 @@ const AdminCharGenPage = () => {
                 </div>
               </div>
             </motion.div>
-          ) : (
+          ) : viewMode === "review" ? (
             /* ═══════════ REVIEW VIEW ═══════════ */
             <motion.div
               key="review"
@@ -702,7 +776,7 @@ const AdminCharGenPage = () => {
                           </Button>
                           <Button
                             variant="outline"
-                            onClick={() => setShowReview(false)}
+                            onClick={() => setViewMode("chat")}
                             className="border-oled-border text-muted-foreground hover:text-foreground"
                           >
                             Quay lại Chat
@@ -711,6 +785,140 @@ const AdminCharGenPage = () => {
                       </CardContent>
                     </Card>
                   </>
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            /* ═══════════ HISTORY VIEW ═══════════ */
+            <motion.div
+              key="history"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full overflow-y-auto scrollbar-thin"
+            >
+              <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4 pb-24">
+                {/* History header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History size={18} className="text-neon-blue" />
+                    <h2 className="text-lg font-bold text-foreground">Lịch sử tạo Card</h2>
+                    <Badge variant="outline" className="border-oled-border text-muted-foreground text-xs">
+                      {historyChars.length} cards
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchHistory}
+                    disabled={historyLoading}
+                    className="text-muted-foreground hover:text-neon-blue text-xs"
+                  >
+                    <RotateCcw size={14} className={historyLoading ? "animate-spin mr-1" : "mr-1"} />
+                    Tải lại
+                  </Button>
+                </div>
+
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 size={24} className="animate-spin text-neon-purple" />
+                  </div>
+                ) : historyChars.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-oled-surface flex items-center justify-center">
+                      <Sparkles size={24} className="text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">Chưa có card nào được tạo bằng AI Generator.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setViewMode("chat")}
+                      className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10 text-xs mt-2"
+                    >
+                      <Wand2 size={14} className="mr-1" />
+                      Tạo card đầu tiên
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {historyChars.map((char) => (
+                      <Card key={char.id} className="bg-oled-surface border-oled-border hover:border-neon-purple/30 transition-colors group">
+                        <CardContent className="p-3 flex items-center gap-3">
+                          {/* Avatar */}
+                          <div className="w-12 h-12 rounded-xl bg-oled-base overflow-hidden shrink-0 flex items-center justify-center">
+                            {char.avatar_url ? (
+                              <img src={char.avatar_url} alt={char.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <Sparkles size={16} className="text-muted-foreground" />
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">{char.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] px-1.5 py-0 ${
+                                  char.is_public ? "border-green-400/40 text-green-400" : "border-gray-500/40 text-gray-400"
+                                }`}
+                              >
+                                {char.is_public ? "Public" : "Private"}
+                              </Badge>
+                              {char.tags?.slice(0, 3).map((t) => (
+                                <Badge key={t} variant="outline" className="text-[10px] px-1.5 py-0 border-oled-border text-muted-foreground">
+                                  {t}
+                                </Badge>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                              <Clock size={10} />
+                              {new Date(char.created_at).toLocaleString("vi-VN", {
+                                day: "2-digit", month: "2-digit", year: "numeric",
+                                hour: "2-digit", minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-neon-blue"
+                              onClick={() => navigate(`/character/${char.id}`)}
+                              title="Xem trang nhân vật"
+                            >
+                              <ExternalLink size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-neon-purple"
+                              onClick={() => navigate(`/edit/${char.id}`)}
+                              title="Chỉnh sửa"
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-neon-rose"
+                              onClick={() => handleDeleteChar(char.id, char.name)}
+                              disabled={deletingId === char.id}
+                              title="Xoá"
+                            >
+                              {deletingId === char.id ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Trash size={14} />
+                              )}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 )}
               </div>
             </motion.div>
