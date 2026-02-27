@@ -25,6 +25,7 @@ const AdminKnowledgePage = lazy(() => import("@/pages/AdminKnowledgePage"));
 const AdminSqlEditorPage = lazy(() => import("@/pages/AdminSqlEditorPage"));
 const AdminDashboardPage = lazy(() => import("@/pages/AdminDashboardPage"));
 const AdminCharGenPage = lazy(() => import("@/pages/AdminCharGenPage"));
+const AdminApiSettingsPage = lazy(() => import("@/pages/AdminApiSettingsPage"));
 const CharacterPage = lazy(() => import("@/pages/CharacterPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const TermsPage = lazy(() => import("@/pages/TermsPage"));
@@ -69,6 +70,7 @@ const App = () => (
                 <Route path="/admin/sql" element={<ProtectedRoute><AdminSqlEditorPage /></ProtectedRoute>} />
                 <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboardPage /></ProtectedRoute>} />
                 <Route path="/admin/chargen" element={<ProtectedRoute><AdminCharGenPage /></ProtectedRoute>} />
+                <Route path="/admin/api-settings" element={<ProtectedRoute><AdminApiSettingsPage /></ProtectedRoute>} />
                 <Route path="/terms" element={<TermsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />

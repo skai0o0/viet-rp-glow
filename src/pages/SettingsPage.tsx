@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck } from "lucide-react";
+import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
   AVAILABLE_MODELS,
   verifyApiKey,
 } from "@/services/openRouter";
+import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
 import ModelCombobox from "@/components/ModelCombobox";
 
 const SettingsPage = () => {
@@ -133,9 +134,16 @@ const SettingsPage = () => {
           <div className="space-y-2">
             <label className="text-xs text-muted-foreground">Model AI</label>
             <ModelCombobox value={selectedModel} onValueChange={handleModelChange} />
-            <p className="text-[10px] text-muted-foreground">
-              Chọn model phù hợp với nhu cầu roleplay của bạn.
-            </p>
+            <div className="bg-oled-elevated rounded-xl p-3 space-y-1.5">
+              <div className="flex items-start gap-1.5">
+                <Info size={12} className="text-neon-blue mt-0.5 shrink-0" />
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Danh sách model đã được admin chọn lọc phù hợp cho roleplay.
+                  Model có nhãn <span className="text-green-400 font-semibold">FREE</span> hoàn toàn miễn phí.
+                  Model có biểu tượng <span className="text-yellow-500">⭐</span> được đề xuất cho trải nghiệm tốt nhất.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Save button */}

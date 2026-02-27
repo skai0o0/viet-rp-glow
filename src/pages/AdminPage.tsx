@@ -209,6 +209,13 @@ const AdminPage = () => {
       path: "/admin/sql",
       color: "text-amber-400 bg-amber-400/10",
     },
+    {
+      icon: Sparkles,
+      label: "API Global Settings",
+      description: "Verify API & quản lý model cho phép người dùng",
+      path: "/admin/api-settings",
+      color: "text-orange-400 bg-orange-400/10",
+    },
   ];
 
   type InlineSection = {
