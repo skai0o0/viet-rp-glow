@@ -8,6 +8,7 @@ import { CharacterSummary } from "@/services/characterDb";
 import { toggleFavorite } from "@/services/favoriteDb";
 import { rateCharacter, getMyRating } from "@/services/ratingDb";
 import { useAuth } from "@/contexts/AuthContext";
+import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "sonner";
 
 function formatCount(n: number): string {
@@ -80,7 +81,7 @@ const CharacterPreviewDialog = ({
   const handleShare = async () => {
     const url = `${window.location.origin}/character/${character.id}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await copyToClipboard(url);
       toast.success("Đã copy link chia sẻ!");
     } catch {
       toast.error("Không thể copy link");

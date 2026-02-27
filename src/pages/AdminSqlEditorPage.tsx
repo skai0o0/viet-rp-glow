@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Navigate } from "react-router-dom";
@@ -175,8 +176,8 @@ const AdminSqlEditorPage = () => {
   };
 
   const copySetupSql = async () => {
-    await navigator.clipboard.writeText(SETUP_SQL);
-    toast.success("Da copy SQL setup!");
+    await copyToClipboard(SETUP_SQL);
+    toast.success("Đã copy SQL setup!");
   };
 
   if (isLoading || checking) {
@@ -367,7 +368,7 @@ const AdminSqlEditorPage = () => {
               {isArray && result.length > 0 && (
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+                    copyToClipboard(JSON.stringify(result, null, 2));
                     toast.success("Đã copy JSON!");
                   }}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"

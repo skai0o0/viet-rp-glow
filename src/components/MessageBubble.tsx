@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Copy, Check, GitBranch, Trash2, Edit2 } from "lucide-react";
 import { ChatMessage } from "@/types/character";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/utils/clipboard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import RoleplayMessage from "@/components/RoleplayMessage";
 
@@ -48,7 +49,7 @@ const MessageBubble = ({
   }, [editing]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content);
+    copyToClipboard(message.content);
     setCopied(true);
     toast.success("Đã sao chép");
     setTimeout(() => setCopied(false), 2000);
