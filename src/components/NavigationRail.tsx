@@ -1,8 +1,11 @@
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText } from "lucide-react";
+import { useState } from "react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { Switch } from "@/components/ui/switch";
+import { upsertProfile } from "@/services/profileDb";
 import logoImg from "@/assets/logo.png";
 import { toast } from "sonner";
 import {
@@ -71,6 +74,21 @@ const NavigationRail = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [nsfwMode, setNsfwMode] = useState(() => localStorage.getItem("vietrp_nsfw_mode") === "true");
+
+  const handleNsfwToggle = async (checked: boolean) => {
+    setNsfwMode(checked);
+    localStorage.setItem("vietrp_nsfw_mode", String(checked));
+    if (user) {
+      try {
+        await upsertProfile(user.id, { nsfw_mode: checked });
+        toast.success(checked ? "Đã bật NSFW" : "Đã tắt NSFW");
+      } catch {
+        toast.error("Không thể lưu cài đặt.");
+      }
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     toast.success("Đã đăng xuất");
@@ -106,17 +124,19 @@ const NavigationRail = () => {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  import("turndown").then(({ default: TurndownService }) => {
+                onClick={async () => {
+                  try {
+                    const mod = await import("turndown");
+                    const TurndownService = mod.default ?? mod;
                     const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
                     const main = document.querySelector("main") || document.body;
                     const md = td.turndown(main.innerHTML);
-                    navigator.clipboard.writeText(md).then(() => {
-                      toast.success("Đã copy markdown vào clipboard");
-                    }).catch(() => {
-                      toast.error("Không thể copy vào clipboard");
-                    });
-                  });
+                    await navigator.clipboard.writeText(md);
+                    toast.success("Đã copy markdown vào clipboard");
+                  } catch (err) {
+                    console.error("Copy MD error:", err);
+                    toast.error("Không thể copy markdown");
+                  }
                 }}
                 className="relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
               >
@@ -175,9 +195,23 @@ const NavigationRail = () => {
                 <Settings size={20} />
               </motion.button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="end" className="bg-oled-elevated border-gray-border w-52 z-50">
+            <DropdownMenuContent side="right" align="end" className="bg-oled-elevated border-gray-border w-56 z-50">
               <DropdownMenuItem onClick={() => navigate("/settings")} className="text-foreground focus:bg-oled-surface cursor-pointer">
                 <Key size={14} className="mr-2" /> Thẻ API của tôi
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-gray-border" />
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Cài đặt hệ thống</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert size={14} />
+                    <span>NSFW</span>
+                  </div>
+                  <Switch checked={nsfwMode} onCheckedChange={handleNsfwToggle} className="scale-90" />
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-foreground/40 focus:bg-oled-surface cursor-default" disabled>
+                <Palette size={14} className="mr-2" /> Theme: Cyberpunk (sắp ra mắt)
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-gray-border" />
               <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Trạng thái</DropdownMenuLabel>
