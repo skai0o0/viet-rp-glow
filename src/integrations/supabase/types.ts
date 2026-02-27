@@ -409,6 +409,43 @@ export type Database = {
         }
         Returns: undefined
       }
+      increment_character_message_count_fallback: {
+        Args: {
+          char_id: string
+        }
+        Returns: undefined
+      }
+      decrement_character_message_count: {
+        Args: {
+          char_id: string
+          amount: number
+        }
+        Returns: undefined
+      }
+      get_weekly_trending: {
+        Args: {
+          lim?: number
+        }
+        Returns: {
+          character_id: string
+          msg_count: number
+        }[]
+      }
+      get_most_favorited: {
+        Args: {
+          lim?: number
+        }
+        Returns: {
+          character_id: string
+          fav_count: number
+        }[]
+      }
+      exec_sql: {
+        Args: {
+          query: string
+        }
+        Returns: Record<string, unknown>
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
