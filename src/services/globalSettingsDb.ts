@@ -116,3 +116,131 @@ export async function updateModelSortOrder(id: string, sortOrder: number): Promi
     .eq("id", id);
   if (error) throw error;
 }
+
+// ─── Subscription Plan Board ────────────────────────────────
+
+export type PlanPhaseStatus = "planned" | "in-progress" | "done";
+
+export interface PlanPhase {
+  id: number;
+  title: string;
+  description: string;
+  status: PlanPhaseStatus;
+  details: string[];
+}
+
+const DEFAULT_PLAN: PlanPhase[] = [
+  {
+    id: 1,
+    title: "Database & Roles",
+    description: "Mở rộng role (op), bảng subscriptions, usage_logs, subscription_plans",
+    status: "planned",
+    details: [
+      "ALTER TYPE app_role ADD VALUE 'op'",
+      "Bảng subscriptions: user_id, plan, credits, expires_at",
+      "Bảng usage_logs: tracking token & cost",
+      "Bảng subscription_plans: admin định nghĩa gói",
+      "Platform API key trong global_settings (encrypted)",
+    ],
+  },
+  {
+    id: 2,
+    title: "Backend Proxy (Edge Function)",
+    description: "Edge Function chat-proxy xử lý subscription, rate limit, streaming",
+    status: "planned",
+    details: [
+      "Supabase Edge Function 'chat-proxy'",
+      "Check credits → gọi OpenRouter bằng platform key",
+      "Trừ credits + log usage sau mỗi request",
+      "Rate limit theo plan",
+      "Forward SSE stream về client",
+    ],
+  },
+  {
+    id: 3,
+    title: "Frontend: BYOK vs Subscription",
+    description: "Phân luồng streamChat(), SettingsPage, ChatPage theo role",
+    status: "planned",
+    details: [
+      "Hook useUserRole() trả role + subscription info",
+      "streamChat() phân nhánh: user→proxy, op/admin→BYOK",
+      "SettingsPage: user ẩn API key, hiện gói + credits",
+      "ChatPage badge BYOK/Sub, toast hết credits",
+    ],
+  },
+  {
+    id: 4,
+    title: "Role Operator (op)",
+    description: "Role op: xem admin read-only, dùng BYOK",
+    status: "planned",
+    details: [
+      "op được truy cập Admin Hub (read-only)",
+      "op dùng BYOK giống admin",
+      "useIsAdmin → useUserRole trả 3 role",
+      "Nút chỉnh sửa chỉ hiện cho admin",
+      "NavigationRail hiện Admin Hub cho op (màu khác)",
+    ],
+  },
+  {
+    id: 5,
+    title: "Subscription Management UI",
+    description: "Trang /subscription cho user, admin quản lý subscribers",
+    status: "planned",
+    details: [
+      "Trang /subscription: xem gói, credits, lịch sử",
+      "Admin: Subscription Manager trong Admin Hub",
+      "Tặng/trừ credits, thay đổi plan",
+      "Tích hợp thanh toán (MoMo/VNPAY) hoặc manual",
+    ],
+  },
+  {
+    id: 6,
+    title: "Polish & Monitoring",
+    description: "Dashboard chi phí, budget alert, UX polish",
+    status: "planned",
+    details: [
+      "Dashboard chi phí realtime cho admin",
+      "Budget alert trên OpenRouter",
+      "Giới hạn model theo plan",
+      "UX polish cho flow subscription",
+    ],
+  },
+];
+
+export async function fetchSubscriptionPlan(): Promise<PlanPhase[]> {
+  const { data } = await supabase
+    .from("global_settings")
+    .select("value")
+    .eq("key", "subscription_plan")
+    .single();
+  if (data?.value) {
+    try {
+      return JSON.parse(data.value) as PlanPhase[];
+    } catch {
+      return DEFAULT_PLAN;
+    }
+  }
+  return DEFAULT_PLAN;
+}
+
+export async function saveSubscriptionPlan(plan: PlanPhase[]): Promise<void> {
+  const value = JSON.stringify(plan);
+  // Upsert: try update first, if no row then insert
+  const { data } = await supabase
+    .from("global_settings")
+    .select("key")
+    .eq("key", "subscription_plan")
+    .single();
+  if (data) {
+    const { error } = await supabase
+      .from("global_settings")
+      .update({ value, updated_at: new Date().toISOString() })
+      .eq("key", "subscription_plan");
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("global_settings")
+      .insert({ key: "subscription_plan", value });
+    if (error) throw error;
+  }
+}

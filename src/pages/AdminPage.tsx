@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Navigate, Link } from "react-router-dom";
@@ -26,11 +26,41 @@ import {
   Save,
   BarChart3,
   Wand2,
+  Rocket,
+  CheckCircle2,
+  Clock,
+  Circle,
+  Pencil,
+  X,
+  Pin,
+  ExternalLink,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
 import { readJsonFile, parseTavernCardJson } from "@/utils/importCharacterJson";
-import { fetchGlobalSystemPrompt, saveGlobalSystemPrompt } from "@/services/globalSettingsDb";
+import {
+  fetchGlobalSystemPrompt,
+  saveGlobalSystemPrompt,
+  fetchSubscriptionPlan,
+  saveSubscriptionPlan,
+  type PlanPhase,
+  type PlanPhaseStatus,
+} from "@/services/globalSettingsDb";
+
+const planStatusConfig: Record<PlanPhaseStatus, { icon: React.ElementType; label: string; color: string; bg: string }> = {
+  done: { icon: CheckCircle2, label: "Hoàn thành", color: "text-green-400", bg: "bg-green-400/10 border-green-400/30" },
+  "in-progress": { icon: Clock, label: "Đang làm", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/30" },
+  planned: { icon: Circle, label: "Dự kiến", color: "text-muted-foreground", bg: "bg-muted/10 border-gray-border" },
+};
 
 const StatCard = ({
   icon: Icon,
@@ -70,9 +100,53 @@ const AdminPage = () => {
 
   const [stats, setStats] = useState({ characters: "—", users: "—", sessions: "—" });
 
+  // Subscription plan board
+  const [planPhases, setPlanPhases] = useState<PlanPhase[]>([]);
+  const [planExpanded, setPlanExpanded] = useState(false);
+  const [editingPhase, setEditingPhase] = useState<PlanPhase | null>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
+
+  const loadPlan = useCallback(async () => {
+    const plan = await fetchSubscriptionPlan();
+    setPlanPhases(plan);
+  }, []);
+
   useEffect(() => {
     fetchGlobalSystemPrompt().then(setPrompt);
-  }, []);
+    loadPlan();
+  }, [loadPlan]);
+
+  const handlePlanStatusToggle = async (phaseId: number) => {
+    const cycle: PlanPhaseStatus[] = ["planned", "in-progress", "done"];
+    const updated = planPhases.map((p) => {
+      if (p.id !== phaseId) return p;
+      const nextIdx = (cycle.indexOf(p.status) + 1) % cycle.length;
+      return { ...p, status: cycle[nextIdx] };
+    });
+    setPlanPhases(updated);
+    try {
+      await saveSubscriptionPlan(updated);
+    } catch {
+      toast.error("Không thể lưu trạng thái.");
+      loadPlan();
+    }
+  };
+
+  const handleSavePhaseEdit = async () => {
+    if (!editingPhase) return;
+    setSavingPlan(true);
+    const updated = planPhases.map((p) => (p.id === editingPhase.id ? editingPhase : p));
+    try {
+      await saveSubscriptionPlan(updated);
+      setPlanPhases(updated);
+      setEditingPhase(null);
+      toast.success("Đã lưu thay đổi!");
+    } catch {
+      toast.error("Không thể lưu.");
+    } finally {
+      setSavingPlan(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -266,6 +340,193 @@ const AdminPage = () => {
           <StatCard icon={Sparkles} label="Nhân vật" value={stats.characters} color="text-neon-purple bg-neon-purple/10" />
           <StatCard icon={Users} label="Người dùng" value={stats.users} color="text-neon-blue bg-neon-blue/10" />
           <StatCard icon={MessageSquare} label="Phiên chat" value={stats.sessions} color="text-neon-rose bg-neon-rose/10" />
+        </div>
+
+        {/* Pinned Subscription Plan Board */}
+        <div className="relative">
+          <Card className="bg-gradient-to-br from-oled-surface to-oled-elevated border border-neon-blue/20 overflow-hidden">
+            {/* Glow accent */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-neon-blue via-neon-purple to-neon-rose" />
+
+            <CardContent className="p-4 space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-neon-blue/10 flex items-center justify-center">
+                    <Rocket size={18} className="text-neon-blue" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-foreground">Subscription System</h2>
+                      <Badge variant="outline" className="text-[10px] border-neon-blue/30 text-neon-blue py-0 h-5">
+                        <Pin size={8} className="mr-1" /> Ghim
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Kế hoạch song song BYOK + Subscription ·{" "}
+                      <span className="text-green-400">{planPhases.filter(p => p.status === "done").length}</span>
+                      /{planPhases.length} hoàn thành
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link to="/admin/roadmap" className="text-[10px] text-neon-purple hover:underline flex items-center gap-1">
+                    Roadmap <ExternalLink size={10} />
+                  </Link>
+                  <button
+                    onClick={() => setPlanExpanded(!planExpanded)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-oled-elevated transition-colors"
+                  >
+                    <ChevronDown size={16} className={`transition-transform duration-200 ${planExpanded ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full h-2 bg-oled-base rounded-full overflow-hidden flex gap-0.5">
+                {planPhases.map((phase) => (
+                  <div
+                    key={phase.id}
+                    className={`flex-1 rounded-full transition-colors duration-300 ${
+                      phase.status === "done"
+                        ? "bg-green-400"
+                        : phase.status === "in-progress"
+                        ? "bg-yellow-400 animate-pulse"
+                        : "bg-muted-foreground/20"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Compact phase chips (always visible) */}
+              <div className="flex flex-wrap gap-1.5">
+                {planPhases.map((phase) => {
+                  const { icon: StatusIcon, color } = planStatusConfig[phase.status];
+                  return (
+                    <button
+                      key={phase.id}
+                      onClick={() => handlePlanStatusToggle(phase.id)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] transition-all hover:scale-105 ${
+                        planStatusConfig[phase.status].bg
+                      }`}
+                      title={`Click để đổi trạng thái · ${phase.title}`}
+                    >
+                      <StatusIcon size={12} className={color} />
+                      <span className="text-foreground font-medium">P{phase.id}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Expanded details */}
+              <AnimatePresence>
+                {planExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-2 pt-2 border-t border-gray-border">
+                      {planPhases.map((phase) => {
+                        const { icon: StatusIcon, color } = planStatusConfig[phase.status];
+                        const isEditing = editingPhase?.id === phase.id;
+
+                        if (isEditing) {
+                          return (
+                            <div key={phase.id} className="bg-oled-base rounded-xl p-3 space-y-2 border border-neon-purple/20">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={editingPhase.title}
+                                  onChange={(e) => setEditingPhase({ ...editingPhase, title: e.target.value })}
+                                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-8 flex-1"
+                                />
+                                <Select
+                                  value={editingPhase.status}
+                                  onValueChange={(v) => setEditingPhase({ ...editingPhase, status: v as PlanPhaseStatus })}
+                                >
+                                  <SelectTrigger className="w-32 h-8 bg-oled-elevated border-gray-border text-foreground text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="done">✅ Hoàn thành</SelectItem>
+                                    <SelectItem value="in-progress">🔨 Đang làm</SelectItem>
+                                    <SelectItem value="planned">⭕ Dự kiến</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <Input
+                                value={editingPhase.description}
+                                onChange={(e) => setEditingPhase({ ...editingPhase, description: e.target.value })}
+                                placeholder="Mô tả..."
+                                className="bg-oled-elevated border-gray-border text-foreground text-xs h-8"
+                              />
+                              <Textarea
+                                value={editingPhase.details.join("\n")}
+                                onChange={(e) => setEditingPhase({ ...editingPhase, details: e.target.value.split("\n") })}
+                                rows={3}
+                                className="bg-oled-elevated border-gray-border text-foreground text-xs font-mono resize-none"
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <Button size="sm" variant="ghost" onClick={() => setEditingPhase(null)} className="h-7 text-xs">
+                                  <X size={12} className="mr-1" /> Huỷ
+                                </Button>
+                                <Button size="sm" onClick={handleSavePhaseEdit} disabled={savingPlan} className="h-7 text-xs bg-neon-purple hover:bg-neon-purple/80 text-white">
+                                  {savingPlan ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                                  Lưu
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={phase.id}
+                            className="bg-oled-base rounded-xl p-3 group hover:border-neon-blue/20 border border-transparent transition-colors"
+                          >
+                            <div className="flex items-start gap-2">
+                              <button
+                                onClick={() => handlePlanStatusToggle(phase.id)}
+                                className="mt-0.5 shrink-0 hover:scale-125 transition-transform"
+                                title="Click để đổi trạng thái"
+                              >
+                                <StatusIcon size={16} className={color} />
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-neon-blue/30 text-neon-blue shrink-0">
+                                    Phase {phase.id}
+                                  </Badge>
+                                  <span className="text-sm font-medium text-foreground truncate">{phase.title}</span>
+                                  <button
+                                    onClick={() => setEditingPhase({ ...phase })}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-neon-blue"
+                                  >
+                                    <Pencil size={11} />
+                                  </button>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">{phase.description}</p>
+                                <ul className="mt-1.5 space-y-0.5">
+                                  {phase.details.map((d, i) => (
+                                    <li key={i} className="text-[10px] text-muted-foreground/70 flex items-start gap-1.5">
+                                      <span className="text-neon-blue/50 mt-px">›</span>
+                                      <span>{d}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Links + Inline Sections */}
