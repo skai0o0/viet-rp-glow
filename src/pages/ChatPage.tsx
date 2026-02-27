@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
-import { getCharacterById, dbCharToCard, CharacterSummary, incrementMessageCount, decrementMessageCount } from "@/services/characterDb";
+import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
 import {
   getUserSessions,
   createSession,
@@ -261,20 +261,8 @@ const ChatPage = () => {
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
-      // Count assistant messages before deleting to decrement character counter
-      const session = sessions.find((s) => s.id === sessionId);
-      let assistantCount = 0;
-      try {
-        const sessionMsgs = await getSessionMessages(sessionId);
-        assistantCount = sessionMsgs.filter((m) => m.role === "assistant").length;
-      } catch { /* proceed with delete even if count fails */ }
-
       await deleteSession(sessionId);
-
-      // Decrement character message_count by the number of deleted assistant messages
-      if (session && assistantCount > 0) {
-        decrementMessageCount(session.character_id, assistantCount);
-      }
+      // message_count tự động giảm qua DB trigger khi CASCADE DELETE chat_messages
 
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       if (activeSessionId === sessionId) {
@@ -391,7 +379,7 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
-              if (activeCharId) incrementMessageCount(activeCharId);
+              // message_count tự động tăng qua DB trigger khi INSERT chat_messages
             } else {
               // Remove empty assistant message if stream produced no content
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
@@ -489,22 +477,15 @@ const ChatPage = () => {
   const handleDeleteMessage = useCallback(
     async (msgId: string) => {
       try {
-        // Check if the deleted message is an assistant message
-        const deletedMsg = messages.find((m) => m.id === msgId);
         await deleteMessage(msgId);
         setMessages((prev) => prev.filter((m) => m.id !== msgId));
-
-        // Decrement character message_count if an assistant message was deleted
-        if (deletedMsg?.role === "assistant" && activeCharId) {
-          decrementMessageCount(activeCharId);
-        }
-
+        // message_count tự động giảm qua DB trigger khi DELETE chat_messages
         toast.success("Đã xóa tin nhắn");
       } catch {
         toast.error("Không thể xóa tin nhắn");
       }
     },
-    [messages, activeCharId]
+    []
   );
 
   const handleEditAndResend = useCallback(

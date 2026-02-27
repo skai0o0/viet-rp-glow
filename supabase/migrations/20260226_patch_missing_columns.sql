@@ -183,7 +183,6 @@ AS $$
   FROM public.chat_messages cm
   JOIN public.chat_sessions cs ON cs.id = cm.session_id
   WHERE cm.created_at >= now() - INTERVAL '7 days'
-    AND cm.role = 'assistant'
   GROUP BY cs.character_id
   ORDER BY msg_count DESC
   LIMIT lim;
@@ -264,3 +263,85 @@ EXCEPTION
     RETURN json_build_object('error', SQLERRM, 'detail', SQLSTATE);
 END;
 $$;
+
+-- ────────────────────────────────────────────────────────────
+-- 10. Trigger: tự động cập nhật characters.message_count
+--     khi chat_messages thêm/xóa (bao gồm cascade delete)
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.update_character_message_count_trigger()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_character_id UUID;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT character_id INTO v_character_id
+    FROM public.chat_sessions WHERE id = NEW.session_id;
+    IF v_character_id IS NOT NULL THEN
+      UPDATE public.characters
+      SET message_count = message_count + 1
+      WHERE id = v_character_id;
+    END IF;
+    RETURN NEW;
+
+  ELSIF TG_OP = 'DELETE' THEN
+    SELECT character_id INTO v_character_id
+    FROM public.chat_sessions WHERE id = OLD.session_id;
+    IF v_character_id IS NOT NULL THEN
+      UPDATE public.characters
+      SET message_count = GREATEST(message_count - 1, 0)
+      WHERE id = v_character_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+-- Xóa trigger cũ nếu tồn tại, tạo lại
+DROP TRIGGER IF EXISTS trg_update_character_message_count ON public.chat_messages;
+
+CREATE TRIGGER trg_update_character_message_count
+  AFTER INSERT OR DELETE ON public.chat_messages
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_character_message_count_trigger();
+
+-- ────────────────────────────────────────────────────────────
+-- 11. Hàm đồng bộ: tính lại message_count từ dữ liệu thực
+--     Chạy 1 lần để khôi phục counter cho dữ liệu lịch sử
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.sync_all_character_message_counts()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Cập nhật characters có tin nhắn
+  UPDATE public.characters c
+  SET message_count = sub.cnt
+  FROM (
+    SELECT cs.character_id, COUNT(cm.id)::INTEGER AS cnt
+    FROM public.chat_sessions cs
+    JOIN public.chat_messages cm ON cm.session_id = cs.id
+    GROUP BY cs.character_id
+  ) sub
+  WHERE c.id = sub.character_id;
+
+  -- Reset characters không có tin nhắn nào
+  UPDATE public.characters
+  SET message_count = 0
+  WHERE id NOT IN (
+    SELECT DISTINCT cs.character_id
+    FROM public.chat_sessions cs
+    JOIN public.chat_messages cm ON cm.session_id = cs.id
+  );
+END;
+$$;
+
+-- Chạy sync ngay để cập nhật tất cả counter từ dữ liệu lịch sử
+SELECT public.sync_all_character_message_counts();
