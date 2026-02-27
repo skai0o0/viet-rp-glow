@@ -16,6 +16,28 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
+/** Clipboard fallback for non-HTTPS (HTTP) contexts */
+function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      resolve();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
 const navItems = [
   { icon: Home, label: "Khám phá", path: "/" },
   { icon: MessageSquare, label: "Chat", path: "/chat" },
@@ -100,7 +122,7 @@ const BottomNavBar = () => {
               const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
               const main = document.querySelector("main") || document.body;
               const md = td.turndown(main.innerHTML);
-              await navigator.clipboard.writeText(md);
+              await copyToClipboard(md);
               toast.success("Đã copy markdown vào clipboard");
             } catch (err) {
               console.error("Copy MD error:", err);
