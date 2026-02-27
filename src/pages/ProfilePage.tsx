@@ -5,14 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +32,6 @@ const ProfilePage = () => {
   // Persona state
   const [displayName, setDisplayName] = useState("");
   const [userDescription, setUserDescription] = useState("");
-  const [nsfwMode, setNsfwMode] = useState(false);
   const [savingPersona, setSavingPersona] = useState(false);
 
   // Characters state
@@ -59,7 +50,6 @@ const ProfilePage = () => {
       if (p) {
         setDisplayName(p.display_name);
         setUserDescription(p.user_description);
-        setNsfwMode(p.nsfw_mode);
         localStorage.setItem("vietrp_nsfw_mode", String(p.nsfw_mode));
       }
     });
@@ -84,7 +74,6 @@ const ProfilePage = () => {
       await upsertProfile(user.id, {
         display_name: displayName,
         user_description: userDescription,
-        nsfw_mode: nsfwMode,
       });
       setCachedUserPersona(displayName, userDescription);
       toast.success("Đã lưu hồ sơ Roleplay!");
@@ -149,12 +138,6 @@ const ProfilePage = () => {
               className="flex-1 data-[state=active]:bg-neon-purple/15 data-[state=active]:text-neon-purple rounded-lg text-sm"
             >
               Nhân vật
-            </TabsTrigger>
-            <TabsTrigger
-              value="settings"
-              className="flex-1 data-[state=active]:bg-neon-purple/15 data-[state=active]:text-neon-purple rounded-lg text-sm"
-            >
-              Cài đặt hệ thống
             </TabsTrigger>
           </TabsList>
 
@@ -300,55 +283,6 @@ const ProfilePage = () => {
             </motion.div>
           </TabsContent>
 
-          {/* TAB 3: System Settings */}
-          <TabsContent value="settings" className="mt-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="space-y-6"
-            >
-              {/* Toggles */}
-              <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-neon-blue shadow-neon-blue" />
-                  <h2 className="text-sm font-semibold text-foreground">Tùy chỉnh</h2>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-foreground">Chế độ NSFW</p>
-                    <p className="text-[10px] text-muted-foreground">Cho phép nội dung người lớn trong RP.</p>
-                  </div>
-                  <Switch
-                    checked={nsfwMode}
-                    onCheckedChange={async (checked) => {
-                      setNsfwMode(checked);
-                      localStorage.setItem("vietrp_nsfw_mode", String(checked));
-                      if (user) {
-                        await upsertProfile(user.id, { nsfw_mode: checked });
-                        toast.success(checked ? "Đã bật NSFW" : "Đã tắt NSFW");
-                      }
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Theme Color</label>
-                  <Select defaultValue="cyberpunk">
-                    <SelectTrigger className="bg-oled-elevated border-gray-border text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-oled-elevated border-gray-border">
-                      <SelectItem value="cyberpunk" className="text-foreground focus:bg-neon-purple/10">Cyberpunk OLED</SelectItem>
-                      <SelectItem value="midnight" className="text-foreground focus:bg-neon-purple/10">Midnight Blue</SelectItem>
-                      <SelectItem value="sakura" className="text-foreground focus:bg-neon-purple/10">Sakura Pink</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground">Thay đổi giao diện màu sắc (sắp ra mắt).</p>
-                </div>
-              </div>
-            </motion.div>
-          </TabsContent>
         </Tabs>
       </div>
     </div>
