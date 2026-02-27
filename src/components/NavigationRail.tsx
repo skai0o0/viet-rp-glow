@@ -21,29 +21,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-
-/** Clipboard fallback for non-HTTPS (HTTP) contexts */
-function copyToClipboard(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-  // Fallback: hidden textarea + execCommand
-  return new Promise((resolve, reject) => {
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      resolve();
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
+import { copyToClipboard } from "@/utils/clipboard";
 
 const topItems = [
   { icon: Home, label: "Khám phá", path: "/" },

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
 import { streamChat, getApiKey } from "@/services/openRouter";
+import { copyToClipboard } from "@/utils/clipboard";
 import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
 import {
   getUserSessions,
@@ -117,7 +118,7 @@ const ChatPage = () => {
       }
       
       const md = lines.join("\n");
-      navigator.clipboard.writeText(md).then(() => {
+      copyToClipboard(md).then(() => {
         toast.success("Đã copy markdown vào clipboard");
       }).catch(() => {
         toast.error("Không thể copy vào clipboard");

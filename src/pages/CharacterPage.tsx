@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { copyToClipboard } from "@/utils/clipboard";
 import { motion } from "framer-motion";
 import {
   Send,
@@ -84,7 +85,7 @@ const CharacterPage = () => {
   const handleShare = async () => {
     const url = window.location.href;
     try {
-      await navigator.clipboard.writeText(url);
+      await copyToClipboard(url);
       toast.success("Đã copy link chia sẻ!");
     } catch {
       toast.error("Không thể copy link");

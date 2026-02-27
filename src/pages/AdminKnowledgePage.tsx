@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Navigate } from "react-router-dom";
@@ -182,7 +183,7 @@ const AdminKnowledgePage = () => {
 
   const handleCopy = async (content: string) => {
     try {
-      await navigator.clipboard.writeText(content);
+      await copyToClipboard(content);
       toast.success("Đã copy nội dung!");
     } catch {
       toast.error("Không thể copy");
