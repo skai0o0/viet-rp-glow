@@ -114,8 +114,8 @@ const AdminSqlEditorPage = () => {
 
   useEffect(() => {
     // Test if exec_sql function exists
-    (supabase.rpc as any)("exec_sql", { query: "SELECT 1 as test" })
-      .then(({ error: err }: { error: any }) => {
+    supabase.rpc("exec_sql", { query: "SELECT 1 as test" })
+      .then(({ error: err }) => {
         if (err && (err.message.includes("could not find") || err.message.includes("function") || err.code === "PGRST202")) {
           setSetupNeeded(true);
         }
@@ -134,7 +134,7 @@ const AdminSqlEditorPage = () => {
     const start = performance.now();
 
     try {
-      const { data, error: rpcError } = await (supabase.rpc as any)("exec_sql", {
+      const { data, error: rpcError } = await supabase.rpc("exec_sql", {
         query: trimmed,
       });
 

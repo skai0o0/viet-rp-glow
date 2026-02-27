@@ -214,19 +214,31 @@ export async function incrementMessageCount(characterId: string) {
     });
     if (error) {
       console.warn("[characterDb] RPC increment failed, trying direct update:", error.message);
-      const { data } = await supabase
-        .from("characters")
-        .select("message_count")
-        .eq("id", characterId)
-        .single();
-      const current = (data?.message_count as number) ?? 0;
-      await supabase
-        .from("characters")
-        .update({ message_count: current + 1 } as any)
-        .eq("id", characterId);
+      // Atomic increment via fallback RPC to avoid race conditions
+      const { error: rpcErr } = await supabase.rpc("increment_character_message_count_fallback", {
+        char_id: characterId,
+      });
+      if (rpcErr) {
+        console.warn("[characterDb] Fallback RPC also failed:", rpcErr.message);
+      }
     }
   } catch (e) {
     console.warn("[characterDb] incrementMessageCount failed:", e);
+  }
+}
+
+/** Decrement message_count for a character (fire-and-forget, never goes below 0) */
+export async function decrementMessageCount(characterId: string, count: number = 1) {
+  try {
+    const { error } = await supabase.rpc("decrement_character_message_count", {
+      char_id: characterId,
+      amount: count,
+    });
+    if (error) {
+      console.warn("[characterDb] decrement RPC failed:", error.message);
+    }
+  } catch (e) {
+    console.warn("[characterDb] decrementMessageCount failed:", e);
   }
 }
 
@@ -254,7 +266,7 @@ export async function getTrendingCharacters(limit = 10): Promise<CharacterSummar
 /** Fetch characters trending in last 7 days (by recent message volume) */
 export async function getWeeklyTrendingCharacters(limit = 10): Promise<CharacterSummary[]> {
   try {
-    const { data, error } = await (supabase.rpc as any)("get_weekly_trending", { lim: limit });
+    const { data, error } = await supabase.rpc("get_weekly_trending", { lim: limit });
     if (error || !data) return [];
     const ids: string[] = data.map((r: any) => r.character_id);
     if (ids.length === 0) return [];
@@ -278,7 +290,7 @@ export async function getWeeklyTrendingCharacters(limit = 10): Promise<Character
 /** Fetch most favorited characters (all time) */
 export async function getMostFavoritedCharacters(limit = 10): Promise<CharacterSummary[]> {
   try {
-    const { data, error } = await (supabase.rpc as any)("get_most_favorited", { lim: limit });
+    const { data, error } = await supabase.rpc("get_most_favorited", { lim: limit });
     if (error || !data) return [];
     const ids: string[] = data.map((r: any) => r.character_id);
     if (ids.length === 0) return [];

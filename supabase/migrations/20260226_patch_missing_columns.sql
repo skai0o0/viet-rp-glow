@@ -135,6 +135,40 @@ END;
 $$;
 
 -- ────────────────────────────────────────────────────────────
+-- 5b. RPC: increment_character_message_count_fallback
+--     Fallback atomic increment (same as main, used when RPC name resolution fails)
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.increment_character_message_count_fallback(char_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.characters
+  SET message_count = message_count + 1
+  WHERE id = char_id;
+END;
+$$;
+
+-- ────────────────────────────────────────────────────────────
+-- 5c. RPC: decrement_character_message_count
+--     Giảm message_count, không bao giờ xuống dưới 0
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.decrement_character_message_count(char_id UUID, amount INTEGER DEFAULT 1)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.characters
+  SET message_count = GREATEST(message_count - amount, 0)
+  WHERE id = char_id;
+END;
+$$;
+
+-- ────────────────────────────────────────────────────────────
 -- 6. RPC: get_weekly_trending
 --    Trả về top characters theo số tin nhắn trong 7 ngày qua
 -- ────────────────────────────────────────────────────────────
@@ -149,6 +183,7 @@ AS $$
   FROM public.chat_messages cm
   JOIN public.chat_sessions cs ON cs.id = cm.session_id
   WHERE cm.created_at >= now() - INTERVAL '7 days'
+    AND cm.role = 'assistant'
   GROUP BY cs.character_id
   ORDER BY msg_count DESC
   LIMIT lim;
@@ -189,3 +224,43 @@ CREATE INDEX IF NOT EXISTS idx_characters_message_count
 
 CREATE INDEX IF NOT EXISTS idx_characters_public_created
   ON public.characters(is_public, created_at DESC);
+
+-- ────────────────────────────────────────────────────────────
+-- 9. RPC: exec_sql (Admin-only SQL Editor)
+--    Cho phép admin chạy SQL tùy ý từ giao diện Admin Hub
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.exec_sql(query text)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  result json;
+  affected int;
+  is_select boolean;
+BEGIN
+  -- Admin-only check via has_role
+  IF NOT (SELECT public.has_role(auth.uid(), 'admin')) THEN
+    RAISE EXCEPTION 'Unauthorized: Admin access required';
+  END IF;
+
+  is_select := lower(trim(query)) ~ '^(select|with|explain)';
+
+  IF is_select THEN
+    EXECUTE format(
+      'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (%s) t',
+      query
+    ) INTO result;
+  ELSE
+    EXECUTE query;
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    result := json_build_object('affected_rows', affected, 'status', 'ok');
+  END IF;
+
+  RETURN result;
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN json_build_object('error', SQLERRM, 'detail', SQLSTATE);
+END;
+$$;
