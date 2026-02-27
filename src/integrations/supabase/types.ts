@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      allowed_models: {
+        Row: {
+          id: string
+          model_id: string
+          model_name: string
+          provider: string
+          description: string
+          is_free: boolean
+          is_recommended: boolean
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          model_id: string
+          model_name: string
+          provider?: string
+          description?: string
+          is_free?: boolean
+          is_recommended?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          model_id?: string
+          model_name?: string
+          provider?: string
+          description?: string
+          is_free?: boolean
+          is_recommended?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       banners: {
         Row: {
           created_at: string

@@ -225,6 +225,47 @@ CREATE INDEX IF NOT EXISTS idx_characters_public_created
   ON public.characters(is_public, created_at DESC);
 
 -- ────────────────────────────────────────────────────────────
+-- 8b. Bảng allowed_models: danh sách model admin cho phép user sử dụng
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.allowed_models (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  model_id TEXT NOT NULL UNIQUE,
+  model_name TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  is_free BOOLEAN NOT NULL DEFAULT false,
+  is_recommended BOOLEAN NOT NULL DEFAULT false,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.allowed_models ENABLE ROW LEVEL SECURITY;
+
+-- Ai cũng đọc được (user cần biết model nào khả dụng)
+CREATE POLICY "Anyone can read allowed_models"
+  ON public.allowed_models FOR SELECT
+  USING (true);
+
+-- Chỉ admin mới được thêm/sửa/xóa
+CREATE POLICY "Admins can insert allowed_models"
+  ON public.allowed_models FOR INSERT
+  TO authenticated
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+CREATE POLICY "Admins can update allowed_models"
+  ON public.allowed_models FOR UPDATE
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+CREATE POLICY "Admins can delete allowed_models"
+  ON public.allowed_models FOR DELETE
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+CREATE INDEX IF NOT EXISTS idx_allowed_models_sort
+  ON public.allowed_models(sort_order ASC, model_name ASC);
+
+-- ────────────────────────────────────────────────────────────
 -- 9. RPC: exec_sql (Admin-only SQL Editor)
 --    Cho phép admin chạy SQL tùy ý từ giao diện Admin Hub
 -- ────────────────────────────────────────────────────────────
