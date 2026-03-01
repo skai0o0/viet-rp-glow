@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
+import JSON5 from "json5";
 import { readJsonFile, parseTavernCardJson } from "@/utils/importCharacterJson";
 import {
   fetchGlobalSystemPrompt,
@@ -220,7 +221,7 @@ const AdminPage = () => {
     }
     setImportingRaw(true);
     try {
-      const parsed = JSON.parse(trimmed);
+      const parsed = JSON5.parse(trimmed);
       const card = parseTavernCardJson(parsed);
       if (!card.data.name.trim()) {
         toast.error("JSON thiếu trường 'name'.");

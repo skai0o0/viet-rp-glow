@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKey, getModel, streamChat, type StreamCallbacks } from "@/services/openRouter";
+import JSON5 from "json5";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
 
 /* ------------------------------------------------------------------ */
@@ -117,9 +118,9 @@ function extractCardJson(raw: string): TavernCardV2 | null {
     return null;
   }
 
-  // Try direct parse first
+  // Try direct parse first (JSON5 tolerates trailing commas, single quotes, etc.)
   try {
-    return normalize(JSON.parse(raw));
+    return normalize(JSON5.parse(raw));
   } catch { /* continue */ }
 
   // Try to find JSON block in markdown fences or raw text
@@ -133,7 +134,7 @@ function extractCardJson(raw: string): TavernCardV2 | null {
     const m = raw.match(pat);
     if (m?.[1]) {
       try {
-        return normalize(JSON.parse(m[1].trim()));
+        return normalize(JSON5.parse(m[1].trim()));
       } catch { /* continue */ }
     }
   }
