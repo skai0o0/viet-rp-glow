@@ -63,8 +63,8 @@ Bạn PHẢI trả về kết quả là MỘT chuỗi JSON hợp lệ theo đún
     "creator_notes": "Tạo bởi VietRP AI Generator.",
     "system_prompt": "[Lệnh ép AI đóng vai: VD 'Hãy giữ thái độ lạnh lùng, xưng hô Tôi-Cậu, thường xuyên dùng (...) để thể hiện sự khinh bỉ ngầm.']",
     "post_history_instructions": "",
-    "tags": ["[Tag 1]", "[Tag 2]", "[Tag 3]"],
-    "creator": "VietRP AI",
+    "tags": [Tag 1, Tag 2, Tag 3],
+    "creator": "VietRP Charagen AI",
     "character_version": "1.0",
     "alternate_greetings": []
   }
@@ -75,9 +75,14 @@ LƯU Ý NGHIÊM NGẶT:
 2. Trường \`scenario\` và \`first_mes\` chỉ là bối cảnh nền chung chung (Vanilla), để trống không gian sáng tạo cho người chơi tự tùy chỉnh sau.
 3. Luôn sử dụng {{user}} để đại diện cho người chơi, và {{char}} để đại diện cho nhân vật trong các trường text.
 4. Trả về bằng tiếng Việt tự nhiên, văn phong cuốn hút. Format chuẩn code JSON theo SillyTavern spec card v2 để phần mềm nhận file.
-5. Card có thể SFW hoặc NSFW nhẹ do website luôn yêu cầu đủ 18 tuổi khi tham gia.
+5. Card có thể SFW hoặc NSFW do website luôn yêu cầu đủ 18 tuổi khi tham gia.
 6. GIỚI HẠN TOKEN: Toàn bộ output JSON phải nằm trong khoảng 2000-3500 token. Viết súc tích nhưng đủ sâu. Trường \`description\` tối đa ~300 từ, \`personality\` tối đa ~150 từ, các trường còn lại ngắn gọn. TUYỆT ĐỐI phải hoàn thành JSON đầy đủ, đóng ngoặc đúng chuẩn, không được bị cắt giữa chừng.
-7. Quy chuẩn về cách trả lời như sau: *Hành động*, (Suy nghĩ) và "Lời nói". Ví dụ: *{{char}} nhún vai, ánh mắt lướt qua {{user}} một cách lạnh lùng* và "Ồ, lại là cậu à. Có chuyện gì nữa không?".`;
+7. Quy chuẩn về cách trả lời như sau: *Hành động*, (Suy nghĩ) và "Lời nói". Ví dụ: *{{char}} nhún vai, ánh mắt lướt qua {{user}} một cách lạnh lùng* và "Ồ, lại là cậu à. Có chuyện gì nữa không?".
+
+Một số quy chuẩn về cách xưng hô tiếng Việt:
+- {{user}} xưng tôi - trung lập, tớ - thân thiện, tao - thô lỗ, chuỵ/mị - hiện đại thân thiết, bố mày - rất láo, bổn + [chức danh] - kiêu ngạo. Gọi {{char}} bằng [danh từ riêng] thì tự coi là {{char}}, gọi bạn/cậu/ông/bà - trung lập, anh/chị/em - lịch sự, mày - thô lỗ, đồ + [tính từ] - rất láo, cô nương/tiểu thư/đại ca - kính nể. Tùy theo tính cách nhân vật mà chọn cách xưng hô phù hợp, có thể kết hợp nhiều kiểu để tạo chiều sâu (ví dụ: một tsundere lạnh lùng nhưng thỉnh thoảng lại thân thiện sẽ xen kẽ giữa "tớ" và "mày"). Cố gắng thể hiện rõ ràng qua cách xưng hô để người chơi dễ dàng nhập vai.
+- {{char}} cũng tương tự, tuỳ tình huống và bối cảnh mà tuỳ biến theo mạch truyện nhập vai.
+`;
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
@@ -103,7 +108,7 @@ function extractCardJson(raw: string): TavernCardV2 | null {
           post_history_instructions: d.post_history_instructions || "",
           alternate_greetings: d.alternate_greetings || [],
           tags: d.tags || [],
-          creator: d.creator || "VietRP AI",
+          creator: d.creator || "VietRP Charagen AI",
           character_version: d.character_version || "1.0",
           extensions: d.extensions || {},
         },
