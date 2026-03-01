@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, LogIn } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -14,11 +14,37 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const [focused, setFocused] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea height based on content
+  const adjustHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, []);
+
+  useEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  // Focus textarea on mount & after streaming finishes
+  useEffect(() => {
+    if (!disabled) {
+      // Small delay to let the DOM settle (e.g. after streaming ends)
+      const t = setTimeout(() => textareaRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [disabled]);
 
   const handleSend = () => {
     if (!value.trim() || disabled) return;
     onSend(value.trim());
     setValue("");
+    // Re-focus immediately after sending
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -54,6 +80,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
         }`}
       >
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -62,20 +89,21 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           placeholder="Nhập tin nhắn..."
           rows={1}
           disabled={disabled}
-          className="flex-1 bg-transparent text-foreground text-base md:text-sm resize-none outline-none placeholder:text-muted-foreground py-1.5 max-h-32 scrollbar-thin"
-          style={{ minHeight: "24px" }}
+          enterKeyHint="send"
+          className="flex-1 bg-transparent text-foreground text-base md:text-sm resize-none outline-none placeholder:text-muted-foreground py-1.5 scrollbar-thin"
+          style={{ minHeight: "48px", maxHeight: "160px" }}
         />
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleSend}
           disabled={!value.trim() || disabled}
-          className="p-2 rounded-xl text-neon-purple transition-all duration-200 hover:shadow-neon-purple hover:bg-neon-purple/10 disabled:opacity-30 disabled:hover:shadow-none flex-shrink-0"
+          className="p-2.5 rounded-xl text-neon-purple transition-all duration-200 hover:shadow-neon-purple hover:bg-neon-purple/10 disabled:opacity-30 disabled:hover:shadow-none flex-shrink-0 active:scale-90"
         >
-          <Send size={18} />
+          <Send size={20} />
         </motion.button>
       </div>
-      <p className="text-[10px] text-muted-foreground text-center mt-2">
+      <p className="text-[10px] text-muted-foreground text-center mt-2 hidden md:block">
         VietRP có thể tạo ra nội dung không chính xác. Hãy sử dụng có trách nhiệm.
       </p>
     </div>
