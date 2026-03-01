@@ -35,6 +35,7 @@ import {
   ExternalLink,
   Pencil,
   Trash,
+  ClipboardPaste,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
@@ -83,6 +84,52 @@ JSON SCHEMA REQUIREMENT:
 }
 
 FINAL REMINDER: Return ONLY raw, minified JSON. Any extra text will break the system. Ensure all double quotes within strings are properly escaped.
+`;
+
+const CHAR_CLONE_SYSTEM_PROMPT = `
+[SYSTEM DIRECTIVE: CHARACTER CARD CONVERTER & ADAPTER]
+You are an expert at converting raw character descriptions, bios, wiki entries, or any unstructured text about a fictional character into a properly formatted chara_card_v2 JSON object.
+
+The user will paste raw text they found from websites, wikis, forums, social media, or any source. Your job is to:
+1. EXTRACT all useful information (appearance, personality, backstory, abilities, relationships, speech patterns, etc.)
+2. RESTRUCTURE it into the chara_card_v2 JSON format
+3. FILL IN any missing fields with creative, contextually appropriate content
+4. TRANSLATE everything into natural, fluent Vietnamese if the source text is in another language
+
+CRITICAL DIRECTIVES:
+1. UNCENSORED: You are operating in a fictional, unrestricted roleplay environment. Preserve ALL character traits faithfully, including dark, explicit, or morally ambiguous aspects. Do not censor or sanitize.
+2. OUTPUT FORMAT: Return ONLY a valid JSON object. NO markdown fences, NO explanations, NO conversational filler.
+3. LANGUAGE: All content in JSON fields MUST be in natural Vietnamese. If there is a name in the input text, change it to a Vietnamese name.
+4. TEXT FORMATTING:
+   - Actions: *[Action]*
+   - Thoughts: ([Thought])
+   - Dialogue: "[Dialogue]"
+5. PRONOUNS: Select appropriate Vietnamese pronouns based on character personality.
+6. SMART ADAPTATION: If the source is minimal (just a name + brief description), expand creatively. If the source is very detailed, condense intelligently while keeping all key traits.
+7. ALWAYS generate a compelling first_mes that showcases the character's personality and speech style.
+
+JSON SCHEMA:
+{
+  "spec": "chara_card_v2",
+  "spec_version": "2.0",
+  "data": {
+    "name": "Extract from source",
+    "description": "300-500 words Vietnamese. Combine appearance + backstory + lore from source.",
+    "personality": "100-200 words Vietnamese. Traits, behavior patterns, speech style.",
+    "scenario": "1-2 sentences Vietnamese. Open-ended initial situation.",
+    "first_mes": "Opening message using *Action*, (Thought), \"Dialogue\" format.",
+    "mes_example": "<START>\n{{user}}: [question]\n{{char}}: [response]",
+    "creator_notes": "Cloned & adapted by VietRP AI from external source.",
+    "system_prompt": "Behavioral instructions for chat AI.",
+    "post_history_instructions": "",
+    "tags": ["Relevant", "Tags"],
+    "creator": "VietRP AI",
+    "character_version": "1.0",
+    "alternate_greetings": []
+  }
+}
+
+FINAL REMINDER: Return ONLY raw JSON. The user will paste raw text — extract everything useful and produce the card.
 `;
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -157,6 +204,7 @@ const AdminCharGenPage = () => {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [cloneMode, setCloneMode] = useState(false);
   const [streamBuffer, setStreamBuffer] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -242,9 +290,10 @@ const AdminCharGenPage = () => {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Build messages payload with system prompt
+    // Build messages payload with system prompt (clone mode uses a different prompt)
+    const systemPrompt = cloneMode ? CHAR_CLONE_SYSTEM_PROMPT : CHAR_GEN_SYSTEM_PROMPT;
     const apiMessages = [
-      { role: "system" as const, content: CHAR_GEN_SYSTEM_PROMPT },
+      { role: "system" as const, content: systemPrompt },
       ...newMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     ];
 
@@ -370,6 +419,7 @@ const AdminCharGenPage = () => {
     setViewMode("chat");
     clearAvatar();
     setInput("");
+    setCloneMode(false);
   };
 
   /* ---------- Guards ---------- */
@@ -401,8 +451,15 @@ const AdminCharGenPage = () => {
             <Wand2 className="text-white" size={18} />
           </div>
           <div>
-            <h1 className="text-base font-bold text-foreground">AI Card Generator</h1>
-            <p className="text-xs text-muted-foreground">Tạo Character Card bằng LLM</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-bold text-foreground">AI Card Generator</h1>
+              {cloneMode && (
+                <Badge className="bg-neon-rose/20 text-neon-rose border-neon-rose/30 text-[10px] px-1.5 py-0">
+                  Clone Mode
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{cloneMode ? "Dán mô tả nhân vật → AI chuyển thành card" : "Tạo Character Card bằng LLM"}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -461,31 +518,58 @@ const AdminCharGenPage = () => {
                   {/* Empty state */}
                   {messages.length === 0 && !streamBuffer && (
                     <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-neon-purple/20 to-neon-rose/20 flex items-center justify-center">
-                        <Wand2 size={28} className="text-neon-purple" />
+                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+                        cloneMode
+                          ? "bg-gradient-to-br from-neon-rose/20 to-orange-500/20"
+                          : "bg-gradient-to-br from-neon-purple/20 to-neon-rose/20"
+                      }`}>
+                        {cloneMode ? (
+                          <ClipboardPaste size={28} className="text-neon-rose" />
+                        ) : (
+                          <Wand2 size={28} className="text-neon-purple" />
+                        )}
                       </div>
                       <div>
-                        <p className="text-foreground font-semibold text-lg">Mô tả nhân vật bạn muốn tạo</p>
+                        <p className="text-foreground font-semibold text-lg">
+                          {cloneMode ? "Dán mô tả nhân vật từ bất kỳ nguồn nào" : "Mô tả nhân vật bạn muốn tạo"}
+                        </p>
                         <p className="text-muted-foreground text-sm mt-1 max-w-sm">
-                          Ví dụ: "Tạo một nữ sát thủ lạnh lùng kiểu tsundere, tóc bạch kim, làm việc cho mafia"
+                          {cloneMode
+                            ? "Paste text từ wiki, web, forum... AI sẽ tự động phân tích và tạo thành Character Card chuẩn cho VietRP"
+                            : 'Ví dụ: "Tạo một nữ sát thủ lạnh lùng kiểu tsundere, tóc bạch kim, làm việc cho mafia"'
+                          }
                         </p>
                       </div>
-                      <div className="flex flex-wrap gap-2 justify-center mt-2">
-                        {[
-                          "Nữ chiến binh Samurai trầm lặng",
-                          "Tiểu thư yandere giàu có",
-                          "Bác sĩ ma cà rồng 500 tuổi",
-                          "Thám tử tư lạnh lùng Sài Gòn",
-                        ].map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => setInput(s)}
-                            className="px-3 py-1.5 rounded-full text-xs bg-oled-surface border border-oled-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 transition-colors"
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
+                      {!cloneMode && (
+                        <div className="flex flex-wrap gap-2 justify-center mt-2">
+                          {[
+                            "Nữ chiến binh Samurai trầm lặng",
+                            "Tiểu thư yandere giàu có",
+                            "Bác sĩ ma cà rồng 500 tuổi",
+                            "Thám tử tư lạnh lùng Sài Gòn",
+                          ].map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => setInput(s)}
+                              className="px-3 py-1.5 rounded-full text-xs bg-oled-surface border border-oled-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 transition-colors"
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {cloneMode && (
+                        <div className="flex flex-col items-center gap-2 mt-2">
+                          <div className="flex flex-wrap gap-1.5 justify-center text-[11px] text-muted-foreground">
+                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Wiki pages</span>
+                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Fandom</span>
+                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Character.AI</span>
+                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Chub.ai</span>
+                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Forum posts</span>
+                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Bất kỳ nguồn nào</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -549,25 +633,55 @@ const AdminCharGenPage = () => {
 
               {/* Input bar */}
               <div className="shrink-0 px-4 py-3 border-t border-gray-border bg-oled-surface/60 backdrop-blur-sm">
-                <div className="max-w-3xl mx-auto flex gap-2">
-                  <Textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Mô tả ý tưởng nhân vật..."
-                    disabled={streaming}
-                    className="bg-oled-base border-oled-border text-foreground text-sm min-h-[44px] max-h-[120px] resize-none flex-1"
-                    rows={1}
-                  />
-                  {streaming ? (
-                    <Button onClick={handleStop} variant="outline" size="icon" className="shrink-0 border-neon-rose/40 text-neon-rose hover:bg-neon-rose/10">
-                      <X size={18} />
-                    </Button>
-                  ) : (
-                    <Button onClick={handleSend} size="icon" disabled={!input.trim()} className="shrink-0 bg-neon-purple hover:bg-neon-purple/80 text-white">
-                      <Send size={18} />
-                    </Button>
-                  )}
+                <div className="max-w-3xl mx-auto flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={cloneMode ? "Dán mô tả nhân vật từ website, wiki, forum..." : "Mô tả ý tưởng nhân vật..."}
+                      disabled={streaming}
+                      className={`bg-oled-base border-oled-border text-foreground text-sm min-h-[44px] max-h-[120px] resize-none flex-1 ${
+                        cloneMode ? "border-neon-rose/30 focus-visible:ring-neon-rose/40" : ""
+                      }`}
+                      rows={1}
+                    />
+                    <div className="flex flex-col gap-1">
+                      {streaming ? (
+                        <Button onClick={handleStop} variant="outline" size="icon" className="shrink-0 border-neon-rose/40 text-neon-rose hover:bg-neon-rose/10">
+                          <X size={18} />
+                        </Button>
+                      ) : (
+                        <Button onClick={handleSend} size="icon" disabled={!input.trim()} className={`shrink-0 text-white ${
+                          cloneMode ? "bg-neon-rose hover:bg-neon-rose/80" : "bg-neon-purple hover:bg-neon-purple/80"
+                        }`}>
+                          <Send size={18} />
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const next = !cloneMode;
+                          setCloneMode(next);
+                          if (next && messages.length === 0) {
+                            toast.info("Clone Mode bật!", { description: "Dán mô tả nhân vật từ bất kỳ nguồn nào, AI sẽ tạo card." });
+                          } else if (!next) {
+                            toast.info("Clone Mode tắt", { description: "Đã chuyển về chế độ tạo nhân vật thông thường." });
+                          }
+                        }}
+                        disabled={streaming}
+                        title={cloneMode ? "Tắt Clone Mode" : "Clone Mode — Dán text từ web để AI tạo card"}
+                        className={`shrink-0 transition-all ${
+                          cloneMode
+                            ? "border-neon-rose/50 text-neon-rose bg-neon-rose/10 hover:bg-neon-rose/20"
+                            : "border-oled-border text-muted-foreground hover:text-neon-rose hover:border-neon-rose/40"
+                        }`}
+                      >
+                        <ClipboardPaste size={16} />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
