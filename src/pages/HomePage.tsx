@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { filterByNsfw } from "@/utils/nsfwFilter";
+import { useNsfwMode } from "@/hooks/useNsfwMode";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
@@ -41,7 +42,8 @@ const HomePage = () => {
   const [perPage, setPerPage] = useState(18);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const visibleCharacters = useMemo(() => filterByNsfw(characters), [characters]);
+  const nsfwMode = useNsfwMode();
+  const visibleCharacters = useMemo(() => filterByNsfw(characters, nsfwMode), [characters, nsfwMode]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -345,10 +347,11 @@ const HomePage = () => {
 
           {/* Tab content */}
           {(() => {
-            const list =
+            const rawList =
               showcaseTab === "hall" ? trending
               : showcaseTab === "trending" ? weeklyTrending
               : mostFavorited;
+            const list = filterByNsfw(rawList, nsfwMode);
 
             if (list.length === 0) return (
               <div className="text-center py-8 text-muted-foreground text-sm">

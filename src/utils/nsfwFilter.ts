@@ -167,7 +167,8 @@ export function filterByNsfw<
     description?: string | null;
     short_summary?: string | null;
   },
->(chars: T[]): T[] {
-  if (getNsfwMode()) return chars;
+>(chars: T[], nsfwModeOverride?: boolean): T[] {
+  const isNsfwOn = nsfwModeOverride ?? getNsfwMode();
+  if (isNsfwOn) return chars;
   return chars.filter((c) => !isCharacterNsfw(c));
 }

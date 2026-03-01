@@ -1,3 +1,4 @@
+import JSON5 from "json5";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
 
 /**
@@ -65,7 +66,7 @@ export function readJsonFile(file: File): Promise<TavernCardV2> {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const json = JSON.parse(reader.result as string);
+        const json = JSON5.parse(reader.result as string);
         resolve(parseTavernCardJson(json));
       } catch (e: any) {
         reject(new Error(e.message || "Không thể đọc file JSON."));

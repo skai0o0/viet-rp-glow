@@ -7,6 +7,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { upsertProfile } from "@/services/profileDb";
+import { dispatchNsfwModeChange } from "@/hooks/useNsfwMode";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +35,7 @@ const BottomNavBar = () => {
   const handleNsfwToggle = async (checked: boolean) => {
     setNsfwMode(checked);
     localStorage.setItem("vietrp_nsfw_mode", String(checked));
+    dispatchNsfwModeChange();
     if (user) {
       try {
         await upsertProfile(user.id, { nsfw_mode: checked });
