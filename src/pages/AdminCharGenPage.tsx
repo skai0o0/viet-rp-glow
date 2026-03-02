@@ -77,7 +77,7 @@ JSON SCHEMA REQUIREMENT:
     "system_prompt": "Prompt for the AI during chat (e.g., 'Luôn giữ thái độ lạnh lùng, xưng hô Tôi-Cậu, thường xuyên dùng (...) để thể hiện sự ngập ngừng.')",
     "post_history_instructions": "",
     "tags": ["Tag1", "Tag2"],
-    "creator": "VietRP Admin",
+    "creator": "VietRP Charagen AI",
     "character_version": "1.0",
     "alternate_greetings": []
   }
@@ -123,7 +123,7 @@ JSON SCHEMA:
     "system_prompt": "Behavioral instructions for chat AI.",
     "post_history_instructions": "",
     "tags": ["Relevant", "Tags"],
-    "creator": "VietRP AI",
+    "creator": "VietRP Charagen AI",
     "character_version": "1.0",
     "alternate_greetings": []
   }
