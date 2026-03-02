@@ -659,7 +659,7 @@ const AdminCharGenPage = () => {
                         </Button>
                       )}
                       <Button
-                        variant="outline"
+                        variant={cloneMode ? "default" : "ghost"}
                         size="icon"
                         onClick={() => {
                           const next = !cloneMode;
@@ -674,8 +674,8 @@ const AdminCharGenPage = () => {
                         title={cloneMode ? "Tắt Clone Mode" : "Clone Mode — Dán text từ web để AI tạo card"}
                         className={`shrink-0 transition-all ${
                           cloneMode
-                            ? "border-neon-rose/50 text-neon-rose bg-neon-rose/10 hover:bg-neon-rose/20"
-                            : "border-oled-border text-muted-foreground hover:text-neon-rose hover:border-neon-rose/40"
+                            ? "bg-neon-rose text-white hover:bg-neon-rose/80 shadow-[0_0_8px_rgba(255,38,100,0.3)]"
+                            : "text-muted-foreground hover:text-neon-rose hover:bg-neon-rose/10"
                         }`}
                       >
                         <ClipboardPaste size={16} />
