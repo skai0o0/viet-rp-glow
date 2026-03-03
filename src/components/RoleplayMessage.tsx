@@ -42,7 +42,7 @@ const styleMap: Record<Token["type"], string> = {
   dialogue: "text-neon-blue font-medium",
   action: "text-muted-foreground italic",
   thought: "text-yellow-600/80 italic",
-  text: "text-foreground/90",
+  text: "text-neon-blue font-medium",
 };
 
 interface RoleplayMessageProps {
