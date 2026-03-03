@@ -71,6 +71,17 @@ export function setCachedUserPersona(
   if (sexuality !== undefined) localStorage.setItem("vietrp_sexuality", sexuality);
 }
 
+/** Check if user profile is missing required fields */
+export function isProfileIncomplete(): { incomplete: boolean; missing: string[] } {
+  const persona = getCachedUserPersona();
+  const missing: string[] = [];
+  if (!persona.displayName || persona.displayName === "User") missing.push("Tên hiển thị");
+  if (!persona.gender) missing.push("Giới tính");
+  if (!persona.sexuality) missing.push("Xu hướng tính dục");
+  if (!persona.userDescription) missing.push("Mô tả bản thân");
+  return { incomplete: missing.length > 0, missing };
+}
+
 /** Build a human-readable identity string from gender + sexuality for prompt injection */
 export function buildIdentityString(gender: UserGender, sexuality: UserSexuality): string {
   const parts: string[] = [];

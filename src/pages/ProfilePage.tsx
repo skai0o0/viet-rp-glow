@@ -76,6 +76,17 @@ const ProfilePage = () => {
 
   const handleSavePersona = async () => {
     if (!user) return;
+    // Validate required fields
+    const missingFields: string[] = [];
+    if (!displayName.trim()) missingFields.push("Tên hiển thị");
+    if (!gender) missingFields.push("Giới tính");
+    if (!sexuality) missingFields.push("Xu hướng tính dục");
+    if (missingFields.length > 0) {
+      toast.error("Vui lòng điền đầy đủ thông tin", {
+        description: `Còn thiếu: ${missingFields.join(", ")}`,
+      });
+      return;
+    }
     setSavingPersona(true);
     try {
       await upsertProfile(user.id, {
@@ -175,10 +186,11 @@ const ProfilePage = () => {
 
               {/* Gender selector */}
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Giới tính</label>
+                <label className="text-xs text-muted-foreground">
+                  Giới tính <span className="text-neon-rose">*</span>
+                </label>
                 <div className="flex gap-2">
                   {[
-                    { value: "" as UserGender, label: "Không chọn", emoji: "➖" },
                     { value: "nam" as UserGender, label: "Nam", emoji: "♂️" },
                     { value: "nữ" as UserGender, label: "Nữ", emoji: "♀️" },
                   ].map((opt) => (
@@ -195,14 +207,18 @@ const ProfilePage = () => {
                     </button>
                   ))}
                 </div>
+                {!gender && (
+                  <p className="text-[10px] text-neon-rose/80">⚠ Vui lòng chọn giới tính</p>
+                )}
               </div>
 
               {/* Sexuality selector */}
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Xu hướng tính dục</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <label className="text-xs text-muted-foreground">
+                  Xu hướng tính dục <span className="text-neon-rose">*</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { value: "" as UserSexuality, label: "Không chọn", emoji: "➖" },
                     { value: "dị" as UserSexuality, label: "Dị tính", emoji: "💑" },
                     { value: "đồng" as UserSexuality, label: "Đồng tính", emoji: "🏳️‍🌈" },
                     { value: "song" as UserSexuality, label: "Song tính", emoji: "💜" },
@@ -221,6 +237,9 @@ const ProfilePage = () => {
                     </button>
                   ))}
                 </div>
+                {!sexuality && (
+                  <p className="text-[10px] text-neon-rose/80">⚠ Vui lòng chọn xu hướng tính dục</p>
+                )}
                 <p className="text-[10px] text-muted-foreground">
                   Thông tin này giúp AI hiểu và phản hồi đúng hướng trong roleplay.
                 </p>

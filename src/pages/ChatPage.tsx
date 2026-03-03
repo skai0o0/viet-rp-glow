@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getCachedUserPersona } from "@/services/profileDb";
-import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Plus } from "lucide-react";
+import { getCachedUserPersona, isProfileIncomplete } from "@/services/profileDb";
+import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Plus, AlertTriangle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
@@ -813,6 +813,23 @@ const ChatPage = () => {
           {/* Chat messages area */}
           <div className="flex-1 flex flex-col min-w-0">
             <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">
+              {/* Profile incomplete caution */}
+              {(() => {
+                const profileCheck = isProfileIncomplete();
+                return profileCheck.incomplete ? (
+                  <button
+                    onClick={() => navigate("/profile")}
+                    className="mx-4 md:mx-6 flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/15 hover:border-amber-500/60 transition-all"
+                  >
+                    <AlertTriangle size={16} className="shrink-0" />
+                    <div className="text-left">
+                      <p className="text-xs font-medium">Hồ sơ Roleplay chưa đầy đủ</p>
+                      <p className="text-[10px] text-amber-400/70">Thiếu: {profileCheck.missing.join(", ")} — Bấm để cập nhật</p>
+                    </div>
+                  </button>
+                ) : null;
+              })()}
+
               {activeCharacter.scenario && !scenarioOverride && (
                 <div className="mx-4 md:mx-6 p-3 rounded-xl bg-oled-surface border border-gray-border">
                   <p className="text-[11px] text-muted-foreground">
