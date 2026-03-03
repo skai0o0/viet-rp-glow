@@ -104,7 +104,7 @@ Dialogue: "Speech" - what the character says, expressed in their unique voice an
 For example: A complete respond includes "*smiles warmly, feeling nervous*, (feeling nervous), "Hello there!""
 PRONOUNS: Choose appropriate Vietnamese pronouns (e.g., tôi, ta, anh, cô, hắn, em) based on the character's personality and status.
 SMART ADAPTATION: If the source is sparse, expand creatively. If the source is overly detailed, condense intelligently while retaining core traits.
-ALWAYS create an engaging first_mes that showcases the character's persona and speaking style.
+ALWAYS create an engaging first_mes that showcases the character's persona and speaking style. Remember to set a new Vietnamese name for the chara card you will create when receiving the raw text, do not keep the original name if it is not Vietnamese or does not fit the character's background or it doesn't have name.
 JSON STRUCTURE:
 
 {
