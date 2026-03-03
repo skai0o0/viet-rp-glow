@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -53,8 +54,11 @@ import {
   saveGlobalSystemPrompt,
   fetchSubscriptionPlan,
   saveSubscriptionPlan,
+  fetchSamplingParameters,
+  saveSamplingParameters,
   type PlanPhase,
   type PlanPhaseStatus,
+  type SamplingParameters,
 } from "@/services/globalSettingsDb";
 
 const planStatusConfig: Record<PlanPhaseStatus, { icon: React.ElementType; label: string; color: string; bg: string }> = {
@@ -97,6 +101,15 @@ const AdminPage = () => {
   const [importingRaw, setImportingRaw] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sampling parameters state
+  const [samplingParams, setSamplingParams] = useState<SamplingParameters>({
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 40,
+    repetition_penalty: 1.0,
+  });
+  const [savingSamplingParams, setSavingSamplingParams] = useState(false);
+
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const [stats, setStats] = useState({ characters: "—", users: "—", sessions: "—" });
@@ -114,6 +127,7 @@ const AdminPage = () => {
 
   useEffect(() => {
     fetchGlobalSystemPrompt().then(setPrompt);
+    fetchSamplingParameters().then(setSamplingParams);
     loadPlan();
   }, [loadPlan]);
 
@@ -185,6 +199,18 @@ const AdminPage = () => {
       toast.error("Lưu cấu hình thất bại!");
     } finally {
       setSavingPrompt(false);
+    }
+  };
+
+  const handleSaveSamplingParams = async () => {
+    setSavingSamplingParams(true);
+    try {
+      await saveSamplingParameters(samplingParams);
+      toast.success("Đã lưu sampling parameters thành công!");
+    } catch {
+      toast.error("Lưu sampling parameters thất bại!");
+    } finally {
+      setSavingSamplingParams(false);
     }
   };
 
@@ -308,6 +334,13 @@ const AdminPage = () => {
       label: "Global System Prompt",
       description: "Prompt âm thầm thêm vào đầu mọi cuộc trò chuyện",
       color: "text-cyan-400 bg-cyan-400/10",
+    },
+    {
+      key: "sampling",
+      icon: Wand2,
+      label: "Sampling Parameters",
+      description: "Điều chỉnh độ sáng tạo & độ đa dạng của AI responses",
+      color: "text-neon-purple bg-neon-purple/10",
     },
     {
       key: "import",
@@ -607,6 +640,102 @@ const AdminPage = () => {
                             >
                               {savingPrompt ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
                               Lưu cấu hình
+                            </Button>
+                          </>
+                        )}
+
+                        {section.key === "sampling" && (
+                          <>
+                            <p className="text-xs text-muted-foreground mb-4">
+                              Các thông số này điều chỉnh <strong>độ sáng tạo</strong> và <strong>tính đa dạng</strong> của phản hồi AI. Giá trị cao = sáng tạo hơn, giá trị thấp = nhất quán hơn.
+                            </p>
+                            <div className="space-y-4">
+                              {/* Temperature */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs font-semibold text-foreground">Temperature (độ sáng tạo)</Label>
+                                  <span className="text-xs text-neon-purple font-mono">{samplingParams.temperature.toFixed(2)}</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="2"
+                                  step="0.05"
+                                  value={samplingParams.temperature}
+                                  onChange={(e) => setSamplingParams({ ...samplingParams, temperature: parseFloat(e.target.value) })}
+                                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                                />
+                                <p className="text-[10px] text-muted-foreground">0.0 = Đáp ứng xác định / 2.0 = Cực kì sáng tạo</p>
+                              </div>
+
+                              {/* Top-P */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs font-semibold text-foreground">Top-P (Nucleus Sampling)</Label>
+                                  <span className="text-xs text-neon-purple font-mono">{samplingParams.top_p.toFixed(2)}</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.05"
+                                  value={samplingParams.top_p}
+                                  onChange={(e) => setSamplingParams({ ...samplingParams, top_p: parseFloat(e.target.value) })}
+                                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                                />
+                                <p className="text-[10px] text-muted-foreground">0.9 = Cân bằng sáng tạo & nhất quán / 1.0 = Không có giới hạn</p>
+                              </div>
+
+                              {/* Top-K */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs font-semibold text-foreground">Top-K (Diversity)</Label>
+                                  <span className="text-xs text-neon-purple font-mono">{Math.round(samplingParams.top_k)}</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="1"
+                                  max="100"
+                                  step="1"
+                                  value={samplingParams.top_k}
+                                  onChange={(e) => setSamplingParams({ ...samplingParams, top_k: parseFloat(e.target.value) })}
+                                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                                />
+                                <p className="text-[10px] text-muted-foreground">Số từ tốt nhất cần xem xét (40 = cân bằng tốt)</p>
+                              </div>
+
+                              {/* Repetition Penalty */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs font-semibold text-foreground">Repetition Penalty</Label>
+                                  <span className="text-xs text-neon-purple font-mono">{samplingParams.repetition_penalty.toFixed(2)}</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0.8"
+                                  max="2"
+                                  step="0.05"
+                                  value={samplingParams.repetition_penalty}
+                                  onChange={(e) => setSamplingParams({ ...samplingParams, repetition_penalty: parseFloat(e.target.value) })}
+                                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                                />
+                                <p className="text-[10px] text-muted-foreground">1.0 = Không phạt / 1.2+ = Tránh lặp lại từ (tốt cho roleplay)</p>
+                              </div>
+                            </div>
+
+                            <div className="bg-oled-base/50 border border-oled-border rounded-lg p-3 mt-4">
+                              <p className="text-[10px] text-muted-foreground">
+                                <strong>💡 Gợi ý:</strong> Temperature 0.8-1.0 + Top-P 0.85-0.95 + Repetition Penalty 1.1-1.2 = Roleplay tốt với sáng tạo phù hợp
+                              </p>
+                            </div>
+
+                            <Button
+                              onClick={handleSaveSamplingParams}
+                              disabled={savingSamplingParams}
+                              className="w-full bg-neon-purple hover:bg-neon-purple/80 text-white font-semibold"
+                            >
+                              {savingSamplingParams ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+                              Lưu Sampling Parameters
                             </Button>
                           </>
                         )}

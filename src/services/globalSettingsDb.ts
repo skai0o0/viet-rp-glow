@@ -244,3 +244,58 @@ export async function saveSubscriptionPlan(plan: PlanPhase[]): Promise<void> {
     if (error) throw error;
   }
 }
+
+// ─── Sampling Parameters ────────────────────────────────────
+
+export interface SamplingParameters {
+  temperature: number;
+  top_p: number;
+  top_k: number;
+  repetition_penalty: number;
+}
+
+const DEFAULT_SAMPLING_PARAMS: SamplingParameters = {
+  temperature: 0.7,
+  top_p: 0.9,
+  top_k: 40,
+  repetition_penalty: 1.0,
+};
+
+let cachedSamplingParams: SamplingParameters | null = null;
+
+export async function fetchSamplingParameters(): Promise<SamplingParameters> {
+  const { data } = await supabase
+    .from("global_settings")
+    .select("value")
+    .eq("key", "sampling_parameters")
+    .single();
+  const value = data?.value ? JSON.parse(data.value) : DEFAULT_SAMPLING_PARAMS;
+  cachedSamplingParams = value;
+  return value;
+}
+
+export function getCachedSamplingParameters(): SamplingParameters {
+  return cachedSamplingParams ?? DEFAULT_SAMPLING_PARAMS;
+}
+
+export async function saveSamplingParameters(params: SamplingParameters): Promise<void> {
+  const value = JSON.stringify(params);
+  const { data } = await supabase
+    .from("global_settings")
+    .select("key")
+    .eq("key", "sampling_parameters")
+    .single();
+  if (data) {
+    const { error } = await supabase
+      .from("global_settings")
+      .update({ value, updated_at: new Date().toISOString() })
+      .eq("key", "sampling_parameters");
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("global_settings")
+      .insert({ key: "sampling_parameters", value });
+    if (error) throw error;
+  }
+  cachedSamplingParams = params;
+}
