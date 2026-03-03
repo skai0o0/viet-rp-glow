@@ -2,17 +2,21 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Navigate, Link, useNavigate } from "react-router-dom";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import RoleplayMessage from "@/components/RoleplayMessage";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { copyToClipboard } from "@/utils/clipboard";
 import {
   Loader2,
   ArrowLeft,
@@ -36,6 +40,10 @@ import {
   Pencil,
   Trash,
   ClipboardPaste,
+  Copy,
+  Check,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
@@ -195,10 +203,12 @@ const AdminCharGenPage = () => {
   const { user, isLoading } = useAuth();
   const { isAdmin, checking } = useIsAdmin();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
-  // View mode: 'chat' | 'review' | 'history'
-  type ViewMode = "chat" | "review" | "history";
-  const [viewMode, setViewMode] = useState<ViewMode>("chat");
+  // Panel state
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   // Chat state
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -251,10 +261,10 @@ const AdminCharGenPage = () => {
     }
   };
 
-  // Fetch history when switching to history view
+  // Fetch history when opening history panel
   useEffect(() => {
-    if (viewMode === "history") fetchHistory();
-  }, [viewMode, fetchHistory]);
+    if (historyOpen) fetchHistory();
+  }, [historyOpen, fetchHistory]);
 
   // Avatar
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -314,7 +324,8 @@ const AdminCharGenPage = () => {
         const card = extractCardJson(fullResponse);
         if (card) {
           setGeneratedCard(card);
-          toast.success(`Đã tạo card: ${card.data.name}`, { description: "Nhấn 'Duyệt & Xuất bản' để xem chi tiết." });
+          setReviewOpen(true);
+          toast.success(`Đã tạo card: ${card.data.name}`, { description: "Đang mở panel duyệt card." });
         }
         // Auto-refresh history cache
         fetchHistory();
@@ -416,10 +427,19 @@ const AdminCharGenPage = () => {
     setMessages([]);
     setStreamBuffer("");
     setGeneratedCard(null);
-    setViewMode("chat");
+    setReviewOpen(false);
+    setHistoryOpen(false);
     clearAvatar();
     setInput("");
     setCloneMode(false);
+  };
+
+  /* ---------- Copy message ---------- */
+  const handleCopyMsg = (idx: number, content: string) => {
+    copyToClipboard(content);
+    setCopiedIdx(idx);
+    toast.success("Đã sao chép");
+    setTimeout(() => setCopiedIdx(null), 2000);
   };
 
   /* ---------- Guards ---------- */
@@ -436,615 +456,649 @@ const AdminCharGenPage = () => {
   const cardTextarea =
     "bg-oled-base border-oled-border text-foreground font-mono text-xs resize-y min-h-[80px]";
 
-  /* ---------- Render ---------- */
-  return (
-    <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
-      {/* Header */}
-      <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/admin">
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft size={20} />
-            </Button>
-          </Link>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-neon-purple to-neon-rose flex items-center justify-center">
-            <Wand2 className="text-white" size={18} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-bold text-foreground">AI Card Generator</h1>
-              {cloneMode && (
-                <Badge className="bg-neon-rose/20 text-neon-rose border-neon-rose/30 text-[10px] px-1.5 py-0">
-                  Clone Mode
-                </Badge>
+  /* ---------- Review Panel Content (shared between desktop sidebar & mobile sheet) ---------- */
+  const reviewContent = generatedCard ? (
+    <div className="h-full flex flex-col bg-oled-base">
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-border">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 size={16} className="text-green-400" />
+          <h3 className="text-sm font-bold text-foreground">Duyệt & Xuất bản</h3>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => setReviewOpen(false)} className="text-muted-foreground hover:text-foreground h-8 w-8">
+          <X size={16} />
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-4">
+        {/* Avatar + Name */}
+        <div className="flex items-start gap-3">
+          <div className="shrink-0">
+            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              className="w-20 h-20 rounded-2xl bg-oled-surface border-2 border-dashed border-oled-border hover:border-neon-purple/50 transition-colors flex items-center justify-center overflow-hidden group"
+            >
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-neon-purple transition-colors">
+                  <ImagePlus size={20} />
+                  <span className="text-[9px]">Avatar</span>
+                </div>
               )}
+            </button>
+            {avatarPreview && (
+              <button onClick={clearAvatar} className="mt-1 text-[10px] text-neon-rose hover:underline w-full text-center">
+                Xoá ảnh
+              </button>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div>
+              <Label className={cardFieldLabel}>Tên nhân vật</Label>
+              <Input
+                value={generatedCard.data.name}
+                onChange={(e) => updateCardData({ name: e.target.value })}
+                className="bg-oled-surface border-oled-border text-foreground text-sm font-bold mt-1 h-9"
+              />
             </div>
-            <p className="text-xs text-muted-foreground">{cloneMode ? "Dán mô tả nhân vật → AI chuyển thành card" : "Tạo Character Card bằng LLM"}</p>
+            <div className="flex flex-wrap gap-1">
+              {generatedCard.data.tags.map((tag, i) => (
+                <Badge key={i} variant="outline" className="border-oled-border text-muted-foreground text-[10px] group cursor-default px-1.5 py-0">
+                  {tag}
+                  <button
+                    onClick={() => updateCardData({ tags: generatedCard.data.tags.filter((_, idx) => idx !== i) })}
+                    className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X size={8} />
+                  </button>
+                </Badge>
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* Tabbed fields */}
+        <Tabs defaultValue="core" className="w-full">
+          <TabsList className="w-full bg-oled-surface border border-oled-border h-8">
+            <TabsTrigger value="core" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-[11px] flex-1">
+              Cốt lõi
+            </TabsTrigger>
+            <TabsTrigger value="rp" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-[11px] flex-1">
+              RP Setup
+            </TabsTrigger>
+            <TabsTrigger value="meta" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-[11px] flex-1">
+              Meta
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="core" className="space-y-3 mt-3">
+            <div>
+              <Label className={cardFieldLabel}>Description</Label>
+              <Textarea value={generatedCard.data.description} onChange={(e) => updateCardData({ description: e.target.value })} className={`${cardTextarea} min-h-[160px] mt-1`} />
+            </div>
+            <div>
+              <Label className={cardFieldLabel}>Personality</Label>
+              <Textarea value={generatedCard.data.personality} onChange={(e) => updateCardData({ personality: e.target.value })} className={`${cardTextarea} min-h-[120px] mt-1`} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="rp" className="space-y-3 mt-3">
+            <div>
+              <Label className={cardFieldLabel}>Scenario</Label>
+              <Textarea value={generatedCard.data.scenario} onChange={(e) => updateCardData({ scenario: e.target.value })} className={`${cardTextarea} mt-1`} />
+            </div>
+            <div>
+              <Label className={cardFieldLabel}>First Message</Label>
+              <Textarea value={generatedCard.data.first_mes} onChange={(e) => updateCardData({ first_mes: e.target.value })} className={`${cardTextarea} min-h-[120px] mt-1`} />
+            </div>
+            <div>
+              <Label className={cardFieldLabel}>Message Examples</Label>
+              <Textarea value={generatedCard.data.mes_example} onChange={(e) => updateCardData({ mes_example: e.target.value })} className={`${cardTextarea} mt-1`} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="meta" className="space-y-3 mt-3">
+            <div>
+              <Label className={cardFieldLabel}>System Prompt</Label>
+              <Textarea value={generatedCard.data.system_prompt} onChange={(e) => updateCardData({ system_prompt: e.target.value })} className={`${cardTextarea} mt-1`} />
+            </div>
+            <div>
+              <Label className={cardFieldLabel}>Creator Notes</Label>
+              <Textarea value={generatedCard.data.creator_notes} onChange={(e) => updateCardData({ creator_notes: e.target.value })} className={`${cardTextarea} mt-1`} />
+            </div>
+            <div>
+              <Label className={cardFieldLabel}>Post History Instructions</Label>
+              <Textarea value={generatedCard.data.post_history_instructions} onChange={(e) => updateCardData({ post_history_instructions: e.target.value })} className={`${cardTextarea} mt-1`} />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Publish controls */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Công khai</p>
+                <p className="text-[11px] text-muted-foreground">Hiển thị trên Hub</p>
+              </div>
+              <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+            </div>
+            <Button
+              onClick={handlePublish}
+              disabled={publishing}
+              className="w-full bg-gradient-to-r from-neon-purple to-neon-blue hover:opacity-90 text-white font-semibold"
+            >
+              {publishing ? <Loader2 size={16} className="animate-spin mr-2" /> : <Upload size={16} className="mr-2" />}
+              {publishing ? "Đang xuất bản..." : "Xuất bản lên VietRP"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  ) : null;
+
+  /* ---------- History Panel Content ---------- */
+  const historyContent = (
+    <div className="h-full flex flex-col bg-oled-base">
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-border">
         <div className="flex items-center gap-2">
-          {generatedCard && viewMode !== "review" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setViewMode("review")}
-              className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10 text-xs"
-            >
-              <Eye size={14} className="mr-1" />
-              Duyệt & Xuất bản
-            </Button>
-          )}
-          {viewMode === "review" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setViewMode("chat")}
-              className="border-oled-border text-muted-foreground hover:text-foreground text-xs"
-            >
-              <EyeOff size={14} className="mr-1" />
-              Chat
-            </Button>
-          )}
-          <Button
-            variant={viewMode === "history" ? "default" : "ghost"}
-            size="icon"
-            onClick={() => setViewMode(viewMode === "history" ? "chat" : "history")}
-            className={viewMode === "history" ? "bg-neon-blue/20 text-neon-blue" : "text-muted-foreground hover:text-neon-blue"}
-            title="Lịch sử card đã tạo"
-          >
-            <History size={16} />
+          <History size={16} className="text-neon-blue" />
+          <h3 className="text-sm font-bold text-foreground">Lịch sử tạo Card</h3>
+          <Badge variant="outline" className="border-oled-border text-muted-foreground text-[10px] px-1.5 py-0">
+            {historyChars.length}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={fetchHistory} disabled={historyLoading} className="text-muted-foreground hover:text-neon-blue h-8 w-8">
+            <RotateCcw size={14} className={historyLoading ? "animate-spin" : ""} />
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleReset} className="text-muted-foreground hover:text-neon-rose">
-            <RotateCcw size={16} />
+          <Button variant="ghost" size="icon" onClick={() => setHistoryOpen(false)} className="text-muted-foreground hover:text-foreground h-8 w-8">
+            <X size={16} />
           </Button>
         </div>
       </div>
-
-      {/* Body */}
-      <div className="flex-1 overflow-hidden">
-        <AnimatePresence mode="wait">
-          {viewMode === "chat" ? (
-            /* ═══════════ CHAT VIEW ═══════════ */
-            <motion.div
-              key="chat"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col h-full"
-            >
-              {/* Messages */}
-              <ScrollArea className="flex-1 px-4 py-4">
-                <div className="max-w-3xl mx-auto space-y-4 pb-4">
-                  {/* Empty state */}
-                  {messages.length === 0 && !streamBuffer && (
-                    <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-                        cloneMode
-                          ? "bg-gradient-to-br from-neon-rose/20 to-orange-500/20"
-                          : "bg-gradient-to-br from-neon-purple/20 to-neon-rose/20"
-                      }`}>
-                        {cloneMode ? (
-                          <ClipboardPaste size={28} className="text-neon-rose" />
-                        ) : (
-                          <Wand2 size={28} className="text-neon-purple" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-foreground font-semibold text-lg">
-                          {cloneMode ? "Dán mô tả nhân vật từ bất kỳ nguồn nào" : "Mô tả nhân vật bạn muốn tạo"}
-                        </p>
-                        <p className="text-muted-foreground text-sm mt-1 max-w-sm">
-                          {cloneMode
-                            ? "Paste text từ wiki, web, forum... AI sẽ tự động phân tích và tạo thành Character Card chuẩn cho VietRP"
-                            : 'Ví dụ: "Tạo một nữ sát thủ lạnh lùng kiểu tsundere, tóc bạch kim, làm việc cho mafia"'
-                          }
-                        </p>
-                      </div>
-                      {!cloneMode && (
-                        <div className="flex flex-wrap gap-2 justify-center mt-2">
-                          {[
-                            "Nữ chiến binh Samurai trầm lặng",
-                            "Tiểu thư yandere giàu có",
-                            "Bác sĩ ma cà rồng 500 tuổi",
-                            "Thám tử tư lạnh lùng Sài Gòn",
-                          ].map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => setInput(s)}
-                              className="px-3 py-1.5 rounded-full text-xs bg-oled-surface border border-oled-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 transition-colors"
-                            >
-                              {s}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {cloneMode && (
-                        <div className="flex flex-col items-center gap-2 mt-2">
-                          <div className="flex flex-wrap gap-1.5 justify-center text-[11px] text-muted-foreground">
-                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Wiki pages</span>
-                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Fandom</span>
-                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Character.AI</span>
-                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Chub.ai</span>
-                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Forum posts</span>
-                            <span className="px-2 py-0.5 rounded-full bg-oled-surface border border-oled-border">Bất kỳ nguồn nào</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Chat bubbles */}
-                  {messages.map((msg, i) => (
-                    <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                      {msg.role === "assistant" && (
-                        <div className="w-8 h-8 rounded-lg bg-neon-purple/10 flex items-center justify-center shrink-0 mt-1">
-                          <Bot size={14} className="text-neon-purple" />
-                        </div>
-                      )}
-                      <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                          msg.role === "user"
-                            ? "bg-neon-blue/15 text-foreground rounded-br-md"
-                            : "bg-oled-surface border border-oled-border text-foreground rounded-bl-md"
-                        }`}
-                      >
-                        {msg.role === "assistant" ? (
-                          <pre className="whitespace-pre-wrap break-words font-sans text-sm">{msg.content}</pre>
-                        ) : (
-                          <p>{msg.content}</p>
-                        )}
-                      </div>
-                      {msg.role === "user" && (
-                        <div className="w-8 h-8 rounded-lg bg-neon-blue/10 flex items-center justify-center shrink-0 mt-1">
-                          <User size={14} className="text-neon-blue" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  {/* Streaming bubble */}
-                  {streamBuffer && (
-                    <div className="flex gap-3 justify-start">
-                      <div className="w-8 h-8 rounded-lg bg-neon-purple/10 flex items-center justify-center shrink-0 mt-1">
-                        <Bot size={14} className="text-neon-purple animate-pulse" />
-                      </div>
-                      <div className="max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-oled-surface border border-oled-border">
-                        <pre className="whitespace-pre-wrap break-words font-sans text-sm text-foreground">{streamBuffer}<span className="animate-pulse text-neon-purple">▊</span></pre>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Card detected badge */}
-                  {generatedCard && viewMode === "chat" && (
-                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex justify-center">
-                      <button
-                        onClick={() => setViewMode("review")}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-sm hover:bg-green-500/20 transition-colors"
-                      >
-                        <CheckCircle2 size={16} />
-                        Card đã sẵn sàng — Nhấn để duyệt "{generatedCard.data.name}"
-                      </button>
-                    </motion.div>
-                  )}
-
-                  <div ref={chatEndRef} />
-                </div>
-              </ScrollArea>
-
-              {/* Input bar */}
-              <div className="shrink-0 px-4 py-3 border-t border-gray-border bg-oled-surface/60 backdrop-blur-sm">
-                <div className="max-w-3xl mx-auto flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    <Textarea
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={cloneMode ? "Dán mô tả nhân vật từ website, wiki, forum..." : "Mô tả ý tưởng nhân vật..."}
-                      disabled={streaming}
-                      className={`bg-oled-base border-oled-border text-foreground text-sm min-h-[44px] max-h-[120px] resize-none flex-1 ${
-                        cloneMode ? "border-neon-rose/30 focus-visible:ring-neon-rose/40" : ""
-                      }`}
-                      rows={1}
-                    />
-                    <div className="flex flex-col gap-1">
-                      {streaming ? (
-                        <Button onClick={handleStop} variant="outline" size="icon" className="shrink-0 border-neon-rose/40 text-neon-rose hover:bg-neon-rose/10">
-                          <X size={18} />
-                        </Button>
-                      ) : (
-                        <Button onClick={handleSend} size="icon" disabled={!input.trim()} className={`shrink-0 text-white ${
-                          cloneMode ? "bg-neon-rose hover:bg-neon-rose/80" : "bg-neon-purple hover:bg-neon-purple/80"
-                        }`}>
-                          <Send size={18} />
-                        </Button>
-                      )}
-                      <Button
-                        variant={cloneMode ? "default" : "ghost"}
-                        size="icon"
-                        onClick={() => {
-                          const next = !cloneMode;
-                          setCloneMode(next);
-                          if (next && messages.length === 0) {
-                            toast.info("Clone Mode bật!", { description: "Dán mô tả nhân vật từ bất kỳ nguồn nào, AI sẽ tạo card." });
-                          } else if (!next) {
-                            toast.info("Clone Mode tắt", { description: "Đã chuyển về chế độ tạo nhân vật thông thường." });
-                          }
-                        }}
-                        disabled={streaming}
-                        title={cloneMode ? "Tắt Clone Mode" : "Clone Mode — Dán text từ web để AI tạo card"}
-                        className={`shrink-0 transition-all ${
-                          cloneMode
-                            ? "bg-neon-rose text-white hover:bg-neon-rose/80 shadow-[0_0_8px_rgba(255,38,100,0.3)]"
-                            : "text-muted-foreground hover:text-neon-rose hover:bg-neon-rose/10"
-                        }`}
-                      >
-                        <ClipboardPaste size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ) : viewMode === "review" ? (
-            /* ═══════════ REVIEW VIEW ═══════════ */
-            <motion.div
-              key="review"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-full overflow-y-auto scrollbar-thin"
-            >
-              <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5 pb-24">
-                {generatedCard && (
-                  <>
-                    {/* Avatar upload + Name */}
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardContent className="p-4 space-y-4">
-                        <div className="flex items-start gap-4">
-                          {/* Avatar */}
-                          <div className="shrink-0">
-                            <input
-                              ref={avatarInputRef}
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleAvatarChange}
-                            />
-                            <button
-                              onClick={() => avatarInputRef.current?.click()}
-                              className="w-24 h-24 rounded-2xl bg-oled-base border-2 border-dashed border-oled-border hover:border-neon-purple/50 transition-colors flex items-center justify-center overflow-hidden group"
-                            >
-                              {avatarPreview ? (
-                                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-neon-purple transition-colors">
-                                  <ImagePlus size={24} />
-                                  <span className="text-[10px]">Avatar</span>
-                                </div>
-                              )}
-                            </button>
-                            {avatarPreview && (
-                              <button
-                                onClick={clearAvatar}
-                                className="mt-1 text-[10px] text-neon-rose hover:underline w-full text-center"
-                              >
-                                Xoá ảnh
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Name + tags */}
-                          <div className="flex-1 space-y-3">
-                            <div>
-                              <Label className={cardFieldLabel}>Tên nhân vật</Label>
-                              <Input
-                                value={generatedCard.data.name}
-                                onChange={(e) => updateCardData({ name: e.target.value })}
-                                className="bg-oled-base border-oled-border text-foreground text-lg font-bold mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label className={cardFieldLabel}>Tags</Label>
-                              <div className="flex flex-wrap gap-1.5 mt-1">
-                                {generatedCard.data.tags.map((tag, i) => (
-                                  <Badge
-                                    key={i}
-                                    variant="outline"
-                                    className="border-oled-border text-muted-foreground text-xs group cursor-default"
-                                  >
-                                    {tag}
-                                    <button
-                                      onClick={() =>
-                                        updateCardData({ tags: generatedCard.data.tags.filter((_, idx) => idx !== i) })
-                                      }
-                                      className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      <X size={10} />
-                                    </button>
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Tabbed card fields */}
-                    <Tabs defaultValue="core" className="w-full">
-                      <TabsList className="w-full bg-oled-surface border border-oled-border h-auto flex-wrap">
-                        <TabsTrigger
-                          value="core"
-                          className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1"
-                        >
-                          Cốt lõi
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="rp"
-                          className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1"
-                        >
-                          RP Setup
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="meta"
-                          className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1"
-                        >
-                          Meta
-                        </TabsTrigger>
-                      </TabsList>
-
-                      {/* Core tab */}
-                      <TabsContent value="core" className="space-y-4 mt-4">
-                        <div>
-                          <Label className={cardFieldLabel}>Description (Lore & Background)</Label>
-                          <Textarea
-                            value={generatedCard.data.description}
-                            onChange={(e) => updateCardData({ description: e.target.value })}
-                            className={`${cardTextarea} min-h-[200px] mt-1`}
-                          />
-                        </div>
-                        <div>
-                          <Label className={cardFieldLabel}>Personality (Tâm lý)</Label>
-                          <Textarea
-                            value={generatedCard.data.personality}
-                            onChange={(e) => updateCardData({ personality: e.target.value })}
-                            className={`${cardTextarea} min-h-[150px] mt-1`}
-                          />
-                        </div>
-                      </TabsContent>
-
-                      {/* RP Setup tab */}
-                      <TabsContent value="rp" className="space-y-4 mt-4">
-                        <div>
-                          <Label className={cardFieldLabel}>Scenario (Bối cảnh)</Label>
-                          <Textarea
-                            value={generatedCard.data.scenario}
-                            onChange={(e) => updateCardData({ scenario: e.target.value })}
-                            className={`${cardTextarea} mt-1`}
-                          />
-                        </div>
-                        <div>
-                          <Label className={cardFieldLabel}>First Message (Lời chào)</Label>
-                          <Textarea
-                            value={generatedCard.data.first_mes}
-                            onChange={(e) => updateCardData({ first_mes: e.target.value })}
-                            className={`${cardTextarea} min-h-[120px] mt-1`}
-                          />
-                        </div>
-                        <div>
-                          <Label className={cardFieldLabel}>Message Examples</Label>
-                          <Textarea
-                            value={generatedCard.data.mes_example}
-                            onChange={(e) => updateCardData({ mes_example: e.target.value })}
-                            className={`${cardTextarea} mt-1`}
-                          />
-                        </div>
-                      </TabsContent>
-
-                      {/* Meta tab */}
-                      <TabsContent value="meta" className="space-y-4 mt-4">
-                        <div>
-                          <Label className={cardFieldLabel}>System Prompt</Label>
-                          <Textarea
-                            value={generatedCard.data.system_prompt}
-                            onChange={(e) => updateCardData({ system_prompt: e.target.value })}
-                            className={`${cardTextarea} mt-1`}
-                          />
-                        </div>
-                        <div>
-                          <Label className={cardFieldLabel}>Creator Notes</Label>
-                          <Textarea
-                            value={generatedCard.data.creator_notes}
-                            onChange={(e) => updateCardData({ creator_notes: e.target.value })}
-                            className={`${cardTextarea} mt-1`}
-                          />
-                        </div>
-                        <div>
-                          <Label className={cardFieldLabel}>Post History Instructions</Label>
-                          <Textarea
-                            value={generatedCard.data.post_history_instructions}
-                            onChange={(e) => updateCardData({ post_history_instructions: e.target.value })}
-                            className={`${cardTextarea} mt-1`}
-                          />
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-
-                    {/* Publish controls */}
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardContent className="p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-foreground">Công khai</p>
-                            <p className="text-xs text-muted-foreground">Hiển thị trên Hub cho tất cả người dùng</p>
-                          </div>
-                          <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handlePublish}
-                            disabled={publishing}
-                            className="flex-1 bg-gradient-to-r from-neon-purple to-neon-blue hover:opacity-90 text-white font-semibold"
-                          >
-                            {publishing ? (
-                              <Loader2 size={16} className="animate-spin mr-2" />
-                            ) : (
-                              <Upload size={16} className="mr-2" />
-                            )}
-                            {publishing ? "Đang xuất bản..." : "Xuất bản lên VietRP"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => setViewMode("chat")}
-                            className="border-oled-border text-muted-foreground hover:text-foreground"
-                          >
-                            Quay lại Chat
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </>
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2">
+        {historyLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={24} className="animate-spin text-neon-purple" />
+          </div>
+        ) : historyChars.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-oled-surface flex items-center justify-center">
+              <Sparkles size={20} className="text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground text-xs">Chưa có card nào.</p>
+          </div>
+        ) : (
+          historyChars.map((char) => (
+            <div key={char.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-oled-border bg-oled-surface hover:border-neon-purple/30 transition-colors group">
+              <div className="w-10 h-10 rounded-lg bg-oled-base overflow-hidden shrink-0 flex items-center justify-center">
+                {char.avatar_url ? (
+                  <img src={char.avatar_url} alt={char.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Sparkles size={14} className="text-muted-foreground" />
                 )}
               </div>
-            </motion.div>
-          ) : (
-            /* ═══════════ HISTORY VIEW ═══════════ */
-            <motion.div
-              key="history"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-full overflow-y-auto scrollbar-thin"
-            >
-              <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4 pb-24">
-                {/* History header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <History size={18} className="text-neon-blue" />
-                    <h2 className="text-lg font-bold text-foreground">Lịch sử tạo Card</h2>
-                    <Badge variant="outline" className="border-oled-border text-muted-foreground text-xs">
-                      {historyChars.length} cards
-                    </Badge>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={fetchHistory}
-                    disabled={historyLoading}
-                    className="text-muted-foreground hover:text-neon-blue text-xs"
-                  >
-                    <RotateCcw size={14} className={historyLoading ? "animate-spin mr-1" : "mr-1"} />
-                    Tải lại
-                  </Button>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate">{char.name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Badge variant="outline" className={`text-[9px] px-1 py-0 ${char.is_public ? "border-green-400/40 text-green-400" : "border-gray-500/40 text-gray-400"}`}>
+                    {char.is_public ? "Public" : "Private"}
+                  </Badge>
+                  <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+                    <Clock size={8} />
+                    {new Date(char.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                  </span>
                 </div>
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-neon-blue" onClick={() => navigate(`/character/${char.id}`)}>
+                  <ExternalLink size={12} />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-neon-purple" onClick={() => navigate(`/edit/${char.id}`)}>
+                  <Pencil size={12} />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-neon-rose" onClick={() => handleDeleteChar(char.id, char.name)} disabled={deletingId === char.id}>
+                  {deletingId === char.id ? <Loader2 size={12} className="animate-spin" /> : <Trash size={12} />}
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 
-                {historyLoading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <Loader2 size={24} className="animate-spin text-neon-purple" />
-                  </div>
-                ) : historyChars.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-oled-surface flex items-center justify-center">
-                      <Sparkles size={24} className="text-muted-foreground" />
-                    </div>
-                    <p className="text-muted-foreground text-sm">Chưa có card nào được tạo bằng AI Generator.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setViewMode("chat")}
-                      className="border-neon-purple/40 text-neon-purple hover:bg-neon-purple/10 text-xs mt-2"
-                    >
-                      <Wand2 size={14} className="mr-1" />
-                      Tạo card đầu tiên
-                    </Button>
+  /* ---------- Render ---------- */
+  return (
+    <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
+      {/* ═══════ Header — compact ChatPage style ═══════ */}
+      <div className="shrink-0 flex items-center bg-oled-base border-b border-gray-border">
+        <Link to="/admin" className="p-3 text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={20} />
+        </Link>
+        <div className="flex items-center gap-2.5 flex-1 min-w-0 py-2">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+            cloneMode
+              ? "bg-gradient-to-br from-neon-rose to-orange-500"
+              : "bg-gradient-to-br from-neon-purple to-neon-rose"
+          }`}>
+            {cloneMode ? <ClipboardPaste className="text-white" size={15} /> : <Wand2 className="text-white" size={15} />}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold text-foreground truncate">
+                {cloneMode ? "Clone Mode" : "AI Card Generator"}
+              </h1>
+              {generatedCard && (
+                <Badge className="bg-green-500/15 text-green-400 border-green-500/30 text-[10px] px-1.5 py-0 shrink-0">
+                  Card sẵn sàng
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {cloneMode ? "Dán mô tả → AI chuyển thành card" : "Tạo Character Card bằng LLM"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-0.5 pr-2 shrink-0">
+          {/* Review panel toggle */}
+          {generatedCard && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setReviewOpen(!reviewOpen)}
+                  className={`p-2 transition-colors ${reviewOpen ? "text-green-400" : "text-muted-foreground hover:text-green-400"}`}
+                >
+                  {reviewOpen ? <PanelRightClose size={18} /> : <Eye size={18} />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
+                {reviewOpen ? "Đóng panel duyệt" : "Duyệt & Xuất bản"}
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {/* Clone mode toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => {
+                  const next = !cloneMode;
+                  setCloneMode(next);
+                  if (next && messages.length === 0) {
+                    toast.info("Clone Mode bật!", { description: "Dán mô tả nhân vật từ bất kỳ nguồn nào, AI sẽ tạo card." });
+                  } else if (!next) {
+                    toast.info("Clone Mode tắt");
+                  }
+                }}
+                disabled={streaming}
+                className={`p-2 transition-all ${
+                  cloneMode
+                    ? "text-neon-rose drop-shadow-[0_0_6px_rgba(255,38,100,0.4)]"
+                    : "text-muted-foreground hover:text-neon-rose"
+                }`}
+              >
+                <ClipboardPaste size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
+              {cloneMode ? "Tắt Clone Mode" : "Clone Mode — Dán text từ web"}
+            </TooltipContent>
+          </Tooltip>
+          {/* History */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setHistoryOpen(true)}
+                className="p-2 text-muted-foreground hover:text-neon-blue transition-colors"
+              >
+                <History size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">Lịch sử card</TooltipContent>
+          </Tooltip>
+          {/* Reset */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button onClick={handleReset} className="p-2 text-muted-foreground hover:text-neon-rose transition-colors">
+                <RotateCcw size={18} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">Làm mới</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* ═══════ Main content area — flex row ═══════ */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* ─── Chat column ─── */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Messages scroll area */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">
+            {/* Empty state */}
+            {messages.length === 0 && !streamBuffer && (
+              <div className="flex flex-col items-center justify-center h-full gap-5 px-4">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className={`w-20 h-20 rounded-3xl flex items-center justify-center ${
+                    cloneMode
+                      ? "bg-gradient-to-br from-neon-rose/20 to-orange-500/20 shadow-[0_0_30px_rgba(255,38,100,0.1)]"
+                      : "bg-gradient-to-br from-neon-purple/20 to-neon-rose/20 shadow-[0_0_30px_rgba(176,38,255,0.1)]"
+                  }`}
+                >
+                  {cloneMode ? (
+                    <ClipboardPaste size={32} className="text-neon-rose" />
+                  ) : (
+                    <Wand2 size={32} className="text-neon-purple" />
+                  )}
+                </motion.div>
+                <div className="text-center">
+                  <p className="text-foreground font-semibold text-lg">
+                    {cloneMode ? "Dán mô tả nhân vật" : "Mô tả nhân vật bạn muốn tạo"}
+                  </p>
+                  <p className="text-muted-foreground text-sm mt-1.5 max-w-md mx-auto">
+                    {cloneMode
+                      ? "Paste text từ wiki, web, forum... AI sẽ tự động phân tích và tạo thành Character Card"
+                      : "Mô tả ý tưởng, tính cách, ngoại hình — AI sẽ tạo Character Card chất lượng cao cho bạn"
+                    }
+                  </p>
+                </div>
+                {!cloneMode ? (
+                  <div className="flex flex-wrap gap-2 justify-center mt-1 max-w-lg">
+                    {[
+                      "Nữ chiến binh Samurai trầm lặng",
+                      "Tiểu thư yandere giàu có",
+                      "Bác sĩ ma cà rồng 500 tuổi",
+                      "Thám tử tư lạnh lùng Sài Gòn",
+                    ].map((s) => (
+                      <motion.button
+                        key={s}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setInput(s)}
+                        className="px-3.5 py-2 rounded-xl text-xs bg-oled-surface border border-oled-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 transition-all duration-200"
+                      >
+                        <Sparkles size={10} className="inline mr-1.5 opacity-50" />
+                        {s}
+                      </motion.button>
+                    ))}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {historyChars.map((char) => (
-                      <Card key={char.id} className="bg-oled-surface border-oled-border hover:border-neon-purple/30 transition-colors group">
-                        <CardContent className="p-3 flex items-center gap-3">
-                          {/* Avatar */}
-                          <div className="w-12 h-12 rounded-xl bg-oled-base overflow-hidden shrink-0 flex items-center justify-center">
-                            {char.avatar_url ? (
-                              <img src={char.avatar_url} alt={char.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <Sparkles size={16} className="text-muted-foreground" />
-                            )}
-                          </div>
-
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{char.name}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] px-1.5 py-0 ${
-                                  char.is_public ? "border-green-400/40 text-green-400" : "border-gray-500/40 text-gray-400"
-                                }`}
-                              >
-                                {char.is_public ? "Public" : "Private"}
-                              </Badge>
-                              {char.tags?.slice(0, 3).map((t) => (
-                                <Badge key={t} variant="outline" className="text-[10px] px-1.5 py-0 border-oled-border text-muted-foreground">
-                                  {t}
-                                </Badge>
-                              ))}
-                            </div>
-                            <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
-                              <Clock size={10} />
-                              {new Date(char.created_at).toLocaleString("vi-VN", {
-                                day: "2-digit", month: "2-digit", year: "numeric",
-                                hour: "2-digit", minute: "2-digit",
-                              })}
-                            </p>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-neon-blue"
-                              onClick={() => navigate(`/character/${char.id}`)}
-                              title="Xem trang nhân vật"
-                            >
-                              <ExternalLink size={14} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-neon-purple"
-                              onClick={() => navigate(`/edit/${char.id}`)}
-                              title="Chỉnh sửa"
-                            >
-                              <Pencil size={14} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-neon-rose"
-                              onClick={() => handleDeleteChar(char.id, char.name)}
-                              disabled={deletingId === char.id}
-                              title="Xoá"
-                            >
-                              {deletingId === char.id ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : (
-                                <Trash size={14} />
-                              )}
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
+                  <div className="flex flex-wrap gap-1.5 justify-center text-[11px] text-muted-foreground mt-1">
+                    {["Wiki pages", "Fandom", "Character.AI", "Chub.ai", "Forum posts", "Bất kỳ nguồn nào"].map((s) => (
+                      <span key={s} className="px-2.5 py-1 rounded-full bg-oled-surface border border-oled-border">{s}</span>
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Message bubbles — ChatPage style */}
+            <AnimatePresence>
+              {messages.map((msg, i) => (
+                <motion.div
+                  key={i}
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0, overflow: "hidden" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className={`group flex gap-3 px-4 md:px-6 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {/* AI Avatar */}
+                  {msg.role === "assistant" && (
+                    <div className="flex-shrink-0 mt-1">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border ${
+                        cloneMode
+                          ? "bg-neon-rose/10 border-neon-rose/30 text-neon-rose"
+                          : "bg-neon-purple/10 border-neon-purple/30 text-neon-purple"
+                      }`}>
+                        <Bot size={14} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`max-w-[80%] md:max-w-[70%] ${msg.role === "user" ? "order-first" : ""}`}>
+                    {/* Name label */}
+                    {msg.role === "assistant" && (
+                      <span className={`text-[11px] ml-1 mb-1 block font-medium ${cloneMode ? "text-neon-rose/70" : "text-neon-purple/70"}`}>
+                        {cloneMode ? "Clone AI" : "Card Generator"}
+                      </span>
+                    )}
+
+                    {/* Bubble */}
+                    <div
+                      className={`rounded-2xl px-4 py-3 text-sm leading-relaxed transition-all duration-300 ${
+                        msg.role === "user"
+                          ? "bg-transparent border border-gray-border text-foreground hover:border-neon-blue hover:shadow-neon-blue"
+                          : "bg-oled-surface text-foreground/90"
+                      }`}
+                      style={
+                        msg.role !== "user"
+                          ? {
+                              background: cloneMode
+                                ? "linear-gradient(135deg, rgba(255, 38, 100, 0.05) 0%, #0A0A0A 100%)"
+                                : "linear-gradient(135deg, rgba(176, 38, 255, 0.05) 0%, #0A0A0A 100%)",
+                            }
+                          : undefined
+                      }
+                    >
+                      {msg.role === "assistant" ? (
+                        <span className="whitespace-pre-wrap">
+                          <RoleplayMessage text={msg.content} />
+                        </span>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      )}
+                    </div>
+
+                    {/* Actions row */}
+                    <div className="flex items-center gap-1 mt-1 px-1">
+                      {msg.content && (
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => handleCopyMsg(i, msg.content)}
+                                className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                {copiedIdx === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground text-xs">
+                              Sao chép
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* User Avatar */}
+                  {msg.role === "user" && (
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-8 h-8 rounded-full bg-neon-blue/10 flex items-center justify-center border border-neon-blue/30">
+                        <User size={14} className="text-neon-blue" />
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Streaming bubble */}
+            {streamBuffer && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-3 px-4 md:px-6 justify-start"
+              >
+                <div className="flex-shrink-0 mt-1">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border animate-breathing ${
+                    cloneMode ? "bg-neon-rose/10 border-neon-rose/30 text-neon-rose" : "bg-neon-purple/10 border-neon-purple/30 text-neon-purple"
+                  }`}>
+                    <Bot size={14} />
+                  </div>
+                </div>
+                <div className="max-w-[80%] md:max-w-[70%]">
+                  <span className={`text-[11px] ml-1 mb-1 block font-medium ${cloneMode ? "text-neon-rose/70" : "text-neon-purple/70"}`}>
+                    {cloneMode ? "Clone AI" : "Card Generator"}
+                  </span>
+                  <div
+                    className="rounded-2xl px-4 py-3 bg-oled-surface text-foreground/90"
+                    style={{
+                      background: cloneMode
+                        ? "linear-gradient(135deg, rgba(255, 38, 100, 0.05) 0%, #0A0A0A 100%)"
+                        : "linear-gradient(135deg, rgba(176, 38, 255, 0.05) 0%, #0A0A0A 100%)",
+                    }}
+                  >
+                    <span className="whitespace-pre-wrap text-sm leading-relaxed">
+                      <RoleplayMessage text={streamBuffer} />
+                      <span className={`animate-blink font-mono ml-0.5 ${cloneMode ? "text-neon-rose" : "text-neon-purple"}`}>|</span>
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Streaming typing indicator */}
+            {streaming && !streamBuffer && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-3 px-4 md:px-6"
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border animate-breathing ${
+                  cloneMode ? "bg-neon-rose/10 border-neon-rose/30 text-neon-rose" : "bg-neon-purple/10 border-neon-purple/30 text-neon-purple"
+                }`}>
+                  <Bot size={14} />
+                </div>
+                <div className="bg-oled-surface rounded-2xl px-4 py-3 flex items-center gap-1">
+                  <span className={`text-sm font-mono ${cloneMode ? "text-neon-rose/80" : "text-neon-purple/80"}`}>đang tạo</span>
+                  <span className={`animate-blink font-mono text-sm ${cloneMode ? "text-neon-rose" : "text-neon-purple"}`}>|</span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Card detected notification */}
+            {generatedCard && !reviewOpen && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                className="flex justify-center px-4"
+              >
+                <button
+                  onClick={() => setReviewOpen(true)}
+                  className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-sm font-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+                    "bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 hover:shadow-[0_0_20px_rgba(34,197,94,0.15)]"
+                  }`}
+                >
+                  <CheckCircle2 size={16} />
+                  Card đã sẵn sàng — Nhấn để duyệt "{generatedCard.data.name}"
+                  <PanelRightOpen size={14} className="opacity-50" />
+                </button>
+              </motion.div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* ─── Input bar — ChatPage style ─── */}
+          <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border">
+            <div className="max-w-3xl mx-auto">
+              <div
+                className={`flex items-end gap-2 bg-oled-surface rounded-2xl px-4 py-2 border transition-all duration-300 ${
+                  cloneMode
+                    ? "border-neon-rose/30 focus-within:border-neon-rose focus-within:shadow-[0_0_12px_rgba(255,38,100,0.15)]"
+                    : "border-gray-border focus-within:border-neon-purple focus-within:shadow-neon-purple"
+                }`}
+              >
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={cloneMode ? "Dán mô tả nhân vật từ website, wiki, forum..." : "Mô tả ý tưởng nhân vật..."}
+                  disabled={streaming}
+                  rows={1}
+                  className="flex-1 bg-transparent text-foreground text-base md:text-sm resize-none outline-none placeholder:text-muted-foreground py-1.5 scrollbar-thin"
+                  style={{ minHeight: "40px", maxHeight: "160px" }}
+                  onInput={(e) => {
+                    const el = e.currentTarget;
+                    el.style.height = "auto";
+                    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+                  }}
+                />
+                <div className="flex items-center gap-1 pb-0.5">
+                  {streaming ? (
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleStop}
+                      className="p-2.5 rounded-xl text-neon-rose transition-all duration-200 hover:bg-neon-rose/10"
+                    >
+                      <X size={20} />
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleSend}
+                      disabled={!input.trim()}
+                      className={`p-2.5 rounded-xl transition-all duration-200 disabled:opacity-30 ${
+                        cloneMode
+                          ? "text-neon-rose hover:bg-neon-rose/10 hover:shadow-[0_0_12px_rgba(255,38,100,0.2)]"
+                          : "text-neon-purple hover:bg-neon-purple/10 hover:shadow-neon-purple"
+                      }`}
+                    >
+                      <Send size={20} />
+                    </motion.button>
+                  )}
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center mt-2 hidden md:block">
+                {cloneMode ? "Dán text → AI phân tích & tạo card tự động" : "Mô tả chi tiết để AI tạo card chất lượng cao hơn"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Desktop Review Panel — animated slide-in ─── */}
+        <AnimatePresence>
+          {!isMobile && reviewOpen && generatedCard && (
+            <motion.div
+              key="review-panel"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 380, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="border-l border-gray-border overflow-hidden"
+              style={{ flexShrink: 0, maxWidth: 380 }}
+            >
+              <div style={{ width: 380 }} className="h-full">
+                {reviewContent}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* ═══════ Mobile Review Sheet ═══════ */}
+      {isMobile && (
+        <Sheet open={reviewOpen && !!generatedCard} onOpenChange={(open) => { if (!open) setReviewOpen(false); }}>
+          <SheetContent side="right" className="p-0 w-[90vw] max-w-md bg-oled-base border-gray-border">
+            {reviewContent}
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {/* ═══════ History Sheet (both desktop & mobile) ═══════ */}
+      <Sheet open={historyOpen} onOpenChange={(open) => { if (!open) setHistoryOpen(false); }}>
+        <SheetContent side="right" className="p-0 w-[90vw] max-w-md bg-oled-base border-gray-border">
+          {historyContent}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
