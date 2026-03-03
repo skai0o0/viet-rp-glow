@@ -39,15 +39,50 @@ export async function upsertProfile(
   return data as UserProfile;
 }
 
+export type UserGender = "" | "nam" | "nữ";
+export type UserSexuality = "" | "dị" | "đồng" | "song" | "tự yêu";
+
+export interface CachedPersona {
+  displayName: string;
+  userDescription: string;
+  gender: UserGender;
+  sexuality: UserSexuality;
+}
+
 /** Get display name and description for prompt building (from localStorage cache or DB) */
-export function getCachedUserPersona(): { displayName: string; userDescription: string } {
+export function getCachedUserPersona(): CachedPersona {
   return {
     displayName: localStorage.getItem("vietrp_display_name") || "User",
     userDescription: localStorage.getItem("vietrp_user_description") || "",
+    gender: (localStorage.getItem("vietrp_gender") || "") as UserGender,
+    sexuality: (localStorage.getItem("vietrp_sexuality") || "") as UserSexuality,
   };
 }
 
-export function setCachedUserPersona(displayName: string, userDescription: string) {
+export function setCachedUserPersona(
+  displayName: string,
+  userDescription: string,
+  gender?: UserGender,
+  sexuality?: UserSexuality
+) {
   localStorage.setItem("vietrp_display_name", displayName);
   localStorage.setItem("vietrp_user_description", userDescription);
+  if (gender !== undefined) localStorage.setItem("vietrp_gender", gender);
+  if (sexuality !== undefined) localStorage.setItem("vietrp_sexuality", sexuality);
+}
+
+/** Build a human-readable identity string from gender + sexuality for prompt injection */
+export function buildIdentityString(gender: UserGender, sexuality: UserSexuality): string {
+  const parts: string[] = [];
+  if (gender) parts.push(`Giới tính: ${gender}`);
+  if (sexuality) {
+    const labels: Record<string, string> = {
+      "dị": "dị tính (thích người khác giới)",
+      "đồng": "đồng tính (thích người cùng giới)",
+      "song": "song tính (thích cả hai giới)",
+      "tự yêu": "tự luyến (yêu bản thân / narcissist)",
+    };
+    parts.push(`Xu hướng tính dục: ${labels[sexuality] || sexuality}`);
+  }
+  return parts.join(". ");
 }
