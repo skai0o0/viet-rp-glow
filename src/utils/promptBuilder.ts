@@ -1,5 +1,5 @@
 import { CharacterCard } from "@/types/character";
-import { getCachedUserPersona } from "@/services/profileDb";
+import { getCachedUserPersona, buildIdentityString } from "@/services/profileDb";
 import { getGlobalSystemPrompt } from "@/services/globalSettingsDb";
 import { getResponseStylePrompt } from "@/components/GenerationSettings";
 
@@ -50,8 +50,14 @@ export function buildSystemPrompt(character: CharacterCard, userName: string = "
 
   // 3. User info section
   const persona = getCachedUserPersona();
-  if (persona.userDescription) {
-    sections.push("--- USER INFO ---\n" + `[User's Details: ${persona.userDescription}]`);
+  const userInfoParts: string[] = [];
+  // Identity (gender + sexuality)
+  const identityStr = buildIdentityString(persona.gender, persona.sexuality);
+  if (identityStr) userInfoParts.push(identityStr);
+  // User description
+  if (persona.userDescription) userInfoParts.push(persona.userDescription);
+  if (userInfoParts.length > 0) {
+    sections.push("--- USER INFO ---\n" + `[User's Details: ${userInfoParts.join(". ")}]`);
   }
 
   const combined = sections.join("\n\n");

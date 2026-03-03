@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { getMyProfile, upsertProfile, setCachedUserPersona } from "@/services/profileDb";
+import { getMyProfile, upsertProfile, setCachedUserPersona, type UserGender, type UserSexuality } from "@/services/profileDb";
 import { getMyCharacters, CharacterSummary } from "@/services/characterDb";
 import { getMyFavorites, toggleFavorite } from "@/services/favoriteDb";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +32,8 @@ const ProfilePage = () => {
   // Persona state
   const [displayName, setDisplayName] = useState("");
   const [userDescription, setUserDescription] = useState("");
+  const [gender, setGender] = useState<UserGender>("");
+  const [sexuality, setSexuality] = useState<UserSexuality>("");
   const [savingPersona, setSavingPersona] = useState(false);
 
   // Characters state
@@ -52,6 +54,11 @@ const ProfilePage = () => {
         setUserDescription(p.user_description);
         localStorage.setItem("vietrp_nsfw_mode", String(p.nsfw_mode));
       }
+      // Load gender & sexuality from localStorage
+      const g = localStorage.getItem("vietrp_gender") || "";
+      const s = localStorage.getItem("vietrp_sexuality") || "";
+      setGender(g as UserGender);
+      setSexuality(s as UserSexuality);
     });
 
     // Load characters
@@ -75,7 +82,7 @@ const ProfilePage = () => {
         display_name: displayName,
         user_description: userDescription,
       });
-      setCachedUserPersona(displayName, userDescription);
+      setCachedUserPersona(displayName, userDescription, gender, sexuality);
       toast.success("Đã lưu hồ sơ Roleplay!");
     } catch {
       toast.error("Không thể lưu hồ sơ.");
@@ -163,6 +170,59 @@ const ProfilePage = () => {
                 />
                 <p className="text-[10px] text-muted-foreground">
                   Tên này sẽ thay thế {"{{user}}"} trong mọi cuộc hội thoại.
+                </p>
+              </div>
+
+              {/* Gender selector */}
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Giới tính</label>
+                <div className="flex gap-2">
+                  {[
+                    { value: "" as UserGender, label: "Không chọn", emoji: "➖" },
+                    { value: "nam" as UserGender, label: "Nam", emoji: "♂️" },
+                    { value: "nữ" as UserGender, label: "Nữ", emoji: "♀️" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setGender(opt.value)}
+                      className={`flex-1 py-2 px-3 rounded-xl border text-sm font-medium transition-all duration-200 ${
+                        gender === opt.value
+                          ? "bg-neon-blue/15 border-neon-blue/50 text-neon-blue shadow-[0_0_8px_rgba(0,170,255,0.15)]"
+                          : "bg-oled-elevated border-gray-border text-muted-foreground hover:border-neon-blue/30 hover:text-foreground"
+                      }`}
+                    >
+                      <span className="mr-1.5">{opt.emoji}</span>{opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sexuality selector */}
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Xu hướng tính dục</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { value: "" as UserSexuality, label: "Không chọn", emoji: "➖" },
+                    { value: "dị" as UserSexuality, label: "Dị tính", emoji: "💑" },
+                    { value: "đồng" as UserSexuality, label: "Đồng tính", emoji: "🏳️‍🌈" },
+                    { value: "song" as UserSexuality, label: "Song tính", emoji: "💜" },
+                    { value: "tự yêu" as UserSexuality, label: "Tự luyến", emoji: "🪞" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSexuality(opt.value)}
+                      className={`py-2 px-3 rounded-xl border text-sm font-medium transition-all duration-200 ${
+                        sexuality === opt.value
+                          ? "bg-neon-purple/15 border-neon-purple/50 text-neon-purple shadow-[0_0_8px_rgba(176,38,255,0.15)]"
+                          : "bg-oled-elevated border-gray-border text-muted-foreground hover:border-neon-purple/30 hover:text-foreground"
+                      }`}
+                    >
+                      <span className="mr-1.5">{opt.emoji}</span>{opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Thông tin này giúp AI hiểu và phản hồi đúng hướng trong roleplay.
                 </p>
               </div>
 
