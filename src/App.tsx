@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AppLayout from "@/layouts/AppLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { fetchGlobalSystemPrompt } from "@/services/globalSettingsDb";
+import { fetchGlobalSystemPrompt, fetchSamplingParameters } from "@/services/globalSettingsDb";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded pages
@@ -32,8 +32,9 @@ const TermsPage = lazy(() => import("@/pages/TermsPage"));
 
 const queryClient = new QueryClient();
 
-// Pre-warm global system prompt cache
+// Pre-warm global system prompt & sampling parameters cache
 fetchGlobalSystemPrompt();
+fetchSamplingParameters();
 
 const PageLoader = () => (
   <div className="flex-1 flex items-center justify-center bg-oled-base min-h-[60vh]">

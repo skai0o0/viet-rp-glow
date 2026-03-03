@@ -1,4 +1,5 @@
 import { OpenRouterMessage } from "@/utils/promptBuilder";
+import { getCachedSamplingParameters } from "@/services/globalSettingsDb";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -102,6 +103,9 @@ export async function streamChat(
   const maxTokens = maxTokensOverride ?? parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
 
   try {
+    // Get sampling parameters from global settings
+    const samplingParams = getCachedSamplingParameters();
+
     const response = await fetch(OPENROUTER_API_URL, {
       method: "POST",
       headers: {
@@ -115,10 +119,10 @@ export async function streamChat(
         messages,
         stream: true,
         max_tokens: maxTokens,
-        temperature: 0.85,
-        frequency_penalty: 0.6,
-        presence_penalty: 0.4,
-        repetition_penalty: 1.1,
+        temperature: samplingParams.temperature,
+        top_p: samplingParams.top_p,
+        top_k: samplingParams.top_k,
+        repetition_penalty: samplingParams.repetition_penalty,
       }),
       signal,
     });
