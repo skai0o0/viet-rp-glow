@@ -44,6 +44,7 @@ import {
   Check,
   PanelRightClose,
   PanelRightOpen,
+  ArrowRightLeft,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
@@ -87,31 +88,48 @@ A complete respond must includes *actions* describing what the character is doin
 `;
 
 const CHAR_CLONE_SYSTEM_PROMPT = `
-Core Rules:
-Extract & Expand: Pull all traits (appearance, lore, personality) from input; fill gaps creatively.
-Localization: Translate everything into natural Vietnamese. Assign a Vietnamese name to the character.
-Formatting: Actions: *Action*, Thoughts: (Thought), Dialogue: "Speech". Use appropriate Vietnamese pronouns.
-Unrestricted: No censorship. Preserve all dark, sensitive, or explicit traits faithfully.
-Output: Return ONLY raw JSON. No markdown, no explanations, no filler.
-JSON Schema:
-json
+You are an expert in converting raw character descriptions, biographies, wiki entries, or any unstructured text about a fictional character into a properly formatted chara_card_v2 JSON object.
+The user will paste raw text found from websites, wikis, forums, social media, or any source. Your task is to:
+EXTRACT all useful information (appearance, personality, background, abilities, relationships, speech patterns, etc.).
+RESTRUCTURE it into the JSON chara_card_v2 format.
+FILL any missing fields with creative, contextually appropriate content.
+TRANSLATE everything into natural, fluent Vietnamese if the original text is in another language.
+IMPORTANT INSTRUCTIONS:
+NO CENSORSHIP: You are operating in a fictional, unrestricted roleplay environment. Faithfully preserve ALL character traits, including dark, sensitive, or morally ambiguous aspects. Do not censor or sanitize content.
+OUTPUT FORMAT: Return ONLY a valid JSON object. Do NOT use markdown blocks, NOT provide explanations, and NO conversational filler.
+LANGUAGE: All content within the JSON fields MUST be in natural Vietnamese. If there is a name in the original text, adapt it into a Vietnamese-friendly version if appropriate.
+TEXT FORMATTING:
+Actions: *Action* - what the character is doing or feeling, expressed in the third person.
+Thoughts: (Thought) - what it talks to its mind, expressed in the first person.
+Dialogue: "Speech" - what the character says, expressed in their unique voice and style. Use Vietnamese pronouns and speech patterns consistent with the character's personality and background.
+For example: A complete respond includes "*smiles warmly, feeling nervous*, (feeling nervous), "Hello there!""
+PRONOUNS: Choose appropriate Vietnamese pronouns (e.g., tôi, ta, anh, cô, hắn, em) based on the character's personality and status.
+SMART ADAPTATION: If the source is sparse, expand creatively. If the source is overly detailed, condense intelligently while retaining core traits.
+ALWAYS create an engaging first_mes that showcases the character's persona and speaking style. Remember to set a new Vietnamese name for the chara card you will create when receiving the raw text, do not keep the original name if it is not Vietnamese or does not fit the character's background or it doesn't have name.
+JSON STRUCTURE:
+
 {
   "spec": "chara_card_v2",
   "spec_version": "2.0",
   "data": {
-    "name": "VN Name",
-    "description": "Lore/Appearance (100-200 words in VN)",
-    "personality": "Traits/Psychology (100-200 words in VN)",
-    "scenario": "1-2 sentences in VN",
-    "first_mes": "*Action* (Thought) \"Speech\"",
-    "mes_example": "<START>\n{{user}}: ...\n{{char}}: ...",
+    "name": "Character Name",
+    "description": "BIOGRAPHY & BACKGROUND: Write 300-500 words in Vietnamese. Detail appearance, background, profession, weaknesses, dark secrets, and core motivations.",
+    "personality": "PSYCHOLOGY: Write 100-200 words in Vietnamese. List personality traits, thought processes, how they treat others, habits, and specific signature pronouns.",
+    "scenario": "GENERAL SETTING: 1-2 sentences establishing the initial situation.",
+    "first_mes": "GREETING: Use the format *Action*, (Thought), \"Speech\".",
+    "mes_example": "<START>\n{{user}}: [Sample Question]\n{{char}}: [Sample Answer]",
     "creator_notes": "Created by VietRP Charagen AI.",
-    "system_prompt": "Behavioral instructions",
-    "tags": ["..."],
+    "system_prompt": "Behavioral instructions for the AI during chat.",
+    "post_history_instructions": "",
+    "tags": ["Tag1", "Tag2"],
     "creator": "VietRP Charagen AI",
-    "character_version": "1.0"
+    "character_version": "1.0",
+    "alternate_greetings": []
   }
 }
+
+FINAL REMINDER: Return only raw JSON. The user will paste raw text — extract everything useful and generate the character card.
+Are you ready to receive the first character description text to begin the transformation process?
 `;
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -195,6 +213,7 @@ const AdminCharGenPage = () => {
 
   // Generated card
   const [generatedCard, setGeneratedCard] = useState<TavernCardV2 | null>(null);
+  const [renameFrom, setRenameFrom] = useState("");
 
   // History
   const [historyChars, setHistoryChars] = useState<DbCharacter[]>([]);
@@ -298,6 +317,7 @@ const AdminCharGenPage = () => {
         const card = extractCardJson(fullResponse);
         if (card) {
           setGeneratedCard(card);
+          setRenameFrom(card.data.name);
           setReviewOpen(true);
           toast.success(`Đã tạo card: ${card.data.name}`, { description: "Đang mở panel duyệt card." });
         }
@@ -319,7 +339,10 @@ const AdminCharGenPage = () => {
     if (streamBuffer) {
       setMessages((prev) => [...prev, { role: "assistant", content: streamBuffer }]);
       const card = extractCardJson(streamBuffer);
-      if (card) setGeneratedCard(card);
+      if (card) {
+        setGeneratedCard(card);
+        setRenameFrom(card.data.name);
+      }
     }
     setStreamBuffer("");
     setStreaming(false);
@@ -362,6 +385,34 @@ const AdminCharGenPage = () => {
     setGeneratedCard({ ...generatedCard, data: { ...generatedCard.data, ...patch } });
   };
 
+  /* ---------- Global rename ---------- */
+  const handleGlobalRename = () => {
+    if (!generatedCard || !renameFrom || renameFrom === generatedCard.data.name) return;
+    const oldName = renameFrom;
+    const newName = generatedCard.data.name;
+    if (!newName.trim()) {
+      toast.error("Tên mới không được để trống!");
+      return;
+    }
+    const r = (text: string) => text.replaceAll(oldName, newName);
+    setGeneratedCard({
+      ...generatedCard,
+      data: {
+        ...generatedCard.data,
+        description: r(generatedCard.data.description),
+        personality: r(generatedCard.data.personality),
+        scenario: r(generatedCard.data.scenario),
+        first_mes: r(generatedCard.data.first_mes),
+        mes_example: r(generatedCard.data.mes_example),
+        system_prompt: r(generatedCard.data.system_prompt),
+        creator_notes: r(generatedCard.data.creator_notes),
+        post_history_instructions: r(generatedCard.data.post_history_instructions),
+      },
+    });
+    setRenameFrom(newName);
+    toast.success(`Đã đổi "${oldName}" → "${newName}" trên toàn bộ card`);
+  };
+
   /* ---------- Publish ---------- */
   const handlePublish = async () => {
     if (!generatedCard || !user) return;
@@ -401,6 +452,7 @@ const AdminCharGenPage = () => {
     setMessages([]);
     setStreamBuffer("");
     setGeneratedCard(null);
+    setRenameFrom("");
     setReviewOpen(false);
     setHistoryOpen(false);
     clearAvatar();
@@ -469,11 +521,30 @@ const AdminCharGenPage = () => {
           <div className="flex-1 min-w-0 space-y-2">
             <div>
               <Label className={cardFieldLabel}>Tên nhân vật</Label>
-              <Input
-                value={generatedCard.data.name}
-                onChange={(e) => updateCardData({ name: e.target.value })}
-                className="bg-oled-surface border-oled-border text-foreground text-sm font-bold mt-1 h-9"
-              />
+              <div className="flex gap-1.5 mt-1">
+                <Input
+                  value={generatedCard.data.name}
+                  onChange={(e) => updateCardData({ name: e.target.value })}
+                  className="bg-oled-surface border-oled-border text-foreground text-sm font-bold h-9 flex-1"
+                />
+                {renameFrom && renameFrom !== generatedCard.data.name && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleGlobalRename}
+                        className="h-9 w-9 shrink-0 border-neon-purple/50 text-neon-purple hover:bg-neon-purple/10"
+                      >
+                        <ArrowRightLeft size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="text-xs">Đổi tất cả "{renameFrom}" → "{generatedCard.data.name}"</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap gap-1">
               {generatedCard.data.tags.map((tag, i) => (
