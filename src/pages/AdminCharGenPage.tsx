@@ -45,6 +45,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   ArrowRightLeft,
+  Search,
+  UserCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
@@ -231,7 +233,7 @@ const AdminCharGenPage = () => {
       const { data, error } = await supabase
         .from("characters")
         .select("*")
-        .eq("creator", "VietRP AI")
+        .eq("creator", "VietRP Charagen AI")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -242,7 +244,7 @@ const AdminCharGenPage = () => {
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [])
 
   const handleDeleteChar = async (id: string, name: string) => {
     if (!confirm(`Xoá nhân vật "${name}"? Hành động này không thể hoàn tác.`)) return;
@@ -268,6 +270,34 @@ const AdminCharGenPage = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Target user (who owns the published card)
+  const [targetUserId, setTargetUserId] = useState<string>("");
+  const [userSearch, setUserSearch] = useState("");
+  const [userResults, setUserResults] = useState<{ id: string; display_name: string }[]>([]);
+  const [userSearching, setUserSearching] = useState(false);
+
+  // Init target to current user once loaded
+  useEffect(() => {
+    if (user && !targetUserId) setTargetUserId(user.id);
+  }, [user, targetUserId]);
+
+  const searchUsers = useCallback(async (q: string) => {
+    if (!q.trim()) { setUserResults([]); return; }
+    setUserSearching(true);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .ilike("display_name", `%${q}%`)
+        .limit(8);
+      setUserResults(data ?? []);
+    } catch {
+      // silent
+    } finally {
+      setUserSearching(false);
+    }
+  }, []);
 
   // Publishing
   const [isPublic, setIsPublic] = useState(true);
@@ -425,12 +455,13 @@ const AdminCharGenPage = () => {
       toast.error("Nhân vật thiếu tên!");
       return;
     }
+    const ownerId = targetUserId || user.id;
 
     setPublishing(true);
     try {
       let avatarUrl: string | null = null;
       if (avatarFile) {
-        const filePath = `${user.id}/${Date.now()}.webp`;
+        const filePath = `${ownerId}/${Date.now()}.webp`;
         const { error: uploadErr } = await supabase.storage
           .from("character-avatars")
           .upload(filePath, avatarFile, { upsert: true });
@@ -441,9 +472,11 @@ const AdminCharGenPage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      const saved = await createCharacter(generatedCard, user.id, isPublic, undefined, avatarUrl);
-      toast.success(`Đã xuất bản: ${saved.name}`, { description: "Đang chuyển tới trang nhân vật..." });
-      // Navigate to the new character page so admin can see it immediately
+      const saved = await createCharacter(generatedCard, ownerId, isPublic, undefined, avatarUrl);
+      const ownerLabel = targetUserId !== user.id
+        ? (userResults.find(u => u.id === targetUserId)?.display_name ?? "người dùng")
+        : "bạn";
+      toast.success(`Đã xuất bản: ${saved.name}`, { description: `Thuộc về ${ownerLabel}` });
       navigate(`/character/${saved.id}`);
     } catch (err: any) {
       toast.error(err.message || "Xuất bản thất bại!");
@@ -626,6 +659,70 @@ const AdminCharGenPage = () => {
         {/* Publish controls */}
         <Card className="bg-oled-surface border-oled-border">
           <CardContent className="p-3 space-y-3">
+            {/* Target user picker */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+                <UserCheck size={11} /> Thuộc về người dùng
+              </p>
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => {
+                    setUserSearch(e.target.value);
+                    searchUsers(e.target.value);
+                  }}
+                  placeholder="Tìm user theo tên…"
+                  className="w-full pl-7 pr-3 h-8 bg-oled-base border border-oled-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-neon-purple/50"
+                />
+                {userSearching && (
+                  <Loader2 size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {/* Results dropdown */}
+              {userResults.length > 0 && (
+                <div className="mt-1 bg-oled-elevated border border-gray-border rounded-lg overflow-hidden shadow-lg z-10 relative">
+                  {userResults.map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() => {
+                        setTargetUserId(u.id);
+                        setUserSearch(u.display_name);
+                        setUserResults([]);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-oled-surface transition-colors flex items-center gap-2 ${
+                        targetUserId === u.id ? "text-neon-purple" : "text-foreground"
+                      }`}
+                    >
+                      <User size={11} className="shrink-0 text-muted-foreground" />
+                      <span className="truncate">{u.display_name}</span>
+                      {targetUserId === u.id && <Check size={10} className="ml-auto text-neon-purple shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Current owner badge */}
+              <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
+                <span className="text-muted-foreground">Chủ sở hữu:</span>
+                <span className={`font-medium ${targetUserId === user?.id ? "text-neon-blue" : "text-neon-purple"}`}>
+                  {targetUserId === user?.id
+                    ? "Bạn (admin)"
+                    : userSearch || targetUserId.slice(0, 8) + "…"}
+                </span>
+                {targetUserId !== user?.id && (
+                  <button
+                    onClick={() => { setTargetUserId(user?.id ?? ""); setUserSearch(""); setUserResults([]); }}
+                    className="text-muted-foreground hover:text-red-400 ml-1"
+                    title="Reset về tài khoản của bạn"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Public toggle */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-foreground">Công khai</p>
