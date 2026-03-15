@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
 import { Loader2, Map, CheckCircle2, Circle, Clock, Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,7 +51,7 @@ const emptyItem: Omit<RoadmapItem, "id"> = {
 
 const AdminRoadmapPage = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, checking: checkingRole } = useIsAdmin();
+  const { isAdmin, isAdminOrOp, checking: checkingRole } = useUserRole();
   const [items, setItems] = useState<RoadmapItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -95,7 +95,7 @@ const AdminRoadmapPage = () => {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !isAdminOrOp) {
     return <Navigate to="/" replace />;
   }
 
@@ -196,7 +196,7 @@ const AdminRoadmapPage = () => {
             <Map className="text-neon-blue" size={28} />
             <h1 className="text-2xl font-bold text-foreground">Roadmap phát triển</h1>
           </div>
-          <Button onClick={openAdd} size="sm" className="bg-neon-purple hover:bg-neon-purple/80 text-white">
+          <Button onClick={openAdd} size="sm" className="bg-neon-purple hover:bg-neon-purple/80 text-white" disabled={!isAdmin} title={!isAdmin ? "Chỉ Admin mới có quyền thêm" : ""}>
             <Plus size={14} className="mr-1" /> Thêm mục
           </Button>
         </div>
@@ -242,14 +242,16 @@ const AdminRoadmapPage = () => {
                             <StatusIcon size={14} className={color} />
                           </button>
                           <span className="text-foreground flex-1">{item.title}</span>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                            <button onClick={() => openEdit(item)} className="text-muted-foreground hover:text-neon-blue">
-                              <Pencil size={12} />
-                            </button>
-                            <button onClick={() => setDeleteConfirm(item.id)} className="text-muted-foreground hover:text-red-400">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
+                          {isAdmin && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                              <button onClick={() => openEdit(item)} className="text-muted-foreground hover:text-neon-blue">
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => setDeleteConfirm(item.id)} className="text-muted-foreground hover:text-red-400">
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          )}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-3 pt-0">

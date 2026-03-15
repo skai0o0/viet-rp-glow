@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -42,7 +42,7 @@ import {
 
 const AdminApiSettingsPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, checking } = useIsAdmin();
+  const { isAdminOrOp, checking } = useUserRole();
 
   // API verification
   const [testApiKey, setTestApiKey] = useState("");
@@ -185,7 +185,7 @@ const AdminApiSettingsPage = () => {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !isAdminOrOp) {
     return <Navigate to="/" replace />;
   }
 

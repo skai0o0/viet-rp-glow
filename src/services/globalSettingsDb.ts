@@ -133,79 +133,194 @@ const DEFAULT_PLAN: PlanPhase[] = [
   {
     id: 1,
     title: "Database & Roles",
-    description: "Mở rộng role (op), bảng subscriptions, usage_logs, subscription_plans",
-    status: "planned",
+    description: "Mở rộng role (op), bảng credits, approval, usage_logs, subscription_plans",
+    status: "done",
     details: [
       "ALTER TYPE app_role ADD VALUE 'op'",
-      "Bảng subscriptions: user_id, plan, credits, expires_at",
-      "Bảng usage_logs: tracking token & cost",
-      "Bảng subscription_plans: admin định nghĩa gói",
-      "Platform API key trong global_settings (encrypted)",
+      "Bảng user_credits: user_id, balance, updated_at",
+      "Bảng credit_transactions: user_id, amount, type (purchase/subscription/usage/admin_grant), description",
+      "Bảng subscription_plans: id, name, price, monthly_credits, perks (JSON), is_active",
+      "Bảng user_subscriptions: user_id, plan_id, status, current_period_start, current_period_end",
+      "Bảng credit_packages: id, name, credits, price, is_active (gói credit mua lẻ)",
+      "Bảng usage_logs: user_id, feature, credits_used, metadata, created_at",
+      "Bảng pending_approvals: id, user_id, type (card_create/admin_edit), payload (JSON), status (pending/approved/rejected), reviewer_id, created_at",
+      "User tự quản lý API key riêng (lưu localStorage) — KHÔNG cần platform API key",
     ],
   },
   {
     id: 2,
-    title: "Backend Proxy (Edge Function)",
-    description: "Edge Function chat-proxy xử lý subscription, rate limit, streaming",
-    status: "planned",
+    title: "Phân quyền Admin Hub",
+    description: "Admin có toàn quyền, Operator xem + chỉnh sửa nhưng cần admin duyệt",
+    status: "in-progress",
     details: [
-      "Supabase Edge Function 'chat-proxy'",
-      "Check credits → gọi OpenRouter bằng platform key",
-      "Trừ credits + log usage sau mỗi request",
-      "Rate limit theo plan",
-      "Forward SSE stream về client",
+      "[Admin] Toàn quyền chỉnh sửa mọi thứ trong Admin Hub",
+      "[Operator] Truy cập Admin Hub, xem tất cả dữ liệu",
+      "[Operator] Có thể chỉnh sửa nhưng khi submit → tạo pending_approval",
+      "[Admin] Nhận thông báo + duyệt/từ chối yêu cầu chỉnh sửa từ Operator",
+      "Trang Approval Queue trong Admin Hub (admin thấy tất cả, op thấy của mình)",
+      "NavigationRail hiện Admin Hub cho op (màu khác biệt)",
+      "useIsAdmin → useUserRole() trả 3 role: user, op, admin",
     ],
   },
   {
     id: 3,
-    title: "Frontend: BYOK vs Subscription",
-    description: "Phân luồng streamChat(), SettingsPage, ChatPage theo role",
+    title: "BYOK Chat — Tất cả User",
+    description: "Mọi user tự nhập API Key OpenRouter để chat, tự do tài chính, dùng model free/paid",
     status: "planned",
     details: [
-      "Hook useUserRole() trả role + subscription info",
-      "streamChat() phân nhánh: user→proxy, op/admin→BYOK",
-      "SettingsPage: user ẩn API key, hiện gói + credits",
-      "ChatPage badge BYOK/Sub, toast hết credits",
+      "User nhập OpenRouter API key trong Settings → lưu localStorage",
+      "streamChat() gọi trực tiếp OpenRouter bằng API key của user",
+      "Admin quản lý danh sách allowed_models (đã có sẵn)",
+      "User có thể dùng model miễn phí (free tier) → chat không tốn tiền",
+      "Hướng dẫn user cách tạo API key OpenRouter ngay trong Settings",
+      "Validate API key trước khi cho phép chat",
+      "Ưu điểm: user tự do tài chính, platform đỡ gánh chi phí chat",
     ],
   },
   {
     id: 4,
-    title: "Role Operator (op)",
-    description: "Role op: xem admin read-only, dùng BYOK",
+    title: "Card Creation & Hệ thống duyệt",
+    description: "User tạo tối đa 3 cards/ngày → gửi duyệt, Operator & Admin duyệt",
     status: "planned",
     details: [
-      "op được truy cập Admin Hub (read-only)",
-      "op dùng BYOK giống admin",
-      "useIsAdmin → useUserRole trả 3 role",
-      "Nút chỉnh sửa chỉ hiện cho admin",
-      "NavigationRail hiện Admin Hub cho op (màu khác)",
+      "[User] Tạo card thủ công: tối đa 3 cards/ngày (reset 00:00)",
+      "[User] Card sau khi tạo → trạng thái 'pending' → gửi duyệt",
+      "[Operator + Admin] Xem danh sách card pending, duyệt/từ chối + lý do",
+      "[User] Lorebook: sử dụng tự do, không giới hạn",
+      "Bảng daily_card_usage: user_id, date, count (tracking giới hạn ngày)",
+      "Card được duyệt → public trên Hub, bị từ chối → thông báo + cho sửa lại",
     ],
   },
   {
     id: 5,
-    title: "Subscription Management UI",
-    description: "Trang /subscription cho user, admin quản lý subscribers",
+    title: "Hệ thống Credit & Tính năng Premium",
+    description: "Credit dùng cho tính năng AI cao cấp — không liên quan đến chat",
     status: "planned",
     details: [
-      "Trang /subscription: xem gói, credits, lịch sử",
-      "Admin: Subscription Manager trong Admin Hub",
-      "Tặng/trừ credits, thay đổi plan",
-      "Tích hợp thanh toán (MoMo/VNPAY) hoặc manual",
+      "🔮 Tạo card bằng AI (chuyển từ Admin Hub → user, tốn credit/lần)",
+      "🔮 Clone card bằng AI — tạo biến thể nhân vật từ card có sẵn (credit/lần)",
+      "🔮 AI ghi chú diễn biến chat — tự động tóm tắt sự kiện quan trọng (sắp có)",
+      "🔮 Tóm tắt cuộc chat bằng AI — khi chat quá dài, AI bắt đầu quên (credit/lần, sắp có)",
+      "Edge Function xử lý tính năng tốn credit → check balance → thực hiện → trừ credit + log",
+      "Bảng giá credit mỗi tính năng (admin cấu hình trong global_settings)",
+      "Toast thông báo khi hết credit, hiện nút mua thêm",
+      "Lịch sử sử dụng credit chi tiết (theo tính năng)",
     ],
   },
   {
     id: 6,
-    title: "Polish & Monitoring",
-    description: "Dashboard chi phí, budget alert, UX polish",
+    title: "Subscription & Mua Credit",
+    description: "Subscription = credit hàng tháng + quyền lợi. Mua credit lẻ riêng biệt.",
     status: "planned",
     details: [
-      "Dashboard chi phí realtime cho admin",
-      "Budget alert trên OpenRouter",
-      "Giới hạn model theo plan",
-      "UX polish cho flow subscription",
+      "Gói Free: 0 credit/tháng, giới hạn cơ bản",
+      "Gói Basic / Pro: monthly_credits + perks (badge, ưu tiên duyệt card, v.v.)",
+      "Tự động cấp credit hàng tháng khi subscription active (cron/webhook)",
+      "Credit packages mua lẻ: VD 100cr = 20k, 500cr = 80k (tiết kiệm hơn)",
+      "Tích hợp thanh toán (MoMo/VNPAY/chuyển khoản) hoặc admin duyệt manual",
+      "Credit không hết hạn, cộng dồn từ subscription + mua lẻ",
+      "~[Pro/VIP — pending] Nâng giới hạn tạo card: 5–10 cards/ngày",
+      "~[Pro/VIP — pending] Badge đặc biệt hiển thị trên profile & chat",
+      "~[Pro/VIP — pending] Ưu tiên duyệt card (duyệt nhanh hơn)",
+      "~[Pro/VIP — pending] Truy cập sớm tính năng mới (early access)",
+      "~[Pro/VIP — pending] Giảm giá credit khi mua lẻ (VD: -10% cho Pro, -20% VIP)",
+      "~[Pro/VIP — pending] Model premium exclusive (nếu có)",
+    ],
+  },
+  {
+    id: 7,
+    title: "Frontend — Phân quyền & UI theo Role",
+    description: "Hook useUserRole(), useUserCredits(), UI phân quyền đầy đủ",
+    status: "planned",
+    details: [
+      "Hook useUserRole() → trả role + subscription info",
+      "Hook useUserCredits() → trả credit balance, lịch sử",
+      "Settings: API key (BYOK) + credit balance + gói subscription",
+      "[User] Navbar cơ bản: Home, Hub, Chat, Create, Profile, Settings",
+      "[Op] Navbar thêm: Admin Hub (màu khác), Approval Queue",
+      "[Admin] Navbar đầy đủ + toàn quyền",
+      "ChatPage: badge model, toast khi API key invalid",
+      "CreatePage: hiện đếm số card còn lại trong ngày",
+    ],
+  },
+  {
+    id: 8,
+    title: "Subscription & Credit Management UI",
+    description: "Trang /subscription cho user, admin quản lý subscribers & credit",
+    status: "planned",
+    details: [
+      "Trang /subscription: xem gói hiện tại, credit balance, lịch sử giao dịch",
+      "Mua gói subscription hoặc credit lẻ tại trang này",
+      "Admin Hub: Subscription Manager — quản lý gói, xem subscribers",
+      "Admin Hub: Credit Manager — tặng/trừ credit, xem lịch sử",
+      "Admin Hub: Credit Packages — tạo/sửa gói credit mua lẻ",
+      "Admin Hub: Approval Dashboard — duyệt card + chỉnh sửa từ Operator",
+      "Notification khi subscription sắp hết hạn hoặc credit thấp",
+    ],
+  },
+  {
+    id: 9,
+    title: "Polish & Monitoring",
+    description: "Dashboard, analytics, UX polish",
+    status: "planned",
+    details: [
+      "Dashboard doanh thu: subscription + credit purchases",
+      "Thống kê credit usage theo tính năng (AI gen, tóm tắt, v.v.)",
+      "Thống kê card approval rate, thời gian duyệt trung bình",
+      "UX polish: onboarding BYOK, credit purchase flow, approval flow",
+      "Webhook/cron tự động gia hạn subscription + cấp credit",
+      "~[Pro/VIP — pending] Trang Pro/VIP showcase với perks chi tiết",
+      "~[Pro/VIP — pending] So sánh gói Free vs Pro vs VIP",
+    ],
+  },
+  {
+    id: 10,
+    title: "World System & Lorebook Orchestration",
+    description: "Thêm World với Rule cứng, lorebook bật/tắt theo World, card trực thuộc có context mặc định",
+    status: "planned",
+    details: [
+      "World = context cứng theo bộ Rule (always-on), đóng vai trò hệ luật nền",
+      "Mỗi World có danh sách Lorebook attach sẵn và bật/tắt theo toggle",
+      "Card trực thuộc World có context mặc định kế thừa từ World + override riêng của card",
+      "User vẫn có quyền thêm/bớt Lorebook khi chat và lưu preset cá nhân",
+      "Cho phép chuyển card sang World khác (map lại Rule/Lorebook mặc định, giữ bản override an toàn)",
+      "Thiết kế xung đột ưu tiên context: Card override > User session override > World Rule",
+      "Admin Hub: CRUD World, quản lý Rule, quản lý pool Lorebook theo từng World",
+      "Migration dự kiến: worlds, world_rules, world_lorebooks, character_world_links",
+      "Theo dõi analytics: tỉ lệ bật/tắt lorebook, hiệu quả theo World, retention theo World",
     ],
   },
 ];
+
+const REQUIRED_WORLD_PHASE: PlanPhase = {
+  id: 10,
+  title: "World System & Lorebook Orchestration",
+  description: "Thêm World với Rule cứng, lorebook bật/tắt theo World, card trực thuộc có context mặc định",
+  status: "planned",
+  details: [
+    "World = context cứng theo bộ Rule (always-on), đóng vai trò hệ luật nền",
+    "Mỗi World có danh sách Lorebook attach sẵn và bật/tắt theo toggle",
+    "Card trực thuộc World có context mặc định kế thừa từ World + override riêng của card",
+    "User vẫn có quyền thêm/bớt Lorebook khi chat và lưu preset cá nhân",
+    "Cho phép chuyển card sang World khác (map lại Rule/Lorebook mặc định, giữ bản override an toàn)",
+    "Thiết kế xung đột ưu tiên context: Card override > User session override > World Rule",
+    "Admin Hub: CRUD World, quản lý Rule, quản lý pool Lorebook theo từng World",
+    "Migration dự kiến: worlds, world_rules, world_lorebooks, character_world_links",
+    "Theo dõi analytics: tỉ lệ bật/tắt lorebook, hiệu quả theo World, retention theo World",
+  ],
+};
+
+function ensureWorldPhase(plan: PlanPhase[]): PlanPhase[] {
+  const hasWorld = plan.some((phase) => {
+    const t = phase.title.toLowerCase();
+    return t.includes("world") || t.includes("lorebook");
+  });
+
+  if (hasWorld) return plan;
+
+  const maxId = plan.reduce((max, phase) => Math.max(max, phase.id), 0);
+  return [...plan, { ...REQUIRED_WORLD_PHASE, id: Math.max(maxId + 1, REQUIRED_WORLD_PHASE.id) }];
+}
 
 export async function fetchSubscriptionPlan(): Promise<PlanPhase[]> {
   const { data } = await supabase
@@ -215,7 +330,7 @@ export async function fetchSubscriptionPlan(): Promise<PlanPhase[]> {
     .single();
   if (data?.value) {
     try {
-      return JSON.parse(data.value) as PlanPhase[];
+      return ensureWorldPhase(JSON.parse(data.value) as PlanPhase[]);
     } catch {
       return DEFAULT_PLAN;
     }

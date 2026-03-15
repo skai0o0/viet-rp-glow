@@ -3,7 +3,7 @@ import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Switch } from "@/components/ui/switch";
 import { upsertProfile } from "@/services/profileDb";
 import { dispatchNsfwModeChange } from "@/hooks/useNsfwMode";
@@ -72,7 +72,7 @@ const NavItem = ({
 
 const NavigationRail = () => {
   const { user, logout } = useAuth();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, isAdminOrOp, isOp } = useUserRole();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -120,8 +120,8 @@ const NavigationRail = () => {
 
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
-        {/* Export Markdown - only for admins on chat pages */}
-        {isAdmin && (
+        {/* Export Markdown - for admin & op on chat pages */}
+        {isAdminOrOp && (
           <Tooltip>
             <TooltipTrigger asChild>
               <motion.button
@@ -152,8 +152,8 @@ const NavigationRail = () => {
           </Tooltip>
         )}
 
-        {/* Admin Hub - only for admins */}
-        {isAdmin && (
+        {/* Admin Hub - for admin & op */}
+        {isAdminOrOp && (
           <Tooltip>
             <TooltipTrigger asChild>
               <NavLink to="/admin" className="block">
@@ -162,15 +162,21 @@ const NavigationRail = () => {
                   whileTap={{ scale: 0.95 }}
                   className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
                     location.pathname.startsWith("/admin")
-                      ? "text-neon-rose shadow-neon-rose bg-neon-rose/10"
-                      : "text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
+                      ? isOp
+                        ? "text-neon-blue shadow-neon-blue bg-neon-blue/10"
+                        : "text-neon-rose shadow-neon-rose bg-neon-rose/10"
+                      : isOp
+                        ? "text-neon-blue/60 hover:text-neon-blue hover:bg-neon-blue/10"
+                        : "text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
                   }`}
                 >
                   <ShieldCheck size={20} />
                   {location.pathname.startsWith("/admin") && (
                     <motion.div
                       layoutId="nav-indicator"
-                      className="absolute -left-[14px] w-[3px] h-5 rounded-r-full bg-neon-rose shadow-neon-rose"
+                      className={`absolute -left-[14px] w-[3px] h-5 rounded-r-full ${
+                        isOp ? "bg-neon-blue shadow-neon-blue" : "bg-neon-rose shadow-neon-rose"
+                      }`}
                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
                     />
                   )}
@@ -178,7 +184,7 @@ const NavigationRail = () => {
               </NavLink>
             </TooltipTrigger>
             <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
-              Admin Hub
+              {isOp ? "Admin Hub (Operator)" : "Admin Hub"}
             </TooltipContent>
           </Tooltip>
         )}
