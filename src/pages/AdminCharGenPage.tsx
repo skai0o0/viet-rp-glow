@@ -508,6 +508,7 @@ const AdminCharGenPage = () => {
     clearAvatar();
     setInput("");
     setCloneMode(false);
+    setIsPublic(true);
   };
 
   /* ---------- Copy message ---------- */

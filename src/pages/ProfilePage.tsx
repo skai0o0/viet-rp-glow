@@ -23,6 +23,7 @@ import { getMyCharacters, CharacterSummary } from "@/services/characterDb";
 import { getMyFavorites, toggleFavorite } from "@/services/favoriteDb";
 import { supabase } from "@/integrations/supabase/client";
 import CharacterCard from "@/components/CharacterCard";
+import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
 import { Link, useNavigate } from "react-router-dom";
 
 const ProfilePage = () => {
@@ -43,6 +44,7 @@ const ProfilePage = () => {
   // Favorites state
   const [favorites, setFavorites] = useState<CharacterSummary[]>([]);
   const [loadingFavs, setLoadingFavs] = useState(true);
+  const [previewCharacter, setPreviewCharacter] = useState<CharacterSummary | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -322,17 +324,23 @@ const ProfilePage = () => {
                 <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
                   {characters.map((char) => (
                     <div key={char.id} className="relative group">
-                      <CharacterCard character={char} />
+                      <CharacterCard character={char} onClick={() => setPreviewCharacter(char)} />
                         <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => navigate(`/edit/${char.id}`)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/edit/${char.id}`);
+                            }}
                             className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-neon-blue/40 text-neon-blue hover:bg-neon-blue/20 transition-colors"
                           >
                             <Pencil size={14} />
                           </button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <button className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-destructive/40 text-destructive hover:bg-destructive/20 transition-colors">
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-destructive/40 text-destructive hover:bg-destructive/20 transition-colors"
+                              >
                                 <Trash2 size={14} />
                               </button>
                             </AlertDialogTrigger>
@@ -363,6 +371,11 @@ const ProfilePage = () => {
           </TabsContent>
 
         </Tabs>
+
+        <CharacterPreviewDialog
+          character={previewCharacter}
+          onClose={() => setPreviewCharacter(null)}
+        />
       </div>
     </div>
   );

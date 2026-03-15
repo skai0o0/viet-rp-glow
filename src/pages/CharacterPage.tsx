@@ -43,7 +43,8 @@ const CharacterPage = () => {
     setLoading(true);
     getCharacterById(id)
       .then((c) => {
-        if (!c.is_public) {
+        // Allow owner to always view their own character, even if private
+        if (!c.is_public && c.user_id !== user?.id) {
           setNotFound(true);
         } else {
           setCharacter(c);
@@ -51,7 +52,7 @@ const CharacterPage = () => {
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, user]);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -112,7 +113,7 @@ const CharacterPage = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-oled-base overflow-y-auto scrollbar-thin">
+    <div className="flex-1 bg-oled-base overflow-y-auto scrollbar-thin">
       {/* Hero image */}
       <div className="relative w-full max-h-[50vh] aspect-[3/2] overflow-hidden bg-gradient-to-br from-oled-elevated to-oled-base">
         {character.avatar_url ? (
