@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import RoleplayMessage from "@/components/RoleplayMessage";
+import ModelCombobox from "@/components/ModelCombobox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
@@ -47,11 +48,13 @@ import {
   ArrowRightLeft,
   Search,
   UserCheck,
+  SlidersHorizontal,
+  ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
-import { getApiKey, getModel, streamChat, type StreamCallbacks } from "@/services/openRouter";
+import { getApiKey, getModel, setModel, streamChat, type StreamCallbacks } from "@/services/openRouter";
 import JSON5 from "json5";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
 
@@ -302,6 +305,15 @@ const AdminCharGenPage = () => {
   // Publishing
   const [isPublic, setIsPublic] = useState(true);
   const [publishing, setPublishing] = useState(false);
+
+  // Model settings
+  const [selectedModel, setSelectedModel] = useState(() => getModel());
+  const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
+
+  const handleModelChange = useCallback((value: string) => {
+    setModel(value);
+    setSelectedModel(value);
+  }, []);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -1155,6 +1167,51 @@ const AdminCharGenPage = () => {
           {/* ─── Input bar — ChatPage style ─── */}
           <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border">
             <div className="max-w-3xl mx-auto">
+
+              {/* ── Model settings row ── */}
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  onClick={() => setModelSettingsOpen((v) => !v)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all duration-200 border ${
+                    modelSettingsOpen
+                      ? "bg-neon-purple/10 border-neon-purple/40 text-neon-purple"
+                      : "bg-oled-surface border-oled-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/30"
+                  }`}
+                >
+                  <SlidersHorizontal size={11} />
+                  <span>Model</span>
+                  <ChevronDown
+                    size={10}
+                    className={`transition-transform duration-200 ${modelSettingsOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {/* Show selected model name as a compact badge when collapsed */}
+                {!modelSettingsOpen && (
+                  <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">
+                    {selectedModel.split("/").pop()?.split(":")[0] ?? selectedModel}
+                  </span>
+                )}
+              </div>
+
+              {/* ── Collapsible model picker ── */}
+              <AnimatePresence initial={false}>
+                {modelSettingsOpen && (
+                  <motion.div
+                    key="model-settings"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="overflow-hidden mb-2"
+                  >
+                    <div className="bg-oled-surface border border-oled-border rounded-xl p-3 flex flex-col gap-2">
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Model AI</p>
+                      <ModelCombobox value={selectedModel} onValueChange={handleModelChange} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div
                 className={`flex items-end gap-2 bg-oled-surface rounded-2xl px-4 py-2 border transition-all duration-300 ${
                   cloneMode
