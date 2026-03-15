@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -198,7 +198,7 @@ function extractCardJson(raw: string): TavernCardV2 | null {
 /* ------------------------------------------------------------------ */
 const AdminCharGenPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, checking } = useIsAdmin();
+  const { isAdminOrOp, checking } = useUserRole();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -481,7 +481,7 @@ const AdminCharGenPage = () => {
       </div>
     );
   }
-  if (!user || !isAdmin) return <Navigate to="/" replace />;
+  if (!user || !isAdminOrOp) return <Navigate to="/" replace />;
 
   const cardFieldLabel = "text-xs font-medium text-muted-foreground uppercase tracking-wider";
   const cardTextarea =

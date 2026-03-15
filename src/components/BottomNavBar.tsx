@@ -3,7 +3,7 @@ import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { upsertProfile } from "@/services/profileDb";
@@ -28,7 +28,7 @@ const BottomNavBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, isAdminOrOp, isOp } = useUserRole();
 
   const [nsfwMode, setNsfwMode] = useState(() => localStorage.getItem("vietrp_nsfw_mode") === "true");
 
@@ -92,8 +92,8 @@ const BottomNavBar = () => {
         );
       })}
 
-      {/* Export Markdown - only for admins on chat pages */}
-      {isAdmin && (
+      {/* Export Markdown - for admin & op on chat pages */}
+      {isAdminOrOp && (
         <button
           className="flex-1"
           onClick={async () => {
@@ -123,8 +123,8 @@ const BottomNavBar = () => {
         </button>
       )}
 
-      {/* Admin Hub - only for admins */}
-      {isAdmin && (
+      {/* Admin Hub - for admin & op */}
+      {isAdminOrOp && (
         <NavLink to="/admin" className="flex-1">
           <motion.div
             whileTap={{ scale: 0.9 }}
@@ -133,18 +133,28 @@ const BottomNavBar = () => {
             <div
               className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
                 location.pathname.startsWith("/admin")
-                  ? "text-neon-rose bg-neon-rose/10"
-                  : "text-neon-rose/60"
+                  ? isOp
+                    ? "text-neon-blue bg-neon-blue/10"
+                    : "text-neon-rose bg-neon-rose/10"
+                  : isOp
+                    ? "text-neon-blue/60"
+                    : "text-neon-rose/60"
               }`}
             >
               <ShieldCheck size={20} />
             </div>
             <span
               className={`text-[10px] transition-colors duration-200 ${
-                location.pathname.startsWith("/admin") ? "text-neon-rose font-medium" : "text-neon-rose/60"
+                location.pathname.startsWith("/admin")
+                  ? isOp
+                    ? "text-neon-blue font-medium"
+                    : "text-neon-rose font-medium"
+                  : isOp
+                    ? "text-neon-blue/60"
+                    : "text-neon-rose/60"
               }`}
             >
-              Admin
+              {isOp ? "Op Hub" : "Admin"}
             </span>
           </motion.div>
         </NavLink>

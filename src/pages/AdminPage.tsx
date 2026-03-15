@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate, Link } from "react-router-dom";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
+  ShieldCheck,
   Loader2,
   Upload,
   FileJson,
@@ -35,6 +37,7 @@ import {
   X,
   Pin,
   ExternalLink,
+  ClipboardCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -94,6 +97,7 @@ const StatCard = ({
 const AdminPage = () => {
   const { user, isLoading } = useAuth();
   const { isAdmin, checking } = useIsAdmin();
+  const { isAdminOrOp, isOp } = useUserRole();
   const [prompt, setPrompt] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -164,7 +168,7 @@ const AdminPage = () => {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdminOrOp) return;
     Promise.all([
       supabase.from("characters").select("id", { count: "exact", head: true }),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
@@ -176,7 +180,7 @@ const AdminPage = () => {
         sessions: String(sessions.count ?? 0),
       });
     });
-  }, [isAdmin]);
+  }, [isAdminOrOp]);
 
   if (isLoading || checking) {
     return (
@@ -186,7 +190,7 @@ const AdminPage = () => {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !isAdminOrOp) {
     return <Navigate to="/" replace />;
   }
 
@@ -304,6 +308,13 @@ const AdminPage = () => {
       color: "text-green-400 bg-green-400/10",
     },
     {
+      icon: ClipboardCheck,
+      label: "Approval Queue",
+      description: "Duyệt yêu cầu chỉnh sửa từ Operator",
+      path: "/admin/approvals",
+      color: "text-orange-400 bg-orange-400/10",
+    },
+    {
       icon: Database,
       label: "SQL Editor",
       description: "Thực thi truy vấn SQL trực tiếp trên Supabase",
@@ -360,14 +371,35 @@ const AdminPage = () => {
       >
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-neon-rose to-neon-purple flex items-center justify-center shadow-lg">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${
+            isOp
+              ? "bg-gradient-to-br from-neon-blue to-cyan-500"
+              : "bg-gradient-to-br from-neon-rose to-neon-purple"
+          }`}>
             <Shield className="text-white" size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Admin Hub</h1>
-            <p className="text-sm text-muted-foreground">Quản trị hệ thống VietRP</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              {isOp ? "Operator Hub" : "Admin Hub"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isOp ? "Quản lý hệ thống VietRP (Operator)" : "Quản trị hệ thống VietRP"}
+            </p>
           </div>
         </div>
+
+        {/* Operator notice banner */}
+        {isOp && (
+          <Card className="bg-neon-blue/5 border-neon-blue/20">
+            <CardContent className="p-3 flex items-center gap-2.5">
+              <ShieldCheck size={16} className="text-neon-blue flex-shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Bạn đang truy cập với quyền <span className="text-neon-blue font-medium">Operator</span>. 
+                Có thể xem tất cả & chỉnh sửa — các thay đổi quan trọng sẽ cần Admin duyệt.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Overview */}
         <div className="grid grid-cols-3 gap-3">
@@ -397,7 +429,7 @@ const AdminPage = () => {
                       </Badge>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Kế hoạch song song BYOK + Subscription ·{" "}
+                      BYOK Chat + Credit System + Role Permissions ·{" "}
                       <span className="text-green-400">{planPhases.filter(p => p.status === "done").length}</span>
                       /{planPhases.length} hoàn thành
                     </p>
@@ -439,11 +471,11 @@ const AdminPage = () => {
                   return (
                     <button
                       key={phase.id}
-                      onClick={() => handlePlanStatusToggle(phase.id)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] transition-all hover:scale-105 ${
-                        planStatusConfig[phase.status].bg
-                      }`}
-                      title={`Click để đổi trạng thái · ${phase.title}`}
+                      onClick={() => isAdmin && handlePlanStatusToggle(phase.id)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] transition-all ${
+                        isAdmin ? "hover:scale-105 cursor-pointer" : "cursor-default"
+                      } ${planStatusConfig[phase.status].bg}`}
+                      title={isAdmin ? `Click để đổi trạng thái · ${phase.title}` : phase.title}
                     >
                       <StatusIcon size={12} className={color} />
                       <span className="text-foreground font-medium">P{phase.id}</span>
@@ -534,21 +566,31 @@ const AdminPage = () => {
                                     Phase {phase.id}
                                   </Badge>
                                   <span className="text-sm font-medium text-foreground truncate">{phase.title}</span>
-                                  <button
-                                    onClick={() => setEditingPhase({ ...phase })}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-neon-blue"
-                                  >
-                                    <Pencil size={11} />
-                                  </button>
+                                  {isAdmin && (
+                                    <button
+                                      onClick={() => setEditingPhase({ ...phase })}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-neon-blue"
+                                    >
+                                      <Pencil size={11} />
+                                    </button>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-muted-foreground mt-0.5">{phase.description}</p>
                                 <ul className="mt-1.5 space-y-0.5">
-                                  {phase.details.map((d, i) => (
-                                    <li key={i} className="text-[10px] text-muted-foreground/70 flex items-start gap-1.5">
-                                      <span className="text-neon-blue/50 mt-px">›</span>
-                                      <span>{d}</span>
-                                    </li>
-                                  ))}
+                                  {phase.details.map((d, i) => {
+                                    const isPending = d.startsWith("~");
+                                    const display = isPending ? d.slice(1) : d;
+                                    return (
+                                      <li key={i} className={`text-[10px] flex items-start gap-1.5 ${
+                                        isPending ? "text-muted-foreground/30 italic" : "text-muted-foreground/70"
+                                      }`}>
+                                        <span className={`mt-px ${isPending ? "text-neon-purple/30" : "text-neon-blue/50"}`}>
+                                          {isPending ? "◇" : "›"}
+                                        </span>
+                                        <span>{display}</span>
+                                      </li>
+                                    );
+                                  })}
                                 </ul>
                               </div>
                             </div>
@@ -567,8 +609,10 @@ const AdminPage = () => {
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Truy cập nhanh</h2>
 
-          {/* Page links */}
-          {quickLinks.map((link) => (
+          {/* Page links — SQL Editor hidden for op */}
+          {quickLinks
+            .filter((link) => isAdmin || link.path !== "/admin/sql")
+            .map((link) => (
             <Link key={link.path} to={link.path}>
               <Card className="bg-oled-surface border-oled-border hover:border-neon-purple/40 transition-colors cursor-pointer group">
                 <CardContent className="p-4 flex items-center gap-3">
@@ -585,8 +629,8 @@ const AdminPage = () => {
             </Link>
           ))}
 
-          {/* Expandable inline sections */}
-          {inlineSections.map((section) => {
+          {/* Expandable inline sections — admin only */}
+          {isAdmin && inlineSections.map((section) => {
             const isOpen = expandedSection === section.key;
             return (
               <div key={section.key}>

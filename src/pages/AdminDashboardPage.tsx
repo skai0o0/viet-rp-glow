@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -115,7 +115,7 @@ const MiniBar = ({ value, max, color }: { value: number; max: number; color: str
 /* ------------------------------------------------------------------ */
 const AdminDashboardPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, checking } = useIsAdmin();
+  const { isAdminOrOp, checking } = useUserRole();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentChars, setRecentChars] = useState<RecentCharacter[]>([]);
@@ -203,10 +203,10 @@ const AdminDashboardPage = () => {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdminOrOp) return;
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [isAdminOrOp]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -221,7 +221,7 @@ const AdminDashboardPage = () => {
       </div>
     );
   }
-  if (!user || !isAdmin) return <Navigate to="/" replace />;
+  if (!user || !isAdminOrOp) return <Navigate to="/" replace />;
 
   /* ---------- render ---------- */
   return (

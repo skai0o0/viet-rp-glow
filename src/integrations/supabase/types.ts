@@ -427,11 +427,313 @@ export type Database = {
         }
         Relationships: []
       }
+      user_credits: {
+        Row: {
+          id: string
+          user_id: string
+          balance: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          balance?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          balance?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      credit_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          type: Database["public"]["Enums"]["credit_transaction_type"]
+          description: string
+          reference_id: string | null
+          balance_after: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          type: Database["public"]["Enums"]["credit_transaction_type"]
+          description?: string
+          reference_id?: string | null
+          balance_after?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          type?: Database["public"]["Enums"]["credit_transaction_type"]
+          description?: string
+          reference_id?: string | null
+          balance_after?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      subscription_plans: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          price: number
+          monthly_credits: number
+          perks: Json
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          price?: number
+          monthly_credits?: number
+          perks?: Json
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          price?: number
+          monthly_credits?: number
+          perks?: Json
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          plan_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          current_period_start: string
+          current_period_end: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plan_id: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          current_period_start?: string
+          current_period_end?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plan_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          current_period_start?: string
+          current_period_end?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_packages: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          credits: number
+          price: number
+          discount_percent: number
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          credits: number
+          price: number
+          discount_percent?: number
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          credits?: number
+          price?: number
+          discount_percent?: number
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      usage_logs: {
+        Row: {
+          id: string
+          user_id: string
+          feature: string
+          credits_used: number
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          feature: string
+          credits_used?: number
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          feature?: string
+          credits_used?: number
+          metadata?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      pending_approvals: {
+        Row: {
+          id: string
+          user_id: string
+          type: Database["public"]["Enums"]["approval_type"]
+          title: string
+          payload: Json
+          status: Database["public"]["Enums"]["approval_status"]
+          reviewer_id: string | null
+          reviewer_note: string
+          reviewed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: Database["public"]["Enums"]["approval_type"]
+          title?: string
+          payload?: Json
+          status?: Database["public"]["Enums"]["approval_status"]
+          reviewer_id?: string | null
+          reviewer_note?: string
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: Database["public"]["Enums"]["approval_type"]
+          title?: string
+          payload?: Json
+          status?: Database["public"]["Enums"]["approval_status"]
+          reviewer_id?: string | null
+          reviewer_note?: string
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      daily_card_usage: {
+        Row: {
+          id: string
+          user_id: string
+          usage_date: string
+          card_count: number
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          usage_date?: string
+          card_count?: number
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          usage_date?: string
+          card_count?: number
+        }
+        Relationships: []
+      }
+      credit_feature_pricing: {
+        Row: {
+          id: string
+          feature_key: string
+          feature_name: string
+          credits_cost: number
+          description: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          feature_key: string
+          feature_name: string
+          credits_cost?: number
+          description?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          feature_key?: string
+          feature_name?: string
+          credits_cost?: number
+          description?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_user_role: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -482,9 +784,43 @@ export type Database = {
         }
         Returns: Record<string, unknown>
       }
+      use_credits: {
+        Args: {
+          p_user_id: string
+          p_feature: string
+          p_credits: number
+          p_metadata?: Json
+        }
+        Returns: boolean
+      }
+      grant_credits: {
+        Args: {
+          p_user_id: string
+          p_amount: number
+          p_description?: string
+        }
+        Returns: number
+      }
+      check_daily_card_limit: {
+        Args: {
+          p_user_id: string
+          p_max_cards?: number
+        }
+        Returns: Json
+      }
+      increment_daily_card_count: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "op"
+      credit_transaction_type: "purchase" | "subscription" | "usage" | "admin_grant" | "refund"
+      subscription_status: "active" | "expired" | "cancelled" | "pending"
+      approval_type: "card_create" | "card_edit" | "admin_edit"
+      approval_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -612,7 +948,11 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "op"],
+      credit_transaction_type: ["purchase", "subscription", "usage", "admin_grant", "refund"],
+      subscription_status: ["active", "expired", "cancelled", "pending"],
+      approval_type: ["card_create", "card_edit", "admin_edit"],
+      approval_status: ["pending", "approved", "rejected"],
     },
   },
 } as const

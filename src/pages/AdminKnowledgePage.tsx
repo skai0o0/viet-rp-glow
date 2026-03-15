@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
 import {
   Loader2,
@@ -67,7 +67,7 @@ const emptyItem = {
 
 const AdminKnowledgePage = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, checking: checkingRole } = useIsAdmin();
+  const { isAdmin, isAdminOrOp, checking: checkingRole } = useUserRole();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,7 +104,7 @@ const AdminKnowledgePage = () => {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !isAdminOrOp) {
     return <Navigate to="/" replace />;
   }
 
@@ -225,6 +225,8 @@ const AdminKnowledgePage = () => {
             onClick={openAdd}
             size="sm"
             className="bg-neon-purple hover:bg-neon-purple/80 text-white"
+            disabled={!isAdmin}
+            title={!isAdmin ? "Chỉ Admin mới có quyền thêm" : ""}
           >
             <Plus size={14} className="mr-1" /> Thêm mục
           </Button>
@@ -358,23 +360,27 @@ const AdminKnowledgePage = () => {
                                   >
                                     <Copy size={12} className="mr-1" /> Copy
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openEdit(item)}
-                                    className="border-neon-purple/30 text-neon-purple hover:bg-neon-purple/10"
-                                  >
-                                    <Pencil size={12} className="mr-1" />{" "}
-                                    Chỉnh sửa
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setDeleteConfirm(item.id)}
-                                    className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-                                  >
-                                    <Trash2 size={12} className="mr-1" /> Xoá
-                                  </Button>
+                                  {isAdmin && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openEdit(item)}
+                                        className="border-neon-purple/30 text-neon-purple hover:bg-neon-purple/10"
+                                      >
+                                        <Pencil size={12} className="mr-1" />{" "}
+                                        Chỉnh sửa
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setDeleteConfirm(item.id)}
+                                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                      >
+                                        <Trash2 size={12} className="mr-1" /> Xoá
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </motion.div>

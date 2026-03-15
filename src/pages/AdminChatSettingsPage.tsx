@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,7 +16,7 @@ import type { CharacterCard } from "@/types/character";
 
 const AdminChatSettingsPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, checking } = useIsAdmin();
+  const { isAdminOrOp, checking } = useUserRole();
 
   const [characters, setCharacters] = useState<{ id: string; name: string }[]>([]);
   const [selectedCharId, setSelectedCharId] = useState<string>("");
@@ -24,7 +24,7 @@ const AdminChatSettingsPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdminOrOp) return;
     supabase
       .from("characters")
       .select("id, name")
@@ -32,7 +32,7 @@ const AdminChatSettingsPage = () => {
       .then(({ data }) => {
         if (data) setCharacters(data);
       });
-  }, [isAdmin]);
+  }, [isAdminOrOp]);
 
   if (isLoading || checking) {
     return (
@@ -42,7 +42,7 @@ const AdminChatSettingsPage = () => {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !isAdminOrOp) {
     return <Navigate to="/" replace />;
   }
 
