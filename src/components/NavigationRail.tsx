@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert, Wand2 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -116,6 +116,37 @@ const NavigationRail = () => {
         {topItems.map((item) => (
           <NavItem key={item.path} item={item} />
         ))}
+
+        {/* AI Card Generator - for admin, op & moderator */}
+        {canViewAdminHub && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <NavLink to="/admin/chargen" className="block">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
+                    location.pathname === "/admin/chargen"
+                      ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
+                  }`}
+                >
+                  <Wand2 size={20} />
+                  {location.pathname === "/admin/chargen" && (
+                    <motion.div
+                      layoutId="nav-indicator"
+                      className="absolute -left-[14px] w-[3px] h-5 rounded-r-full bg-neon-purple shadow-neon-purple"
+                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    />
+                  )}
+                </motion.div>
+              </NavLink>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
+              AI Card Generator
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
       {/* Bottom items */}
