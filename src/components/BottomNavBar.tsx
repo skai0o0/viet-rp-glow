@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert, Wand2 } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,7 +21,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 const navItems = [
   { icon: Home, label: "Khám phá", path: "/" },
   { icon: MessageSquare, label: "Chat", path: "/chat" },
-  { icon: PlusCircle, label: "Tạo", path: "/create" },
+  { icon: PlusCircle, label: "Tạo Card", path: "/create", aliases: ["/admin/chargen"] },
 ];
 
 const BottomNavBar = () => {
@@ -52,10 +52,30 @@ const BottomNavBar = () => {
     navigate("/");
   };
 
+  const handleCopyMarkdown = async () => {
+    try {
+      const mod = await import("turndown");
+      const TurndownService = mod.default ?? mod;
+      const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+      const main = document.querySelector("main") || document.body;
+      const md = td.turndown(main.innerHTML);
+      await copyToClipboard(md);
+      toast.success("Đã copy markdown vào clipboard");
+    } catch (err) {
+      console.error("Copy MD error:", err);
+      toast.error("Không thể copy markdown");
+    }
+  };
+
+  const isItemActive = (item: typeof navItems[number]) => {
+    if (location.pathname === item.path) return true;
+    return item.aliases?.includes(location.pathname) ?? false;
+  };
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-oled-surface border-t border-gray-border flex items-center justify-around px-2" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', height: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
       {navItems.map((item) => {
-        const isActive = location.pathname === item.path;
+        const isActive = isItemActive(item);
         const Icon = item.icon;
 
         return (
@@ -91,116 +111,6 @@ const BottomNavBar = () => {
           </NavLink>
         );
       })}
-
-      {/* AI Card Generator - for admin, op & moderator */}
-      {canViewAdminHub && (
-        <NavLink to="/admin/chargen" className="flex-1">
-          <motion.div
-            whileTap={{ scale: 0.9 }}
-            className="flex flex-col items-center gap-0.5"
-          >
-            <div
-              className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
-                location.pathname === "/admin/chargen"
-                  ? "text-neon-purple bg-neon-purple/10"
-                  : "text-muted-foreground"
-              }`}
-            >
-              <Wand2 size={20} />
-            </div>
-            <span
-              className={`text-[10px] transition-colors duration-200 ${
-                location.pathname === "/admin/chargen" ? "text-neon-purple font-medium" : "text-muted-foreground"
-              }`}
-            >
-              AI Tạo Card
-            </span>
-            {location.pathname === "/admin/chargen" && (
-              <motion.div
-                layoutId="bottom-nav-indicator"
-                className="absolute bottom-1 w-8 h-[2px] rounded-full bg-neon-purple shadow-neon-purple"
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              />
-            )}
-          </motion.div>
-        </NavLink>
-      )}
-
-      {/* Export Markdown - for admin, op & moderator on chat pages */}
-      {canViewAdminHub && (
-        <button
-          className="flex-1"
-          onClick={async () => {
-            try {
-              const mod = await import("turndown");
-              const TurndownService = mod.default ?? mod;
-              const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
-              const main = document.querySelector("main") || document.body;
-              const md = td.turndown(main.innerHTML);
-              await copyToClipboard(md);
-              toast.success("Đã copy markdown vào clipboard");
-            } catch (err) {
-              console.error("Copy MD error:", err);
-              toast.error("Không thể copy markdown");
-            }
-          }}
-        >
-          <motion.div
-            whileTap={{ scale: 0.9 }}
-            className="flex flex-col items-center gap-0.5"
-          >
-            <div className="flex items-center justify-center w-10 h-8 rounded-lg text-neon-rose/60 transition-colors duration-200">
-              <FileText size={20} />
-            </div>
-            <span className="text-[10px] text-neon-rose/60">MD</span>
-          </motion.div>
-        </button>
-      )}
-
-      {/* Admin Hub - for admin, op & moderator */}
-      {canViewAdminHub && (
-        <NavLink to="/admin" className="flex-1">
-          <motion.div
-            whileTap={{ scale: 0.9 }}
-            className="flex flex-col items-center gap-0.5"
-          >
-            <div
-              className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
-                location.pathname.startsWith("/admin")
-                  ? isOp
-                    ? "text-neon-blue bg-neon-blue/10"
-                    : isModerator
-                    ? "text-yellow-400 bg-yellow-400/10"
-                    : "text-neon-rose bg-neon-rose/10"
-                  : isOp
-                    ? "text-neon-blue/60"
-                    : isModerator
-                    ? "text-yellow-400/60"
-                    : "text-neon-rose/60"
-              }`}
-            >
-              <ShieldCheck size={20} />
-            </div>
-            <span
-              className={`text-[10px] transition-colors duration-200 ${
-                location.pathname.startsWith("/admin")
-                  ? isOp
-                    ? "text-neon-blue font-medium"
-                    : isModerator
-                    ? "text-yellow-400 font-medium"
-                    : "text-neon-rose font-medium"
-                  : isOp
-                    ? "text-neon-blue/60"
-                    : isModerator
-                    ? "text-yellow-400/60"
-                    : "text-neon-rose/60"
-              }`}
-            >
-              {isOp ? "Op Hub" : isModerator ? "Mod Hub" : "Admin"}
-            </span>
-          </motion.div>
-        </NavLink>
-      )}
 
       {/* Settings dropdown */}
       {user ? (
@@ -278,29 +188,53 @@ const BottomNavBar = () => {
 
       {/* Profile - direct link */}
       {user ? (
-        <NavLink to="/profile" className="flex-1">
-          <motion.div
-            whileTap={{ scale: 0.9 }}
-            className="flex flex-col items-center gap-0.5"
-          >
-            <div
-              className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
-                location.pathname === "/profile"
-                  ? "text-neon-purple bg-neon-purple/10"
-                  : "text-muted-foreground"
-              }`}
-            >
-              <User size={20} />
-            </div>
-            <span
-              className={`text-[10px] transition-colors duration-200 ${
-                location.pathname === "/profile" ? "text-neon-purple font-medium" : "text-muted-foreground"
-              }`}
-            >
-              Hồ sơ
-            </span>
-          </motion.div>
-        </NavLink>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex-1">
+              <motion.div
+                whileTap={{ scale: 0.9 }}
+                className="flex flex-col items-center gap-0.5"
+              >
+                <div
+                  className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
+                    location.pathname === "/profile" || location.pathname.startsWith("/admin")
+                      ? "text-neon-purple bg-neon-purple/10"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <User size={20} />
+                </div>
+                <span
+                  className={`text-[10px] transition-colors duration-200 ${
+                    location.pathname === "/profile" || location.pathname.startsWith("/admin")
+                      ? "text-neon-purple font-medium"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  Hồ sơ
+                </span>
+              </motion.div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="center" className="bg-oled-elevated border-gray-border w-56 mb-2 z-50">
+            <DropdownMenuItem onClick={() => navigate("/profile")} className="text-foreground focus:bg-oled-surface cursor-pointer">
+              <User size={14} className="mr-2" /> Hồ sơ của tôi
+            </DropdownMenuItem>
+            {canViewAdminHub && (
+              <>
+                <DropdownMenuSeparator className="bg-gray-border" />
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Công cụ nâng cao</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => navigate("/admin")} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                  <ShieldCheck size={14} className={`mr-2 ${isOp ? "text-neon-blue" : isModerator ? "text-yellow-400" : "text-neon-rose"}`} />
+                  {isOp ? "Op Hub" : isModerator ? "Mod Hub" : "Admin Hub"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCopyMarkdown} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                  <FileText size={14} className="mr-2 text-neon-rose" /> Copy Markdown
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : (
         <NavLink to="/auth" className="flex-1">
           <motion.div

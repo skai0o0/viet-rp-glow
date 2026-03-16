@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Navigate, Link, useNavigate } from "react-router-dom";
+import { Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -205,6 +205,7 @@ const AdminCharGenPage = () => {
   const { user, isLoading } = useAuth();
   const { canViewAdminHub, canEditAdminHub, checking } = useUserRole();
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobile();
 
   // Panel state
@@ -928,6 +929,19 @@ const AdminCharGenPage = () => {
             <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">Làm mới</TooltipContent>
           </Tooltip>
         </div>
+      </div>
+
+      <div className="shrink-0 px-3 py-2 border-b border-gray-border bg-oled-surface/30">
+        <Tabs value={location.pathname === "/admin/chargen" ? "ai" : "manual"} className="w-full max-w-md">
+          <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
+            <TabsTrigger value="manual" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+              <Link to="/create">Tạo Card</Link>
+            </TabsTrigger>
+            <TabsTrigger value="ai" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+              <Link to="/admin/chargen">AI Charagen</Link>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* ═══════ Main content area — flex row ═══════ */}

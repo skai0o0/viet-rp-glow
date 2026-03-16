@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert, Wand2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,16 +27,16 @@ import { copyToClipboard } from "@/utils/clipboard";
 const topItems = [
   { icon: Home, label: "Khám phá", path: "/" },
   { icon: MessageSquare, label: "Cuộc trò chuyện", path: "/chat" },
-  { icon: PlusCircle, label: "Tạo nhân vật", path: "/create" },
+  { icon: PlusCircle, label: "Tạo Card", path: "/create", aliases: ["/admin/chargen"] },
 ];
 
 const NavItem = ({
   item,
 }: {
-  item: { icon: React.ElementType; label: string; path: string };
+  item: { icon: React.ElementType; label: string; path: string; aliases?: string[] };
 }) => {
   const location = useLocation();
-  const isActive = location.pathname === item.path;
+  const isActive = location.pathname === item.path || (item.aliases?.includes(location.pathname) ?? false);
   const Icon = item.icon;
 
   return (
@@ -77,6 +77,15 @@ const NavigationRail = () => {
   const location = useLocation();
 
   const [nsfwMode, setNsfwMode] = useState(() => localStorage.getItem("vietrp_nsfw_mode") === "true");
+  const [isPortraitTablet, setIsPortraitTablet] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1024px) and (orientation: portrait)");
+    const onChange = () => setIsPortraitTablet(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   const handleNsfwToggle = async (checked: boolean) => {
     setNsfwMode(checked);
@@ -98,6 +107,23 @@ const NavigationRail = () => {
     navigate("/");
   };
 
+  const handleCopyMarkdown = async () => {
+    try {
+      const mod = await import("turndown");
+      const TurndownService = mod.default ?? mod;
+      const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+      const main = document.querySelector("main") || document.body;
+      const md = td.turndown(main.innerHTML);
+      await copyToClipboard(md);
+      toast.success("Đã copy markdown vào clipboard");
+    } catch (err) {
+      console.error("Copy MD error:", err);
+      toast.error("Không thể copy markdown");
+    }
+  };
+
+  const moveAdminShortcutsIntoProfile = isPortraitTablet;
+
   return (
     <nav className="hidden md:flex flex-col items-center w-16 h-[100dvh] bg-oled-surface border-r border-gray-border py-4 flex-shrink-0">
       {/* Brand */}
@@ -117,61 +143,18 @@ const NavigationRail = () => {
           <NavItem key={item.path} item={item} />
         ))}
 
-        {/* AI Card Generator - for admin, op & moderator */}
-        {canViewAdminHub && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <NavLink to="/admin/chargen" className="block">
-                <motion.div
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
-                    location.pathname === "/admin/chargen"
-                      ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
-                  }`}
-                >
-                  <Wand2 size={20} />
-                  {location.pathname === "/admin/chargen" && (
-                    <motion.div
-                      layoutId="nav-indicator"
-                      className="absolute -left-[14px] w-[3px] h-5 rounded-r-full bg-neon-purple shadow-neon-purple"
-                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                    />
-                  )}
-                </motion.div>
-              </NavLink>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
-              AI Card Generator
-            </TooltipContent>
-          </Tooltip>
-        )}
       </div>
 
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
         {/* Export Markdown - for admin & op on chat pages */}
-        {canViewAdminHub && (
+        {canViewAdminHub && !moveAdminShortcutsIntoProfile && (
           <Tooltip>
             <TooltipTrigger asChild>
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={async () => {
-                  try {
-                    const mod = await import("turndown");
-                    const TurndownService = mod.default ?? mod;
-                    const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
-                    const main = document.querySelector("main") || document.body;
-                    const md = td.turndown(main.innerHTML);
-                    await copyToClipboard(md);
-                    toast.success("Đã copy markdown vào clipboard");
-                  } catch (err) {
-                    console.error("Copy MD error:", err);
-                    toast.error("Không thể copy markdown");
-                  }
-                }}
+                onClick={handleCopyMarkdown}
                 className="relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
               >
                 <FileText size={20} />
@@ -184,7 +167,7 @@ const NavigationRail = () => {
         )}
 
         {/* Admin Hub - for admin, op & moderator */}
-        {canViewAdminHub && (
+        {canViewAdminHub && !moveAdminShortcutsIntoProfile && (
           <Tooltip>
             <TooltipTrigger asChild>
               <NavLink to="/admin" className="block">
@@ -275,35 +258,78 @@ const NavigationRail = () => {
           <NavItem item={{ icon: Settings, label: "Cài đặt", path: "/settings" }} />
         )}
 
-        {/* Profile - direct link */}
+        {/* Profile */}
         {user ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <NavLink to="/profile" className="block">
-                <motion.div
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
-                    location.pathname === "/profile"
-                      ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
-                  }`}
-                >
-                  <User size={20} />
-                  {location.pathname === "/profile" && (
-                    <motion.div
-                      layoutId="nav-indicator"
-                      className="absolute -left-[14px] w-[3px] h-5 rounded-r-full bg-neon-purple shadow-neon-purple"
-                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                    />
-                  )}
-                </motion.div>
-              </NavLink>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
-              Hồ sơ
-            </TooltipContent>
-          </Tooltip>
+          moveAdminShortcutsIntoProfile ? (
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
+                        location.pathname === "/profile" || location.pathname.startsWith("/admin")
+                          ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                          : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
+                      }`}
+                    >
+                      <User size={20} />
+                    </motion.button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
+                  Hồ sơ
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent side="right" align="end" className="bg-oled-elevated border-gray-border w-56 z-50">
+                <DropdownMenuItem onClick={() => navigate("/profile")} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                  <User size={14} className="mr-2" /> Hồ sơ của tôi
+                </DropdownMenuItem>
+                {canViewAdminHub && (
+                  <>
+                    <DropdownMenuSeparator className="bg-gray-border" />
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Công cụ nâng cao</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate("/admin")} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                      <ShieldCheck size={14} className={`mr-2 ${isOp ? "text-neon-blue" : isModerator ? "text-yellow-400" : "text-neon-rose"}`} />
+                      {isOp ? "Op Hub" : isModerator ? "Mod Hub" : "Admin Hub"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCopyMarkdown} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                      <FileText size={14} className="mr-2 text-neon-rose" /> Copy Markdown
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <NavLink to="/profile" className="block">
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
+                      location.pathname === "/profile"
+                        ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                        : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
+                    }`}
+                  >
+                    <User size={20} />
+                    {location.pathname === "/profile" && (
+                      <motion.div
+                        layoutId="nav-indicator"
+                        className="absolute -left-[14px] w-[3px] h-5 rounded-r-full bg-neon-purple shadow-neon-purple"
+                        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                      />
+                    )}
+                  </motion.div>
+                </NavLink>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="bg-oled-elevated border-gray-border text-foreground">
+                Hồ sơ
+              </TooltipContent>
+            </Tooltip>
+          )
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>

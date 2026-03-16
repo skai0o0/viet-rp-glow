@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, Upload, ImagePlus } from "lucide-react";
 import { readJsonFile } from "@/utils/importCharacterJson";
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   TavernCardV2,
   TavernCardV2Data,
@@ -35,6 +36,8 @@ const sectionCard =
 
 const CreatePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { canViewAdminHub } = useUserRole();
   const [card, setCard] = useState<TavernCardV2>(createEmptyTavernCard());
   const [tagInput, setTagInput] = useState("");
   const [greetingDraft, setGreetingDraft] = useState("");
@@ -230,6 +233,21 @@ const CreatePage = () => {
             <span className="hidden sm:inline ml-1">Xem trước</span>
           </Button>
         </div>
+      </div>
+
+      <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/30">
+        <Tabs value={location.pathname === "/admin/chargen" ? "ai" : "manual"} className="w-full max-w-md">
+          <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
+            <TabsTrigger value="manual" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+              <Link to="/create">Tạo Card</Link>
+            </TabsTrigger>
+            {canViewAdminHub && (
+              <TabsTrigger value="ai" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+                <Link to="/admin/chargen">AI Charagen</Link>
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Form Body */}
