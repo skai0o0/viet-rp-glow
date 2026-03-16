@@ -42,7 +42,7 @@ import {
 
 const AdminApiSettingsPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdminOrOp, checking } = useUserRole();
+  const { canViewAdminHub, canEditAdminHub, checking } = useUserRole();
 
   // API verification
   const [testApiKey, setTestApiKey] = useState("");
@@ -185,7 +185,7 @@ const AdminApiSettingsPage = () => {
     );
   }
 
-  if (!user || !isAdminOrOp) {
+  if (!user || !canViewAdminHub) {
     return <Navigate to="/" replace />;
   }
 
@@ -314,20 +314,28 @@ const AdminApiSettingsPage = () => {
                       {model.provider}
                     </span>
                     <button
-                      onClick={() => handleToggleRecommended(model)}
+                      onClick={() => canEditAdminHub && handleToggleRecommended(model)}
                       className={`p-1.5 rounded-lg transition-colors ${
                         model.is_recommended
                           ? "text-yellow-500 bg-yellow-500/10"
-                          : "text-muted-foreground/40 hover:text-yellow-500 hover:bg-yellow-500/10"
+                          : canEditAdminHub
+                          ? "text-muted-foreground/40 hover:text-yellow-500 hover:bg-yellow-500/10"
+                          : "text-muted-foreground/20 cursor-not-allowed"
                       }`}
-                      title={model.is_recommended ? "Bỏ đề xuất" : "Đánh dấu đề xuất"}
+                      title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thay đổi" : model.is_recommended ? "Bỏ đề xuất" : "Đánh dấu đề xuất"}
+                      disabled={!canEditAdminHub}
                     >
                       <Star size={14} />
                     </button>
                     <button
-                      onClick={() => handleRemoveModel(model.id)}
-                      className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      title="Xoá model"
+                      onClick={() => canEditAdminHub && handleRemoveModel(model.id)}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        canEditAdminHub
+                          ? "text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10"
+                          : "text-muted-foreground/20 cursor-not-allowed"
+                      }`}
+                      title={canEditAdminHub ? "Xoá model" : "Chỉ Admin/Op mới có quyền xoá"}
+                      disabled={!canEditAdminHub}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -421,10 +429,11 @@ const AdminApiSettingsPage = () => {
                           ) : (
                             <Button
                               onClick={() => handleAddModel(model)}
-                              disabled={adding === model.id}
+                              disabled={adding === model.id || !canEditAdminHub}
                               size="sm"
                               variant="ghost"
                               className="h-8 w-8 p-0 text-muted-foreground hover:text-neon-purple hover:bg-neon-purple/10"
+                              title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm model" : undefined}
                             >
                               {adding === model.id ? (
                                 <Loader2 size={14} className="animate-spin" />

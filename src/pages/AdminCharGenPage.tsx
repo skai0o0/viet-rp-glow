@@ -203,7 +203,7 @@ function extractCardJson(raw: string): TavernCardV2 | null {
 /* ------------------------------------------------------------------ */
 const AdminCharGenPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdminOrOp, checking } = useUserRole();
+  const { canViewAdminHub, canEditAdminHub, checking } = useUserRole();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -527,7 +527,7 @@ const AdminCharGenPage = () => {
       </div>
     );
   }
-  if (!user || !isAdminOrOp) return <Navigate to="/" replace />;
+  if (!user || !canViewAdminHub) return <Navigate to="/" replace />;
 
   const cardFieldLabel = "text-xs font-medium text-muted-foreground uppercase tracking-wider";
   const cardTextarea =
@@ -741,11 +741,12 @@ const AdminCharGenPage = () => {
                 <p className="text-sm font-medium text-foreground">Công khai</p>
                 <p className="text-[11px] text-muted-foreground">Hiển thị trên Hub</p>
               </div>
-              <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+              <Switch checked={isPublic} onCheckedChange={canEditAdminHub ? setIsPublic : undefined} disabled={!canEditAdminHub} />
             </div>
             <Button
               onClick={handlePublish}
-              disabled={publishing}
+              disabled={publishing || !canEditAdminHub}
+              title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền xuất bản" : undefined}
               className="w-full bg-gradient-to-r from-neon-purple to-neon-blue hover:opacity-90 text-white font-semibold"
             >
               {publishing ? <Loader2 size={16} className="animate-spin mr-2" /> : <Upload size={16} className="mr-2" />}
@@ -818,7 +819,7 @@ const AdminCharGenPage = () => {
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-neon-purple" onClick={() => navigate(`/edit/${char.id}`)}>
                   <Pencil size={12} />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-neon-rose" onClick={() => handleDeleteChar(char.id, char.name)} disabled={deletingId === char.id}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-neon-rose" onClick={() => handleDeleteChar(char.id, char.name)} disabled={deletingId === char.id || !canEditAdminHub} title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền xoá" : undefined}>
                   {deletingId === char.id ? <Loader2 size={12} className="animate-spin" /> : <Trash size={12} />}
                 </Button>
               </div>

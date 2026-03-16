@@ -28,7 +28,7 @@ const BottomNavBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { isAdmin, isAdminOrOp, isOp } = useUserRole();
+  const { isOp, isModerator, canViewAdminHub } = useUserRole();
 
   const [nsfwMode, setNsfwMode] = useState(() => localStorage.getItem("vietrp_nsfw_mode") === "true");
 
@@ -92,8 +92,8 @@ const BottomNavBar = () => {
         );
       })}
 
-      {/* Export Markdown - for admin & op on chat pages */}
-      {isAdminOrOp && (
+      {/* Export Markdown - for admin, op & moderator on chat pages */}
+      {canViewAdminHub && (
         <button
           className="flex-1"
           onClick={async () => {
@@ -123,8 +123,8 @@ const BottomNavBar = () => {
         </button>
       )}
 
-      {/* Admin Hub - for admin & op */}
-      {isAdminOrOp && (
+      {/* Admin Hub - for admin, op & moderator */}
+      {canViewAdminHub && (
         <NavLink to="/admin" className="flex-1">
           <motion.div
             whileTap={{ scale: 0.9 }}
@@ -135,9 +135,13 @@ const BottomNavBar = () => {
                 location.pathname.startsWith("/admin")
                   ? isOp
                     ? "text-neon-blue bg-neon-blue/10"
+                    : isModerator
+                    ? "text-yellow-400 bg-yellow-400/10"
                     : "text-neon-rose bg-neon-rose/10"
                   : isOp
                     ? "text-neon-blue/60"
+                    : isModerator
+                    ? "text-yellow-400/60"
                     : "text-neon-rose/60"
               }`}
             >
@@ -148,13 +152,17 @@ const BottomNavBar = () => {
                 location.pathname.startsWith("/admin")
                   ? isOp
                     ? "text-neon-blue font-medium"
+                    : isModerator
+                    ? "text-yellow-400 font-medium"
                     : "text-neon-rose font-medium"
                   : isOp
                     ? "text-neon-blue/60"
+                    : isModerator
+                    ? "text-yellow-400/60"
                     : "text-neon-rose/60"
               }`}
             >
-              {isOp ? "Op Hub" : "Admin"}
+              {isOp ? "Op Hub" : isModerator ? "Mod Hub" : "Admin"}
             </span>
           </motion.div>
         </NavLink>
