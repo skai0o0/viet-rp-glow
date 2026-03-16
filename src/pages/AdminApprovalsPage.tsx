@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { applyApprovalPayload, ACTION_LABELS } from "@/services/approvalService";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -96,7 +97,7 @@ function timeAgo(dateStr: string): string {
 /* ------------------------------------------------------------------ */
 const AdminApprovalsPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, isOp, isModerator, canViewAdminHub, checking } = useUserRole();
+  const { isAdmin, isAdminOrOp, isOp, checking } = useUserRole();
 
   const [items, setItems] = useState<ApprovalItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,10 +158,10 @@ const AdminApprovalsPage = () => {
   }, [isOp, isAdmin, user]);
 
   useEffect(() => {
-    if (!canViewAdminHub) return;
+    if (!isAdminOrOp) return;
     setLoading(true);
     fetchItems().finally(() => setLoading(false));
-  }, [canViewAdminHub, fetchItems]);
+  }, [isAdminOrOp, fetchItems]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -174,6 +175,21 @@ const AdminApprovalsPage = () => {
     if (!reviewDialog || !user) return;
     setSubmitting(true);
     try {
+      // Auto-apply changes when approving admin_edit type
+      if (
+        reviewDialog.action === "approved" &&
+        reviewDialog.item.type === "admin_edit" &&
+        reviewDialog.item.payload
+      ) {
+        try {
+          await applyApprovalPayload(reviewDialog.item.payload);
+        } catch (applyErr: any) {
+          toast.error(`Không thể áp dụng thay đổi: ${applyErr.message}`);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from("pending_approvals")
         .update({
@@ -186,7 +202,11 @@ const AdminApprovalsPage = () => {
 
       if (error) throw error;
 
-      toast.success(reviewDialog.action === "approved" ? "Đã duyệt yêu cầu!" : "Đã từ chối yêu cầu!");
+      toast.success(
+        reviewDialog.action === "approved"
+          ? "Đã duyệt & áp dụng thay đổi!"
+          : "Đã từ chối yêu cầu!",
+      );
       setReviewDialog(null);
       setReviewNote("");
       await fetchItems();
@@ -216,7 +236,7 @@ const AdminApprovalsPage = () => {
     );
   }
 
-  if (!user || !canViewAdminHub) return <Navigate to="/" replace />;
+  if (!user || !isAdminOrOp) return <Navigate to="/" replace />;
 
   /* ---------- Render ---------- */
   return (
@@ -247,11 +267,7 @@ const AdminApprovalsPage = () => {
                 )}
               </div>
               <p className="text-sm text-muted-foreground">
-                {isAdmin
-                  ? "Duyệt yêu cầu chỉnh sửa từ Operator"
-                  : isModerator
-                  ? "Xem tất cả yêu cầu chỉnh sửa (Read-Only)"
-                  : "Theo dõi yêu cầu chỉnh sửa của bạn"}
+                {isAdmin ? "Duyệt yêu cầu chỉnh sửa từ Operator" : "Theo dõi yêu cầu chỉnh sửa của bạn"}
               </p>
             </div>
           </div>
@@ -451,6 +467,19 @@ const AdminApprovalsPage = () => {
                               className="overflow-hidden"
                             >
                               <div className="mt-3 pt-3 border-t border-gray-border">
+                                {item.type === "admin_edit" && typeof item.payload === "object" && (item.payload as any)?.action && (
+                                  <div className="mb-2 flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px] border-neon-purple/30 text-neon-purple">
+                                      {ACTION_LABELS[(item.payload as any).action] ?? (item.payload as any).action}
+                                    </Badge>
+                                    {(item.payload as any).target_table && (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        → {(item.payload as any).target_table}
+                                        {(item.payload as any).target_id ? ` #${String((item.payload as any).target_id).slice(0, 8)}` : ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Payload dữ liệu</p>
                                 <pre className="bg-oled-base rounded-lg p-3 text-xs text-foreground/80 font-mono overflow-x-auto max-h-64 whitespace-pre-wrap break-words">
                                   {JSON.stringify(item.payload, null, 2)}

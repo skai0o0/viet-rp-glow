@@ -57,6 +57,7 @@ import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKey, getModel, setModel, streamChat, type StreamCallbacks } from "@/services/openRouter";
 import JSON5 from "json5";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
+import { createApproval } from "@/services/approvalService";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -203,7 +204,7 @@ function extractCardJson(raw: string): TavernCardV2 | null {
 /* ------------------------------------------------------------------ */
 const AdminCharGenPage = () => {
   const { user, isLoading } = useAuth();
-  const { canViewAdminHub, canEditAdminHub, checking } = useUserRole();
+  const { isAdmin, isOp, canViewAdminHub, canEditAdminHub, checking } = useUserRole();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -483,6 +484,28 @@ const AdminCharGenPage = () => {
           .from("character-avatars")
           .getPublicUrl(filePath);
         avatarUrl = urlData.publicUrl;
+      }
+
+      if (isOp && !isAdmin) {
+        await createApproval(
+          user.id,
+          `Xuất bản nhân vật: ${generatedCard.data.name}`,
+          {
+            action: "chargen_publish",
+            target_table: "characters",
+            data: {
+              card: generatedCard as unknown as Record<string, unknown>,
+              owner_id: ownerId,
+              is_public: isPublic,
+              avatar_url: avatarUrl,
+            },
+          },
+        );
+        toast.success("Yêu cầu xuất bản đã gửi cho Admin duyệt!", {
+          description: generatedCard.data.name,
+        });
+        setPublishing(false);
+        return;
       }
 
       const saved = await createCharacter(generatedCard, ownerId, isPublic, undefined, avatarUrl);

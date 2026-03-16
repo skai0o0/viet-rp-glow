@@ -5,6 +5,7 @@ const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const STORAGE_KEY_API = "vietrp_openrouter_key";
 const STORAGE_KEY_MODEL = "vietrp_openrouter_model";
+const STORAGE_KEY_VERIFIED = "vietrp_key_verified";
 
 // Fallback models if API fetch fails
 export const AVAILABLE_MODELS = [
@@ -28,7 +29,17 @@ export function getApiKey(): string {
 }
 
 export function setApiKey(key: string) {
+  const old = localStorage.getItem(STORAGE_KEY_API);
   localStorage.setItem(STORAGE_KEY_API, key);
+  if (key !== old) localStorage.removeItem(STORAGE_KEY_VERIFIED);
+}
+
+export function isKeyVerified(): boolean {
+  return localStorage.getItem(STORAGE_KEY_VERIFIED) === "true";
+}
+
+export function markKeyVerified() {
+  localStorage.setItem(STORAGE_KEY_VERIFIED, "true");
 }
 
 export function getModel(): string {

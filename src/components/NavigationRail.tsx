@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePendingApprovalCount } from "@/hooks/usePendingApprovalCount";
 import { Switch } from "@/components/ui/switch";
 import { upsertProfile } from "@/services/profileDb";
 import { dispatchNsfwModeChange } from "@/hooks/useNsfwMode";
@@ -72,7 +73,8 @@ const NavItem = ({
 
 const NavigationRail = () => {
   const { user, logout } = useAuth();
-  const { isOp, isModerator, canViewAdminHub } = useUserRole();
+  const { isAdmin, isOp, isModerator, canViewAdminHub } = useUserRole();
+  const pendingCount = usePendingApprovalCount(isAdmin);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -189,6 +191,11 @@ const NavigationRail = () => {
                   }`}
                 >
                   <ShieldCheck size={20} />
+                  {pendingCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-yellow-400 text-oled-base text-[9px] font-bold flex items-center justify-center px-1 shadow-lg">
+                      {pendingCount > 9 ? "9+" : pendingCount}
+                    </span>
+                  )}
                   {location.pathname.startsWith("/admin") && (
                     <motion.div
                       layoutId="nav-indicator"

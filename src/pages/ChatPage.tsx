@@ -5,7 +5,7 @@ import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Pl
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
-import { streamChat, getApiKey } from "@/services/openRouter";
+import { streamChat, getApiKey, isKeyVerified, verifyApiKey, markKeyVerified } from "@/services/openRouter";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
 import {
@@ -311,12 +311,25 @@ const ChatPage = () => {
 
   const handleSend = useCallback(
     async (content: string) => {
-      if (!getApiKey()) {
+      const key = getApiKey();
+      if (!key) {
         toast.error("Vui lòng nhập API Key của OpenRouter trong phần Cài Đặt.", {
           action: { label: "Đi tới Cài Đặt", onClick: () => navigate("/settings") },
         });
         return;
       }
+
+      if (!isKeyVerified()) {
+        const result = await verifyApiKey(key);
+        if (!result.valid) {
+          toast.error(result.error || "API Key không hợp lệ. Vui lòng kiểm tra lại.", {
+            action: { label: "Đi tới Cài Đặt", onClick: () => navigate("/settings") },
+          });
+          return;
+        }
+        markKeyVerified();
+      }
+
       if (!activeCharacter) return;
 
       // Ensure session exists in DB (creates on first user message)

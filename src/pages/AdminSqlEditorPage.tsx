@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -100,7 +100,7 @@ function saveHistory(history: string[]) {
 
 const AdminSqlEditorPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, checking } = useIsAdmin();
+  const { canRunDangerousAdmin: isAdmin, checking } = useUserRole();
 
   const [sql, setSql] = useState("");
   const [running, setRunning] = useState(false);
