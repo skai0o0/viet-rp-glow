@@ -314,7 +314,7 @@ const AdminApiSettingsPage = () => {
                       {model.provider}
                     </span>
                     <button
-                      onClick={() => canEditAdminHub && handleToggleRecommended(model)}
+                      onClick={() => handleToggleRecommended(model)}
                       className={`p-1.5 rounded-lg transition-colors ${
                         model.is_recommended
                           ? "text-yellow-500 bg-yellow-500/10"
@@ -328,7 +328,7 @@ const AdminApiSettingsPage = () => {
                       <Star size={14} />
                     </button>
                     <button
-                      onClick={() => canEditAdminHub && handleRemoveModel(model.id)}
+                      onClick={() => handleRemoveModel(model.id)}
                       className={`p-1.5 rounded-lg transition-colors ${
                         canEditAdminHub
                           ? "text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10"

@@ -235,7 +235,8 @@ const AdminRoadmapPage = () => {
                       <CardHeader className="p-3 pb-1">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
                           <button
-                            onClick={() => canEditAdminHub && handleStatusToggle(item)}
+                            onClick={() => canEditAdminHub ? handleStatusToggle(item) : undefined}
+                            disabled={!canEditAdminHub}
                             className={`shrink-0 transition-transform ${canEditAdminHub ? "hover:scale-125 cursor-pointer" : "cursor-default opacity-60"}`}
                             title={canEditAdminHub ? "Click để đổi trạng thái" : "Chỉ Admin/Op mới có quyền thay đổi"}
                           >
