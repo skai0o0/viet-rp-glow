@@ -1181,7 +1181,7 @@ const AdminCharGenPage = () => {
           </div>
 
           {/* ─── Input bar — ChatPage style ─── */}
-          <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border">
+          <div className="p-3 pb-[calc(0.75rem+4rem+env(safe-area-inset-bottom,0px))] md:p-4 md:pb-4 bg-oled-base border-t border-gray-border">
             <div className="max-w-3xl mx-auto">
 
               {/* ── Model settings row ── */}
