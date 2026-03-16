@@ -72,7 +72,7 @@ const NavItem = ({
 
 const NavigationRail = () => {
   const { user, logout } = useAuth();
-  const { isAdmin, isAdminOrOp, isOp } = useUserRole();
+  const { isOp, isModerator, canViewAdminHub } = useUserRole();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -121,7 +121,7 @@ const NavigationRail = () => {
       {/* Bottom items */}
       <div className="flex flex-col items-center gap-2">
         {/* Export Markdown - for admin & op on chat pages */}
-        {isAdminOrOp && (
+        {canViewAdminHub && (
           <Tooltip>
             <TooltipTrigger asChild>
               <motion.button
@@ -152,8 +152,8 @@ const NavigationRail = () => {
           </Tooltip>
         )}
 
-        {/* Admin Hub - for admin & op */}
-        {isAdminOrOp && (
+        {/* Admin Hub - for admin, op & moderator */}
+        {canViewAdminHub && (
           <Tooltip>
             <TooltipTrigger asChild>
               <NavLink to="/admin" className="block">
@@ -164,9 +164,13 @@ const NavigationRail = () => {
                     location.pathname.startsWith("/admin")
                       ? isOp
                         ? "text-neon-blue shadow-neon-blue bg-neon-blue/10"
+                        : isModerator
+                        ? "text-yellow-400 bg-yellow-400/10"
                         : "text-neon-rose shadow-neon-rose bg-neon-rose/10"
                       : isOp
                         ? "text-neon-blue/60 hover:text-neon-blue hover:bg-neon-blue/10"
+                        : isModerator
+                        ? "text-yellow-400/60 hover:text-yellow-400 hover:bg-yellow-400/10"
                         : "text-neon-rose/60 hover:text-neon-rose hover:bg-neon-rose/10"
                   }`}
                 >
@@ -175,7 +179,7 @@ const NavigationRail = () => {
                     <motion.div
                       layoutId="nav-indicator"
                       className={`absolute -left-[14px] w-[3px] h-5 rounded-r-full ${
-                        isOp ? "bg-neon-blue shadow-neon-blue" : "bg-neon-rose shadow-neon-rose"
+                        isOp ? "bg-neon-blue shadow-neon-blue" : isModerator ? "bg-yellow-400" : "bg-neon-rose shadow-neon-rose"
                       }`}
                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
                     />

@@ -51,7 +51,7 @@ const emptyItem: Omit<RoadmapItem, "id"> = {
 
 const AdminRoadmapPage = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, isAdminOrOp, checking: checkingRole } = useUserRole();
+  const { isAdmin, canViewAdminHub, canEditAdminHub, checking: checkingRole } = useUserRole();
   const [items, setItems] = useState<RoadmapItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -95,7 +95,7 @@ const AdminRoadmapPage = () => {
     );
   }
 
-  if (!user || !isAdminOrOp) {
+  if (!user || !canViewAdminHub) {
     return <Navigate to="/" replace />;
   }
 
@@ -196,7 +196,7 @@ const AdminRoadmapPage = () => {
             <Map className="text-neon-blue" size={28} />
             <h1 className="text-2xl font-bold text-foreground">Roadmap phát triển</h1>
           </div>
-          <Button onClick={openAdd} size="sm" className="bg-neon-purple hover:bg-neon-purple/80 text-white" disabled={!isAdmin} title={!isAdmin ? "Chỉ Admin mới có quyền thêm" : ""}>
+          <Button onClick={openAdd} size="sm" className="bg-neon-purple hover:bg-neon-purple/80 text-white" disabled={!canEditAdminHub} title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm" : ""}>
             <Plus size={14} className="mr-1" /> Thêm mục
           </Button>
         </div>
@@ -235,9 +235,10 @@ const AdminRoadmapPage = () => {
                       <CardHeader className="p-3 pb-1">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
                           <button
-                            onClick={() => handleStatusToggle(item)}
-                            className="shrink-0 hover:scale-125 transition-transform"
-                            title="Click để đổi trạng thái"
+                            onClick={() => canEditAdminHub ? handleStatusToggle(item) : undefined}
+                            disabled={!canEditAdminHub}
+                            className={`shrink-0 transition-transform ${canEditAdminHub ? "hover:scale-125 cursor-pointer" : "cursor-default opacity-60"}`}
+                            title={canEditAdminHub ? "Click để đổi trạng thái" : "Chỉ Admin/Op mới có quyền thay đổi"}
                           >
                             <StatusIcon size={14} className={color} />
                           </button>

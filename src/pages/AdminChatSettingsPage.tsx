@@ -16,7 +16,7 @@ import type { CharacterCard } from "@/types/character";
 
 const AdminChatSettingsPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdminOrOp, checking } = useUserRole();
+  const { canViewAdminHub, checking } = useUserRole();
 
   const [characters, setCharacters] = useState<{ id: string; name: string }[]>([]);
   const [selectedCharId, setSelectedCharId] = useState<string>("");
@@ -24,7 +24,7 @@ const AdminChatSettingsPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isAdminOrOp) return;
+    if (!canViewAdminHub) return;
     supabase
       .from("characters")
       .select("id, name")
@@ -32,7 +32,7 @@ const AdminChatSettingsPage = () => {
       .then(({ data }) => {
         if (data) setCharacters(data);
       });
-  }, [isAdminOrOp]);
+  }, [canViewAdminHub]);
 
   if (isLoading || checking) {
     return (
@@ -42,7 +42,7 @@ const AdminChatSettingsPage = () => {
     );
   }
 
-  if (!user || !isAdminOrOp) {
+  if (!user || !canViewAdminHub) {
     return <Navigate to="/" replace />;
   }
 
