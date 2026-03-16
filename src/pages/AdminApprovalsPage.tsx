@@ -96,7 +96,7 @@ function timeAgo(dateStr: string): string {
 /* ------------------------------------------------------------------ */
 const AdminApprovalsPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, isAdminOrOp, isOp, checking } = useUserRole();
+  const { isAdmin, isOp, isModerator, canViewAdminHub, checking } = useUserRole();
 
   const [items, setItems] = useState<ApprovalItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,10 +157,10 @@ const AdminApprovalsPage = () => {
   }, [isOp, isAdmin, user]);
 
   useEffect(() => {
-    if (!isAdminOrOp) return;
+    if (!canViewAdminHub) return;
     setLoading(true);
     fetchItems().finally(() => setLoading(false));
-  }, [isAdminOrOp, fetchItems]);
+  }, [canViewAdminHub, fetchItems]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -216,7 +216,7 @@ const AdminApprovalsPage = () => {
     );
   }
 
-  if (!user || !isAdminOrOp) return <Navigate to="/" replace />;
+  if (!user || !canViewAdminHub) return <Navigate to="/" replace />;
 
   /* ---------- Render ---------- */
   return (
@@ -247,7 +247,11 @@ const AdminApprovalsPage = () => {
                 )}
               </div>
               <p className="text-sm text-muted-foreground">
-                {isAdmin ? "Duyệt yêu cầu chỉnh sửa từ Operator" : "Theo dõi yêu cầu chỉnh sửa của bạn"}
+                {isAdmin
+                  ? "Duyệt yêu cầu chỉnh sửa từ Operator"
+                  : isModerator
+                  ? "Xem tất cả yêu cầu chỉnh sửa (Read-Only)"
+                  : "Theo dõi yêu cầu chỉnh sửa của bạn"}
               </p>
             </div>
           </div>

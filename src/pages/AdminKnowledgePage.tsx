@@ -67,7 +67,7 @@ const emptyItem = {
 
 const AdminKnowledgePage = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, isAdminOrOp, checking: checkingRole } = useUserRole();
+  const { isAdmin, canViewAdminHub, canEditAdminHub, checking: checkingRole } = useUserRole();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,7 +104,7 @@ const AdminKnowledgePage = () => {
     );
   }
 
-  if (!user || !isAdminOrOp) {
+  if (!user || !canViewAdminHub) {
     return <Navigate to="/" replace />;
   }
 

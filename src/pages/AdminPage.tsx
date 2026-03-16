@@ -97,7 +97,7 @@ const StatCard = ({
 const AdminPage = () => {
   const { user, isLoading } = useAuth();
   const { isAdmin, checking } = useIsAdmin();
-  const { isAdminOrOp, isOp } = useUserRole();
+  const { isOp, isModerator, canViewAdminHub, canEditAdminHub } = useUserRole();
   const [prompt, setPrompt] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -168,7 +168,7 @@ const AdminPage = () => {
   };
 
   useEffect(() => {
-    if (!isAdminOrOp) return;
+    if (!canViewAdminHub) return;
     Promise.all([
       supabase.from("characters").select("id", { count: "exact", head: true }),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
@@ -180,7 +180,7 @@ const AdminPage = () => {
         sessions: String(sessions.count ?? 0),
       });
     });
-  }, [isAdminOrOp]);
+  }, [canViewAdminHub]);
 
   if (isLoading || checking) {
     return (
@@ -190,7 +190,7 @@ const AdminPage = () => {
     );
   }
 
-  if (!user || !isAdminOrOp) {
+  if (!user || !canViewAdminHub) {
     return <Navigate to="/" replace />;
   }
 
@@ -374,16 +374,18 @@ const AdminPage = () => {
           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${
             isOp
               ? "bg-gradient-to-br from-neon-blue to-cyan-500"
+              : isModerator
+              ? "bg-gradient-to-br from-yellow-500 to-amber-600"
               : "bg-gradient-to-br from-neon-rose to-neon-purple"
           }`}>
             <Shield className="text-white" size={24} />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {isOp ? "Operator Hub" : "Admin Hub"}
+              {isOp ? "Operator Hub" : isModerator ? "Moderator Hub" : "Admin Hub"}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {isOp ? "Quản lý hệ thống VietRP (Operator)" : "Quản trị hệ thống VietRP"}
+              {isOp ? "Quản lý hệ thống VietRP (Operator)" : isModerator ? "Xem thống kê & nội dung hệ thống (Read-Only)" : "Quản trị hệ thống VietRP"}
             </p>
           </div>
         </div>
@@ -396,6 +398,19 @@ const AdminPage = () => {
               <p className="text-xs text-muted-foreground">
                 Bạn đang truy cập với quyền <span className="text-neon-blue font-medium">Operator</span>. 
                 Có thể xem tất cả & chỉnh sửa — các thay đổi quan trọng sẽ cần Admin duyệt.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Moderator read-only notice banner */}
+        {isModerator && (
+          <Card className="bg-yellow-500/5 border-yellow-500/20">
+            <CardContent className="p-3 flex items-center gap-2.5">
+              <ShieldCheck size={16} className="text-yellow-400 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Bạn đang truy cập với quyền <span className="text-yellow-400 font-medium">Moderator</span>.
+                Chỉ có quyền xem — không thể thực hiện thao tác chỉnh sửa.
               </p>
             </CardContent>
           </Card>
