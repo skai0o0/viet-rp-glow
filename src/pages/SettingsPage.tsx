@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck, Info } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck, Info, ChevronDown, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -12,6 +12,8 @@ import {
   setModel,
   AVAILABLE_MODELS,
   verifyApiKey,
+  markKeyVerified,
+  isKeyVerified,
 } from "@/services/openRouter";
 import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
 import ModelCombobox from "@/components/ModelCombobox";
@@ -50,9 +52,12 @@ const SettingsPage = () => {
     setSelectedModel(value);
   };
 
+  const [guideOpen, setGuideOpen] = useState(false);
+
   const handleSave = () => {
     setApiKey(apiKey);
     setModel(selectedModel);
+    if (verified) markKeyVerified();
     toast.success("Đã lưu cài đặt!");
     navigate("/");
   };
@@ -126,8 +131,53 @@ const SettingsPage = () => {
               <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline">
                 openrouter.ai/keys
               </a>
-              . Key được lưu trữ cục bộ trên trình duyệt của bạn.
+              . Key được lưu trữ cục bộ trên trình duyệt của bạn — không gửi tới server.
             </p>
+
+            {/* Step-by-step guide */}
+            <button
+              onClick={() => setGuideOpen(!guideOpen)}
+              className="flex items-center gap-1.5 text-[11px] text-neon-purple hover:text-neon-purple/80 transition-colors mt-1"
+            >
+              <Info size={11} />
+              <span>Hướng dẫn tạo API Key</span>
+              <ChevronDown size={11} className={`transition-transform duration-200 ${guideOpen ? "rotate-180" : ""}`} />
+            </button>
+            <AnimatePresence>
+              {guideOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="bg-oled-elevated rounded-xl p-3 space-y-2 border border-gray-border mt-1">
+                    <ol className="space-y-1.5 text-[11px] text-muted-foreground list-decimal list-inside">
+                      <li>Truy cập{" "}
+                        <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline inline-flex items-center gap-0.5">
+                          openrouter.ai <ExternalLink size={9} />
+                        </a>{" "}
+                        và đăng nhập (Google/GitHub)
+                      </li>
+                      <li>Vào menu <span className="text-foreground font-medium">Keys</span> hoặc truy cập{" "}
+                        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline inline-flex items-center gap-0.5">
+                          openrouter.ai/keys <ExternalLink size={9} />
+                        </a>
+                      </li>
+                      <li>Nhấn <span className="text-foreground font-medium">"Create Key"</span>, đặt tên tuỳ ý (VD: VietRP)</li>
+                      <li>Copy key (bắt đầu bằng <code className="text-neon-purple bg-neon-purple/10 px-1 rounded">sk-or-v1-...</code>)</li>
+                      <li>Dán vào ô ở trên → nhấn <span className="text-neon-blue font-medium">Verify</span> → <span className="text-foreground font-medium">Lưu cài đặt</span></li>
+                    </ol>
+                    <div className="pt-1 border-t border-gray-border">
+                      <p className="text-[10px] text-muted-foreground">
+                        <span className="text-green-400 font-medium">Miễn phí:</span> Nhiều model có free tier — chọn model có nhãn FREE để chat hoàn toàn miễn phí, không cần nạp tiền.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Model Selector */}

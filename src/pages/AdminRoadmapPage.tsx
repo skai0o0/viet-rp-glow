@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { createApproval, type ApprovalPayload } from "@/services/approvalService";
 
 type Status = "done" | "in-progress" | "planned";
 
@@ -51,7 +52,7 @@ const emptyItem: Omit<RoadmapItem, "id"> = {
 
 const AdminRoadmapPage = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, canViewAdminHub, canEditAdminHub, checking: checkingRole } = useUserRole();
+  const { isAdmin, isOp, canViewAdminHub, canEditAdminHub, checking: checkingRole } = useUserRole();
   const [items, setItems] = useState<RoadmapItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -123,34 +124,45 @@ const AdminRoadmapPage = () => {
       return;
     }
     setSaving(true);
+    const itemData = {
+      phase: editingItem.phase,
+      phase_label: editingItem.phase_label,
+      title: editingItem.title,
+      description: editingItem.description,
+      status: editingItem.status,
+      sort_order: editingItem.sort_order,
+    };
     try {
-      if ("id" in editingItem && editingItem.id) {
-        // Update
+      const isEdit = "id" in editingItem && editingItem.id;
+
+      if (isOp && !isAdmin) {
+        const payload: ApprovalPayload = {
+          action: isEdit ? "roadmap_edit" : "roadmap_add",
+          target_table: "roadmap_items",
+          target_id: isEdit ? editingItem.id : undefined,
+          data: itemData as Record<string, unknown>,
+        };
+        await createApproval(
+          user!.id,
+          `${isEdit ? "Sửa" : "Thêm"} roadmap: ${editingItem.title}`,
+          payload,
+        );
+        toast.success("Yêu cầu đã gửi cho Admin duyệt!");
+        setDialogOpen(false);
+        return;
+      }
+
+      if (isEdit) {
         const { error } = await supabase
           .from("roadmap_items")
-          .update({
-            phase: editingItem.phase,
-            phase_label: editingItem.phase_label,
-            title: editingItem.title,
-            description: editingItem.description,
-            status: editingItem.status,
-            sort_order: editingItem.sort_order,
-          })
-          .eq("id", editingItem.id);
+          .update(itemData)
+          .eq("id", editingItem.id!);
         if (error) throw error;
         toast.success("Đã cập nhật!");
       } else {
-        // Insert
         const { error } = await supabase
           .from("roadmap_items")
-          .insert({
-            phase: editingItem.phase,
-            phase_label: editingItem.phase_label,
-            title: editingItem.title,
-            description: editingItem.description,
-            status: editingItem.status,
-            sort_order: editingItem.sort_order,
-          });
+          .insert(itemData);
         if (error) throw error;
         toast.success("Đã thêm mục mới!");
       }
@@ -164,6 +176,22 @@ const AdminRoadmapPage = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (isOp && !isAdmin) {
+      try {
+        const item = items.find((i) => i.id === id);
+        await createApproval(user!.id, `Xoá roadmap: ${item?.title ?? id}`, {
+          action: "roadmap_delete",
+          target_table: "roadmap_items",
+          target_id: id,
+          data: {},
+        });
+        toast.success("Yêu cầu xoá đã gửi cho Admin duyệt!");
+      } catch (err: any) {
+        toast.error(err.message || "Không thể gửi yêu cầu");
+      }
+      setDeleteConfirm(null);
+      return;
+    }
     const { error } = await supabase.from("roadmap_items").delete().eq("id", id);
     if (error) {
       toast.error(error.message);
@@ -177,9 +205,26 @@ const AdminRoadmapPage = () => {
   const handleStatusToggle = async (item: RoadmapItem) => {
     const cycle: Status[] = ["planned", "in-progress", "done"];
     const nextIdx = (cycle.indexOf(item.status) + 1) % cycle.length;
+    const newStatus = cycle[nextIdx];
+
+    if (isOp && !isAdmin) {
+      try {
+        await createApproval(user!.id, `Đổi trạng thái roadmap: ${item.title} → ${newStatus}`, {
+          action: "roadmap_status_toggle",
+          target_table: "roadmap_items",
+          target_id: item.id,
+          data: { status: newStatus },
+        });
+        toast.success("Yêu cầu đổi trạng thái đã gửi cho Admin duyệt!");
+      } catch (err: any) {
+        toast.error(err.message || "Không thể gửi yêu cầu");
+      }
+      return;
+    }
+
     const { error } = await supabase
       .from("roadmap_items")
-      .update({ status: cycle[nextIdx] })
+      .update({ status: newStatus })
       .eq("id", item.id);
     if (!error) fetchItems();
   };
@@ -243,7 +288,7 @@ const AdminRoadmapPage = () => {
                             <StatusIcon size={14} className={color} />
                           </button>
                           <span className="text-foreground flex-1">{item.title}</span>
-                          {isAdmin && (
+                          {canEditAdminHub && (
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                               <button onClick={() => openEdit(item)} className="text-muted-foreground hover:text-neon-blue">
                                 <Pencil size={12} />

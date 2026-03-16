@@ -34,6 +34,7 @@ import {
   toggleModelRecommended,
   AllowedModel,
 } from "@/services/globalSettingsDb";
+import { createApproval } from "@/services/approvalService";
 import {
   verifyApiKey,
   fetchOpenRouterModels,
@@ -42,7 +43,7 @@ import {
 
 const AdminApiSettingsPage = () => {
   const { user, isLoading } = useAuth();
-  const { canViewAdminHub, canEditAdminHub, checking } = useUserRole();
+  const { isAdmin, isOp, canViewAdminHub, canEditAdminHub, checking } = useUserRole();
 
   // API verification
   const [testApiKey, setTestApiKey] = useState("");
@@ -122,18 +123,31 @@ const AdminApiSettingsPage = () => {
     if (allowedModelIds.has(model.id)) return;
     setAdding(model.id);
     try {
-      // Extract provider from model ID (e.g. "google/gemini-pro" → "google")
       const provider = model.id.split("/")[0] || "";
       const isFree =
         model.pricing?.prompt === "0" && model.pricing?.completion === "0";
 
-      const saved = await addAllowedModel({
+      const modelData = {
         model_id: model.id,
         model_name: model.name,
         provider,
         is_free: isFree,
+        is_recommended: false,
         sort_order: allowedModels.length,
-      });
+        description: "",
+      };
+
+      if (isOp && !isAdmin) {
+        await createApproval(user!.id, `Thêm model: ${model.name}`, {
+          action: "model_add",
+          target_table: "allowed_models",
+          data: modelData as Record<string, unknown>,
+        });
+        toast.success("Yêu cầu thêm model đã gửi cho Admin duyệt!");
+        return;
+      }
+
+      const saved = await addAllowedModel(modelData);
       setAllowedModels((prev) => [...prev, saved]);
       toast.success(`Đã thêm: ${model.name}`);
     } catch (err: any) {
@@ -149,6 +163,17 @@ const AdminApiSettingsPage = () => {
 
   const handleRemoveModel = async (id: string) => {
     try {
+      if (isOp && !isAdmin) {
+        const model = allowedModels.find((m) => m.id === id);
+        await createApproval(user!.id, `Xoá model: ${model?.model_name ?? id}`, {
+          action: "model_remove",
+          target_table: "allowed_models",
+          target_id: id,
+          data: {},
+        });
+        toast.success("Yêu cầu xoá model đã gửi cho Admin duyệt!");
+        return;
+      }
       await removeAllowedModel(id);
       setAllowedModels((prev) => prev.filter((m) => m.id !== id));
       toast.success("Đã xoá model.");
@@ -160,6 +185,20 @@ const AdminApiSettingsPage = () => {
   const handleToggleRecommended = async (model: AllowedModel) => {
     const newVal = !model.is_recommended;
     try {
+      if (isOp && !isAdmin) {
+        await createApproval(
+          user!.id,
+          `${newVal ? "Đề xuất" : "Bỏ đề xuất"} model: ${model.model_name}`,
+          {
+            action: "model_toggle_recommended",
+            target_table: "allowed_models",
+            target_id: model.id,
+            data: { is_recommended: newVal },
+          },
+        );
+        toast.success("Yêu cầu đã gửi cho Admin duyệt!");
+        return;
+      }
       await toggleModelRecommended(model.id, newVal);
       setAllowedModels((prev) =>
         prev.map((m) => (m.id === model.id ? { ...m, is_recommended: newVal } : m))

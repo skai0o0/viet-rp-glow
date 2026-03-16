@@ -40,6 +40,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { createApproval, type ApprovalPayload } from "@/services/approvalService";
 
 interface KnowledgeItem {
   id: string;
@@ -67,7 +68,7 @@ const emptyItem = {
 
 const AdminKnowledgePage = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, canViewAdminHub, canEditAdminHub, checking: checkingRole } = useUserRole();
+  const { isAdmin, isOp, canViewAdminHub, canEditAdminHub, checking: checkingRole } = useUserRole();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -138,22 +139,41 @@ const AdminKnowledgePage = () => {
       return;
     }
     setSaving(true);
+    const itemData = {
+      title: editingItem.title,
+      description: editingItem.description,
+      content: editingItem.content,
+      category: editingItem.category,
+    };
     try {
-      const payload = {
-        title: editingItem.title,
-        description: editingItem.description,
-        content: editingItem.content,
-        category: editingItem.category,
-      };
-      if ("id" in editingItem && editingItem.id) {
+      const isEdit = "id" in editingItem && editingItem.id;
+
+      if (isOp && !isAdmin) {
+        const approvalPayload: ApprovalPayload = {
+          action: isEdit ? "knowledge_edit" : "knowledge_add",
+          target_table: "knowledge_base",
+          target_id: isEdit ? editingItem.id : undefined,
+          data: itemData as Record<string, unknown>,
+        };
+        await createApproval(
+          user!.id,
+          `${isEdit ? "Sửa" : "Thêm"} knowledge: ${editingItem.title}`,
+          approvalPayload,
+        );
+        toast.success("Yêu cầu đã gửi cho Admin duyệt!");
+        setDialogOpen(false);
+        return;
+      }
+
+      if (isEdit) {
         const { error } = await supabase
           .from("knowledge_base")
-          .update(payload)
-          .eq("id", editingItem.id);
+          .update(itemData)
+          .eq("id", editingItem.id!);
         if (error) throw error;
         toast.success("Đã cập nhật!");
       } else {
-        const { error } = await supabase.from("knowledge_base").insert(payload);
+        const { error } = await supabase.from("knowledge_base").insert(itemData);
         if (error) throw error;
         toast.success("Đã thêm mục mới!");
       }
@@ -167,6 +187,22 @@ const AdminKnowledgePage = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (isOp && !isAdmin) {
+      try {
+        const item = items.find((i) => i.id === id);
+        await createApproval(user!.id, `Xoá knowledge: ${item?.title ?? id}`, {
+          action: "knowledge_delete",
+          target_table: "knowledge_base",
+          target_id: id,
+          data: {},
+        });
+        toast.success("Yêu cầu xoá đã gửi cho Admin duyệt!");
+      } catch (err: any) {
+        toast.error(err.message || "Không thể gửi yêu cầu");
+      }
+      setDeleteConfirm(null);
+      return;
+    }
     const { error } = await supabase
       .from("knowledge_base")
       .delete()
@@ -225,8 +261,8 @@ const AdminKnowledgePage = () => {
             onClick={openAdd}
             size="sm"
             className="bg-neon-purple hover:bg-neon-purple/80 text-white"
-            disabled={!isAdmin}
-            title={!isAdmin ? "Chỉ Admin mới có quyền thêm" : ""}
+            disabled={!canEditAdminHub}
+            title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm" : ""}
           >
             <Plus size={14} className="mr-1" /> Thêm mục
           </Button>
@@ -360,7 +396,7 @@ const AdminKnowledgePage = () => {
                                   >
                                     <Copy size={12} className="mr-1" /> Copy
                                   </Button>
-                                  {isAdmin && (
+                                  {canEditAdminHub && (
                                     <>
                                       <Button
                                         size="sm"

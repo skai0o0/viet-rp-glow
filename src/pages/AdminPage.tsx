@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate, Link } from "react-router-dom";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +62,7 @@ import {
   type PlanPhaseStatus,
   type SamplingParameters,
 } from "@/services/globalSettingsDb";
+import { usePendingApprovalCount } from "@/hooks/usePendingApprovalCount";
 
 const planStatusConfig: Record<PlanPhaseStatus, { icon: React.ElementType; label: string; color: string; bg: string }> = {
   done: { icon: CheckCircle2, label: "Hoàn thành", color: "text-green-400", bg: "bg-green-400/10 border-green-400/30" },
@@ -96,8 +96,7 @@ const StatCard = ({
 
 const AdminPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdmin, checking } = useIsAdmin();
-  const { isOp, isModerator, canViewAdminHub, canEditAdminHub } = useUserRole();
+  const { isAdmin, isOp, isModerator, canViewAdminHub, canEditAdminHub, checking } = useUserRole();
   const [prompt, setPrompt] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -117,6 +116,7 @@ const AdminPage = () => {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const [stats, setStats] = useState({ characters: "—", users: "—", sessions: "—" });
+  const pendingCount = usePendingApprovalCount(isAdmin || isOp);
 
   // Subscription plan board
   const [planPhases, setPlanPhases] = useState<PlanPhase[]>([]);
@@ -310,9 +310,10 @@ const AdminPage = () => {
     {
       icon: ClipboardCheck,
       label: "Approval Queue",
-      description: "Duyệt yêu cầu chỉnh sửa từ Operator",
+      description: `Duyệt yêu cầu chỉnh sửa từ Operator${pendingCount > 0 ? ` · ${pendingCount} chờ duyệt` : ""}`,
       path: "/admin/approvals",
       color: "text-orange-400 bg-orange-400/10",
+      badge: pendingCount,
     },
     {
       icon: Database,
@@ -631,8 +632,13 @@ const AdminPage = () => {
             <Link key={link.path} to={link.path}>
               <Card className="bg-oled-surface border-oled-border hover:border-neon-purple/40 transition-colors cursor-pointer group">
                 <CardContent className="p-4 flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${link.color}`}>
+                  <div className={`relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${link.color}`}>
                     <link.icon size={18} />
+                    {"badge" in link && (link as any).badge > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-yellow-400 text-oled-base text-[10px] font-bold flex items-center justify-center px-1">
+                        {(link as any).badge > 9 ? "9+" : (link as any).badge}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{link.label}</p>
