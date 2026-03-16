@@ -8,14 +8,22 @@ interface UserRoleResult {
   role: UserRole;
   isAdmin: boolean;
   isOp: boolean;
+  isModerator: boolean;
   isAdminOrOp: boolean;
+  /** admin + op + moderator: có thể truy cập Admin Hub */
+  canViewAdminHub: boolean;
+  /** admin + op: có thể thực hiện thao tác ghi trong Admin Hub */
+  canEditAdminHub: boolean;
+  /** admin only: chạy các tác vụ nguy hiểm (SQL editor, v.v.) */
+  canRunDangerousAdmin: boolean;
   checking: boolean;
 }
 
 /**
- * Hook phân quyền 3 cấp: admin > op > user
- * - admin: toàn quyền
- * - op: xem + sửa Admin Hub, submit cần duyệt
+ * Hook phân quyền 4 cấp: admin > op > moderator > user
+ * - admin: toàn quyền (view + edit) mọi nơi
+ * - op: truy cập Admin Hub, sửa được — các thay đổi quan trọng cần duyệt
+ * - moderator: truy cập Admin Hub nhưng chỉ xem (read-only), không ghi
  * - user: truy cập cơ bản
  */
 export function useUserRole(): UserRoleResult {
@@ -40,7 +48,7 @@ export function useUserRole(): UserRoleResult {
         if (!error && data) {
           setRole(data as UserRole);
         } else {
-          // Fallback: check has_role for admin, then op
+          // Fallback: check has_role for admin, then op, then moderator
           const { data: isAdm } = await supabase.rpc("has_role", {
             _user_id: user.id,
             _role: "admin",
@@ -52,7 +60,15 @@ export function useUserRole(): UserRoleResult {
               _user_id: user.id,
               _role: "op",
             } as any);
-            setRole(isOp ? "op" : "user");
+            if (isOp) {
+              setRole("op");
+            } else {
+              const { data: isMod } = await supabase.rpc("has_role", {
+                _user_id: user.id,
+                _role: "moderator",
+              } as any);
+              setRole(isMod ? "moderator" : "user");
+            }
           }
         }
       } catch {
@@ -64,11 +80,19 @@ export function useUserRole(): UserRoleResult {
     fetchRole();
   }, [user]);
 
+  const isAdmin = role === "admin";
+  const isOp = role === "op";
+  const isModerator = role === "moderator";
+
   return {
     role,
-    isAdmin: role === "admin",
-    isOp: role === "op",
-    isAdminOrOp: role === "admin" || role === "op",
+    isAdmin,
+    isOp,
+    isModerator,
+    isAdminOrOp: isAdmin || isOp,
+    canViewAdminHub: isAdmin || isOp || isModerator,
+    canEditAdminHub: isAdmin || isOp,
+    canRunDangerousAdmin: isAdmin,
     checking,
   };
 }

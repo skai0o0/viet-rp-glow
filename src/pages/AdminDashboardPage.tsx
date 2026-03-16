@@ -115,7 +115,7 @@ const MiniBar = ({ value, max, color }: { value: number; max: number; color: str
 /* ------------------------------------------------------------------ */
 const AdminDashboardPage = () => {
   const { user, isLoading } = useAuth();
-  const { isAdminOrOp, checking } = useUserRole();
+  const { canViewAdminHub, checking } = useUserRole();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentChars, setRecentChars] = useState<RecentCharacter[]>([]);
@@ -203,10 +203,10 @@ const AdminDashboardPage = () => {
   };
 
   useEffect(() => {
-    if (!isAdminOrOp) return;
+    if (!canViewAdminHub) return;
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdminOrOp]);
+  }, [canViewAdminHub]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -221,7 +221,7 @@ const AdminDashboardPage = () => {
       </div>
     );
   }
-  if (!user || !isAdminOrOp) return <Navigate to="/" replace />;
+  if (!user || !canViewAdminHub) return <Navigate to="/" replace />;
 
   /* ---------- render ---------- */
   return (
