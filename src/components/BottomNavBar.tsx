@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert, Wand2 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -91,6 +91,40 @@ const BottomNavBar = () => {
           </NavLink>
         );
       })}
+
+      {/* AI Card Generator - for admin, op & moderator */}
+      {canViewAdminHub && (
+        <NavLink to="/admin/chargen" className="flex-1">
+          <motion.div
+            whileTap={{ scale: 0.9 }}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div
+              className={`flex items-center justify-center w-10 h-8 rounded-lg transition-colors duration-200 ${
+                location.pathname === "/admin/chargen"
+                  ? "text-neon-purple bg-neon-purple/10"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <Wand2 size={20} />
+            </div>
+            <span
+              className={`text-[10px] transition-colors duration-200 ${
+                location.pathname === "/admin/chargen" ? "text-neon-purple font-medium" : "text-muted-foreground"
+              }`}
+            >
+              AI Tạo Card
+            </span>
+            {location.pathname === "/admin/chargen" && (
+              <motion.div
+                layoutId="bottom-nav-indicator"
+                className="absolute bottom-1 w-8 h-[2px] rounded-full bg-neon-purple shadow-neon-purple"
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              />
+            )}
+          </motion.div>
+        </NavLink>
+      )}
 
       {/* Export Markdown - for admin, op & moderator on chat pages */}
       {canViewAdminHub && (
