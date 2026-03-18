@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import AppLayout from "@/layouts/AppLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { fetchGlobalSystemPrompt, fetchSamplingParameters } from "@/services/globalSettingsDb";
+import { usePageTracking } from "@/hooks/usePageTracking";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded pages
@@ -27,6 +28,7 @@ const AdminDashboardPage = lazy(() => import("@/pages/AdminDashboardPage"));
 const AdminCharGenPage = lazy(() => import("@/pages/AdminCharGenPage"));
 const AdminApiSettingsPage = lazy(() => import("@/pages/AdminApiSettingsPage"));
 const AdminApprovalsPage = lazy(() => import("@/pages/AdminApprovalsPage"));
+const AdminPlatformKeysPage = lazy(() => import("@/pages/AdminPlatformKeysPage"));
 const CharacterPage = lazy(() => import("@/pages/CharacterPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const TermsPage = lazy(() => import("@/pages/TermsPage"));
@@ -46,6 +48,11 @@ const PageLoader = () => (
   </div>
 );
 
+const PageTracker = ({ children }: { children: React.ReactNode }) => {
+  usePageTracking();
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -53,6 +60,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <PageTracker>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route element={<AppLayout />}>
@@ -74,11 +82,13 @@ const App = () => (
                 <Route path="/admin/chargen" element={<ProtectedRoute><AdminCharGenPage /></ProtectedRoute>} />
                 <Route path="/admin/api-settings" element={<ProtectedRoute><AdminApiSettingsPage /></ProtectedRoute>} />
                 <Route path="/admin/approvals" element={<ProtectedRoute><AdminApprovalsPage /></ProtectedRoute>} />
+                <Route path="/admin/platform-keys" element={<ProtectedRoute><AdminPlatformKeysPage /></ProtectedRoute>} />
                 <Route path="/terms" element={<TermsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </PageTracker>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

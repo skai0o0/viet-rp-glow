@@ -274,8 +274,8 @@ const AdminPage = () => {
   const quickLinks = [
     {
       icon: BarChart3,
-      label: "Dashboard thống kê",
-      description: "Xem tổng quan số liệu hệ thống",
+      label: "Dashboard & Analytics",
+      description: "Thống kê hệ thống, page views, model usage, active users",
       path: "/admin/dashboard",
       color: "text-neon-blue bg-neon-blue/10",
     },
@@ -328,6 +328,13 @@ const AdminPage = () => {
       description: "Verify API & quản lý model cho phép người dùng",
       path: "/admin/api-settings",
       color: "text-orange-400 bg-orange-400/10",
+    },
+    {
+      icon: Shield,
+      label: "Platform Keys & Tiers",
+      description: "Quản lý API key pool & cấu hình model tier cho user",
+      path: "/admin/platform-keys",
+      color: "text-amber-400 bg-amber-400/10",
     },
   ];
 

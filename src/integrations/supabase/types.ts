@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      platform_api_keys: {
+        Row: {
+          id: string
+          key_name: string
+          api_key: string
+          is_active: boolean
+          request_count: number
+          last_used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          key_name: string
+          api_key: string
+          is_active?: boolean
+          request_count?: number
+          last_used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          key_name?: string
+          api_key?: string
+          is_active?: boolean
+          request_count?: number
+          last_used_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      model_tiers: {
+        Row: {
+          id: string
+          tier_key: string
+          display_name: string
+          description: string
+          model_id: string
+          min_subscription: string
+          sort_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tier_key: string
+          display_name: string
+          description?: string
+          model_id: string
+          min_subscription?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tier_key?: string
+          display_name?: string
+          description?: string
+          model_id?: string
+          min_subscription?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       allowed_models: {
         Row: {
           id: string
@@ -481,6 +550,24 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_chat_usage: {
+        Row: {
+          user_id: string
+          usage_date: string
+          message_count: number
+        }
+        Insert: {
+          user_id: string
+          usage_date?: string
+          message_count?: number
+        }
+        Update: {
+          user_id?: string
+          usage_date?: string
+          message_count?: number
+        }
+        Relationships: []
+      }
       subscription_plans: {
         Row: {
           id: string
@@ -491,6 +578,8 @@ export type Database = {
           perks: Json
           is_active: boolean
           sort_order: number
+          daily_messages: number
+          allowed_model_tier: string
           created_at: string
           updated_at: string
         }
@@ -503,6 +592,8 @@ export type Database = {
           perks?: Json
           is_active?: boolean
           sort_order?: number
+          daily_messages?: number
+          allowed_model_tier?: string
           created_at?: string
           updated_at?: string
         }
@@ -515,6 +606,8 @@ export type Database = {
           perks?: Json
           is_active?: boolean
           sort_order?: number
+          daily_messages?: number
+          allowed_model_tier?: string
           created_at?: string
           updated_at?: string
         }
@@ -723,6 +816,60 @@ export type Database = {
         }
         Relationships: []
       }
+      page_views: {
+        Row: {
+          id: string
+          user_id: string | null
+          path: string
+          referrer: string | null
+          user_agent: string | null
+          session_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          path: string
+          referrer?: string | null
+          user_agent?: string | null
+          session_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          path?: string
+          referrer?: string | null
+          user_agent?: string | null
+          session_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      site_events: {
+        Row: {
+          id: string
+          user_id: string | null
+          event_name: string
+          event_data: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          event_name: string
+          event_data?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          event_name?: string
+          event_data?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -813,6 +960,78 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      check_chat_quota: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      increment_chat_count: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      pick_random_api_key: {
+        Args: Record<string, never>
+        Returns: string
+      }
+      resolve_model_tier: {
+        Args: {
+          p_tier_key: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      get_dashboard_stats: {
+        Args: Record<string, never>
+        Returns: Json
+      }
+      get_usage_analytics: {
+        Args: {
+          p_days?: number
+        }
+        Returns: Json
+      }
+      get_model_usage_stats: {
+        Args: {
+          p_days?: number
+        }
+        Returns: Json
+      }
+      get_top_characters: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      get_top_pages: {
+        Args: {
+          p_days?: number
+        }
+        Returns: Json
+      }
+      log_page_view: {
+        Args: {
+          p_path: string
+          p_referrer?: string | null
+          p_session_id?: string | null
+        }
+        Returns: undefined
+      }
+      log_site_event: {
+        Args: {
+          p_event_name: string
+          p_event_data?: Json
+        }
+        Returns: undefined
+      }
+      cleanup_old_analytics: {
+        Args: {
+          p_retention_days?: number
+        }
+        Returns: Json
       }
     }
     Enums: {
