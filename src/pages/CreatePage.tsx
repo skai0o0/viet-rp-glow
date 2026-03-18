@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter } from "@/services/characterDb";
+import { createApproval, type ApprovalPayload } from "@/services/approvalService";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   TavernCardV2,
@@ -37,7 +38,7 @@ const sectionCard =
 const CreatePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { canViewAdminHub } = useUserRole();
+  const { isAdmin, canViewAdminHub } = useUserRole();
   const [card, setCard] = useState<TavernCardV2>(createEmptyTavernCard());
   const [tagInput, setTagInput] = useState("");
   const [greetingDraft, setGreetingDraft] = useState("");
@@ -176,9 +177,10 @@ const CreatePage = () => {
         return;
       }
 
+      const userId = session.session.user.id;
+
       let avatarUrl: string | null = null;
       if (avatarFile) {
-        const userId = session.session.user.id;
         const ext = "webp";
         const filePath = `${userId}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
@@ -191,9 +193,33 @@ const CreatePage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      const saved = await createCharacter(card, session.session.user.id, isPublic, undefined, avatarUrl);
-      toast({ title: "Thành công! 🎉", description: "Tạo nhân vật thành công!" });
-      navigate(`/chat/${saved.id}`);
+      if (isAdmin) {
+        const saved = await createCharacter(card, userId, isPublic, undefined, avatarUrl);
+        toast({ title: "Thành công!", description: "Tạo nhân vật thành công!" });
+        navigate(`/chat/${saved.id}`);
+      } else {
+        const payload: ApprovalPayload = {
+          action: "card_create",
+          target_table: "characters",
+          data: {
+            card: card as unknown as Record<string, unknown>,
+            owner_id: userId,
+            is_public: isPublic,
+            avatar_url: avatarUrl,
+          },
+        };
+        await createApproval(
+          userId,
+          `Tạo nhân vật: ${data.name}`,
+          payload,
+          "card_create",
+        );
+        toast({
+          title: "Đã gửi yêu cầu!",
+          description: "Nhân vật của bạn đang chờ Admin duyệt. Bạn sẽ được thông báo khi hoàn tất.",
+        });
+        navigate("/");
+      }
     } catch (err: any) {
       toast({ title: "Lỗi", description: err.message || "Không thể lưu nhân vật.", variant: "destructive" });
     } finally {
@@ -707,7 +733,7 @@ const CreatePage = () => {
                         className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-neon-purple text-white font-medium text-sm hover:bg-neon-purple/80 hover:shadow-neon-purple transition-all duration-200 disabled:opacity-50"
                       >
                         {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        {isSaving ? "Đang lưu..." : "Lưu Nhân Vật"}
+                        {isSaving ? "Đang xử lý..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
                       </button>
                     </div>
                   </div>

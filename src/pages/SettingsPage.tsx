@@ -1,66 +1,30 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { Settings, Eye, EyeOff, Check, Loader2, ShieldCheck, Info, ChevronDown, ExternalLink } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
+import { Settings, Check, Loader2, Info, Crown, Zap, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import {
-  getApiKey,
-  setApiKey,
-  getModel,
-  setModel,
-  AVAILABLE_MODELS,
-  verifyApiKey,
-  markKeyVerified,
-  isKeyVerified,
-} from "@/services/openRouter";
-import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
-import ModelCombobox from "@/components/ModelCombobox";
+import { getSelectedTier, setSelectedTier } from "@/services/openRouter";
+import { useChatQuota } from "@/hooks/useChatQuota";
+import TierSelector from "@/components/TierSelector";
 
 const SettingsPage = () => {
   const navigate = useNavigate();
-  const [apiKey, setApiKeyState] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
-  const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState<boolean | null>(null);
+  const [tier, setTier] = useState("free");
+  const { quota, loading: quotaLoading } = useChatQuota();
 
   useEffect(() => {
-    setApiKeyState(getApiKey());
-    setSelectedModel(getModel());
+    setTier(getSelectedTier());
   }, []);
 
-  const handleVerify = async () => {
-    if (!apiKey.trim()) {
-      toast.error("Vui lòng nhập API Key trước.");
-      return;
-    }
-    setVerifying(true);
-    setVerified(null);
-    const result = await verifyApiKey(apiKey);
-    setVerifying(false);
-    setVerified(result.valid);
-    if (result.valid) {
-      toast.success("API Key hợp lệ! ✓");
-    } else {
-      toast.error(result.error || "API Key không hợp lệ.");
-    }
-  };
-
-  const handleModelChange = (value: string) => {
-    setSelectedModel(value);
-  };
-
-  const [guideOpen, setGuideOpen] = useState(false);
-
   const handleSave = () => {
-    setApiKey(apiKey);
-    setModel(selectedModel);
-    if (verified) markKeyVerified();
+    setSelectedTier(tier);
     toast.success("Đã lưu cài đặt!");
     navigate("/");
   };
+
+  const isPro = quota.tier === "all" || quota.plan_name === "Pro";
+  const quotaPercent = quota.limit > 0 ? Math.round((quota.used / quota.limit) * 100) : 0;
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin bg-oled-base p-6">
@@ -81,118 +45,121 @@ const SettingsPage = () => {
           </p>
         </div>
 
-        {/* AI Connection */}
-        <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-5">
+        {/* Subscription Info Card */}
+        <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-neon-purple shadow-neon-purple" />
-            <h2 className="text-sm font-semibold text-foreground">Kết nối AI</h2>
+            <div className={`w-2 h-2 rounded-full ${isPro ? "bg-neon-purple shadow-neon-purple" : "bg-neon-blue shadow-neon-blue"}`} />
+            <h2 className="text-sm font-semibold text-foreground">Gói đăng ký</h2>
           </div>
 
-          {/* API Key */}
-          <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">OpenRouter API Key</label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showKey ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(e) => {
-                    setApiKeyState(e.target.value);
-                    setVerified(null);
-                  }}
-                  placeholder="sk-or-v1-..."
-                  className="bg-oled-elevated border-gray-border text-foreground pr-10 focus:border-neon-purple focus:ring-neon-purple/30"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              <button
-                onClick={handleVerify}
-                disabled={verifying}
-                className={`px-3 rounded-xl border text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${
-                  verified === true
-                    ? "bg-green-500/10 border-green-500/30 text-green-400"
-                    : verified === false
-                    ? "bg-destructive/10 border-destructive/30 text-destructive"
-                    : "bg-neon-blue/10 border-neon-blue/30 text-neon-blue hover:shadow-neon-blue"
-                }`}
-              >
-                {verifying ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                {verified === true ? "OK" : "Verify"}
-              </button>
+          {quotaLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 size={20} className="animate-spin text-neon-purple" />
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              Lấy API Key tại{" "}
-              <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline">
-                openrouter.ai/keys
-              </a>
-              . Key được lưu trữ cục bộ trên trình duyệt của bạn — không gửi tới server.
-            </p>
-
-            {/* Step-by-step guide */}
-            <button
-              onClick={() => setGuideOpen(!guideOpen)}
-              className="flex items-center gap-1.5 text-[11px] text-neon-purple hover:text-neon-purple/80 transition-colors mt-1"
-            >
-              <Info size={11} />
-              <span>Hướng dẫn tạo API Key</span>
-              <ChevronDown size={11} className={`transition-transform duration-200 ${guideOpen ? "rotate-180" : ""}`} />
-            </button>
-            <AnimatePresence>
-              {guideOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="bg-oled-elevated rounded-xl p-3 space-y-2 border border-gray-border mt-1">
-                    <ol className="space-y-1.5 text-[11px] text-muted-foreground list-decimal list-inside">
-                      <li>Truy cập{" "}
-                        <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline inline-flex items-center gap-0.5">
-                          openrouter.ai <ExternalLink size={9} />
-                        </a>{" "}
-                        và đăng nhập (Google/GitHub)
-                      </li>
-                      <li>Vào menu <span className="text-foreground font-medium">Keys</span> hoặc truy cập{" "}
-                        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-neon-blue hover:underline inline-flex items-center gap-0.5">
-                          openrouter.ai/keys <ExternalLink size={9} />
-                        </a>
-                      </li>
-                      <li>Nhấn <span className="text-foreground font-medium">"Create Key"</span>, đặt tên tuỳ ý (VD: VietRP)</li>
-                      <li>Copy key (bắt đầu bằng <code className="text-neon-purple bg-neon-purple/10 px-1 rounded">sk-or-v1-...</code>)</li>
-                      <li>Dán vào ô ở trên → nhấn <span className="text-neon-blue font-medium">Verify</span> → <span className="text-foreground font-medium">Lưu cài đặt</span></li>
-                    </ol>
-                    <div className="pt-1 border-t border-gray-border">
-                      <p className="text-[10px] text-muted-foreground">
-                        <span className="text-green-400 font-medium">Miễn phí:</span> Nhiều model có free tier — chọn model có nhãn FREE để chat hoàn toàn miễn phí, không cần nạp tiền.
-                      </p>
-                    </div>
+          ) : (
+            <>
+              {/* Plan badge */}
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  isPro
+                    ? "bg-gradient-to-br from-neon-purple to-neon-blue"
+                    : "bg-oled-elevated border border-gray-border"
+                }`}>
+                  {isPro ? <Crown size={22} className="text-white" /> : <Zap size={22} className="text-muted-foreground" />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold text-foreground">{quota.plan_name}</span>
+                    {isPro && (
+                      <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full">
+                        PRO
+                      </span>
+                    )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isPro ? "Truy cập tất cả tier, 200 tin nhắn/ngày" : "VietRP Free tier, 20 tin nhắn/ngày"}
+                  </p>
+                </div>
+              </div>
 
-          {/* Model Selector */}
-          <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">Model AI</label>
-            <ModelCombobox value={selectedModel} onValueChange={handleModelChange} />
-            <div className="bg-oled-elevated rounded-xl p-3 space-y-1.5">
-              <div className="flex items-start gap-1.5">
-                <Info size={12} className="text-neon-blue mt-0.5 shrink-0" />
-                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  Danh sách model đã được admin chọn lọc phù hợp cho roleplay.
-                  Model có nhãn <span className="text-green-400 font-semibold">FREE</span> hoàn toàn miễn phí.
-                  Model có biểu tượng <span className="text-yellow-500">⭐</span> được đề xuất cho trải nghiệm tốt nhất.
+              {/* Quota progress */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <MessageSquare size={12} />
+                    Tin nhắn hôm nay
+                  </span>
+                  <span className={`font-medium ${
+                    quota.remaining <= 0 ? "text-red-400" : quota.remaining <= 5 ? "text-amber-400" : "text-foreground"
+                  }`}>
+                    {quota.used}/{quota.limit}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-oled-elevated overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(quotaPercent, 100)}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className={`h-full rounded-full ${
+                      quotaPercent >= 100
+                        ? "bg-red-500"
+                        : quotaPercent >= 80
+                          ? "bg-amber-500"
+                          : "bg-neon-blue"
+                    }`}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Còn lại <span className="text-foreground font-medium">{quota.remaining}</span> tin nhắn. Reset lúc 00:00 mỗi ngày.
                 </p>
               </div>
+
+              {/* Upgrade CTA */}
+              {!isPro && (
+                <div className="bg-gradient-to-r from-neon-purple/10 via-oled-elevated to-neon-blue/10 rounded-xl p-4 border border-neon-purple/20">
+                  <div className="flex items-start gap-3">
+                    <Crown size={18} className="text-neon-purple mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">Nâng cấp lên Pro</p>
+                      <ul className="text-[11px] text-muted-foreground mt-1 space-y-0.5">
+                        <li>200 tin nhắn/ngày (gấp 10 lần)</li>
+                        <li>Truy cập VietRP Pro & Ultra tier</li>
+                        <li>Ưu tiên hỗ trợ</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full mt-3 bg-neon-purple text-primary-foreground hover:shadow-neon-purple"
+                    onClick={() => toast.info("Liên hệ admin để nâng cấp gói Pro.")}
+                  >
+                    <Crown size={14} className="mr-1.5" />
+                    Liên hệ nâng cấp
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Tier Selector */}
+        <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-5">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-neon-blue shadow-neon-blue" />
+            <h2 className="text-sm font-semibold text-foreground">Chất lượng AI</h2>
+          </div>
+
+          <TierSelector value={tier} onValueChange={setTier} userTier={quota.tier} />
+
+          <div className="bg-oled-elevated rounded-xl p-3">
+            <div className="flex items-start gap-1.5">
+              <Info size={12} className="text-neon-blue mt-0.5 shrink-0" />
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                {isPro
+                  ? "Bạn có quyền truy cập tất cả tier. Chọn tier phù hợp nhất cho trải nghiệm roleplay."
+                  : "Gói Free chỉ sử dụng được VietRP Free. Nâng cấp Pro để dùng tier cao hơn."
+                }
+              </p>
             </div>
           </div>
 

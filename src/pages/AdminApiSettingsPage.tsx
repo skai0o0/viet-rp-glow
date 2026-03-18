@@ -20,11 +20,15 @@ import {
   EyeOff,
   Save,
   RefreshCw,
+  Layers,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
@@ -40,6 +44,25 @@ import {
   fetchOpenRouterModels,
   type OpenRouterModel,
 } from "@/services/openRouter";
+import { supabase } from "@/integrations/supabase/client";
+
+/* ── Tier config ─────────────────────────────────────────── */
+interface DbModelTier {
+  id: string;
+  tier_key: string;
+  display_name: string;
+  description: string;
+  model_id: string;
+  min_subscription: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+const TIER_META: Record<string, { icon: React.ElementType; color: string }> = {
+  free:  { icon: Zap,      color: "text-neon-blue bg-neon-blue/10" },
+  pro:   { icon: Crown,    color: "text-neon-purple bg-neon-purple/10" },
+  ultra: { icon: Sparkles,  color: "text-neon-rose bg-neon-rose/10" },
+};
 
 const AdminApiSettingsPage = () => {
   const { user, isLoading } = useAuth();
@@ -63,12 +86,46 @@ const AdminApiSettingsPage = () => {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
 
+  // Model tiers (fixed 3: free, pro, ultra)
+  const [tiers, setTiers] = useState<DbModelTier[]>([]);
+  const [loadingTiers, setLoadingTiers] = useState(true);
+  const [tierEdits, setTierEdits] = useState<Record<string, string>>({});
+  const [savingTier, setSavingTier] = useState<string | null>(null);
+
   useEffect(() => {
     fetchAllowedModels().then((m) => {
       setAllowedModels(m);
       setLoadingAllowed(false);
     });
+    supabase
+      .from("model_tiers")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => {
+        setTiers((data ?? []) as DbModelTier[]);
+        const edits: Record<string, string> = {};
+        (data ?? []).forEach((t: any) => { edits[t.tier_key] = t.model_id; });
+        setTierEdits(edits);
+        setLoadingTiers(false);
+      });
   }, []);
+
+  const handleSaveTierModel = async (tier: DbModelTier) => {
+    const newModelId = (tierEdits[tier.tier_key] ?? tier.model_id).trim();
+    if (!newModelId) { toast.error("Model ID không được để trống."); return; }
+    setSavingTier(tier.tier_key);
+    const { error } = await supabase
+      .from("model_tiers")
+      .update({ model_id: newModelId })
+      .eq("id", tier.id);
+    if (error) {
+      toast.error("Không thể lưu: " + error.message);
+    } else {
+      setTiers((prev) => prev.map((t) => t.id === tier.id ? { ...t, model_id: newModelId } : t));
+      toast.success(`Đã cập nhật ${tier.display_name} → ${newModelId}`);
+    }
+    setSavingTier(null);
+  };
 
   const handleLoadModels = useCallback(async () => {
     setLoadingModels(true);
@@ -296,6 +353,70 @@ const AdminApiSettingsPage = () => {
                 {verified === true ? "Hợp lệ ✓" : verified === false ? "Lỗi ✗" : "Verify"}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ═══════ Model Tiers (Fixed: free / pro / ultra) ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-rose shadow-[0_0_6px] shadow-neon-rose" />
+              <h2 className="text-sm font-semibold text-foreground">Model Tiers cho User</h2>
+              <Badge variant="outline" className="text-[10px] border-neon-rose/30 text-neon-rose py-0 h-5">
+                3 cố định
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              User thấy 3 tier này thay vì model thật. Nhập OpenRouter model ID cho mỗi tier.
+            </p>
+
+            {loadingTiers ? (
+              <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-neon-purple" /></div>
+            ) : (
+              <div className="space-y-3">
+                {tiers.map((tier) => {
+                  const meta = TIER_META[tier.tier_key] || TIER_META.free;
+                  const Icon = meta.icon;
+                  const edited = (tierEdits[tier.tier_key] ?? tier.model_id) !== tier.model_id;
+
+                  return (
+                    <div key={tier.id} className="bg-oled-elevated rounded-xl p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${meta.color}`}>
+                          <Icon size={16} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-foreground">{tier.display_name}</span>
+                            {tier.min_subscription !== "free" && (
+                              <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full">PRO</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">{tier.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          value={tierEdits[tier.tier_key] ?? tier.model_id}
+                          onChange={(e) => setTierEdits((prev) => ({ ...prev, [tier.tier_key]: e.target.value }))}
+                          placeholder="google/gemini-2.0-flash-001"
+                          className="bg-oled-base border-gray-border text-foreground text-xs h-8 font-mono flex-1"
+                          disabled={!isAdmin}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveTierModel(tier)}
+                          disabled={!edited || savingTier === tier.tier_key || !isAdmin}
+                          className="h-8 px-3 text-xs bg-neon-purple hover:bg-neon-purple/80 text-white disabled:opacity-30"
+                        >
+                          {savingTier === tier.tier_key ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
