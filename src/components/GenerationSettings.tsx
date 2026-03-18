@@ -10,8 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ModelCombobox from "@/components/ModelCombobox";
-import { getModel, setModel } from "@/services/openRouter";
+import TierSelector from "@/components/TierSelector";
+import { getSelectedTier, setSelectedTier } from "@/services/openRouter";
 
 const STORAGE_KEY_MAX_TOKENS = "vietrp_max_tokens";
 const STORAGE_KEY_RESPONSE_STYLE = "vietrp_response_style";
@@ -71,6 +71,7 @@ interface GenerationSettingsProps {
   onCustomFirstMesChange?: (val: string) => void;
   isPendingChat?: boolean;
   defaultFirstMes?: string;
+  userTier?: string;
 }
 
 const GenerationSettings = ({
@@ -82,14 +83,15 @@ const GenerationSettings = ({
   onCustomFirstMesChange,
   isPendingChat,
   defaultFirstMes,
+  userTier,
 }: GenerationSettingsProps) => {
-  const [selectedModel, setSelectedModel] = useState(getModel());
+  const [selectedTier, setSelectedTierState] = useState(getSelectedTier());
   const [maxTokens, setMaxTokensState] = useState(getMaxTokens());
   const [responseStyle, setResponseStyleState] = useState(getResponseStyle());
 
-  const handleModelChange = (val: string) => {
-    setSelectedModel(val);
-    setModel(val);
+  const handleTierChange = (val: string) => {
+    setSelectedTierState(val);
+    setSelectedTier(val);
   };
 
   const handleMaxTokensChange = (val: number[]) => {
@@ -208,12 +210,12 @@ const GenerationSettings = ({
             </div>
           )}
 
-          {/* Model Switcher */}
+          {/* Tier Switcher */}
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-              Mô hình AI (Model)
+              Chất lượng AI
             </Label>
-            <ModelCombobox value={selectedModel} onValueChange={handleModelChange} />
+            <TierSelector value={selectedTier} onValueChange={handleTierChange} userTier={userTier} />
           </div>
 
           {/* Max Tokens Slider */}

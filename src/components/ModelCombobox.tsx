@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, ChevronsUpDown, Loader2, Star, Gift, BadgeCheck } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, BadgeCheck, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,15 +17,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  fetchOpenRouterModels,
   AVAILABLE_MODELS,
-  type OpenRouterModel,
 } from "@/services/openRouter";
 import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
 
 interface ModelComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
+  userTier?: string;
 }
 
 type DisplayModel = {
@@ -36,14 +35,15 @@ type DisplayModel = {
   provider?: string;
 };
 
-const ModelCombobox = ({ value, onValueChange }: ModelComboboxProps) => {
+const ModelCombobox = ({ value, onValueChange, userTier = "free" }: ModelComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [adminModels, setAdminModels] = useState<AllowedModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasAdminModels, setHasAdminModels] = useState(false);
 
+  const isFreeUser = userTier === "free";
+
   useEffect(() => {
-    // Try to load admin-curated models first
     fetchAllowedModels()
       .then((allowed) => {
         if (allowed.length > 0) {
@@ -54,7 +54,6 @@ const ModelCombobox = ({ value, onValueChange }: ModelComboboxProps) => {
       .finally(() => setLoading(false));
   }, []);
 
-  // If admin curated models exist, use those. Otherwise fallback.
   const recommendedModels: DisplayModel[] = hasAdminModels
     ? adminModels
         .filter((m) => m.is_recommended)
@@ -81,6 +80,14 @@ const ModelCombobox = ({ value, onValueChange }: ModelComboboxProps) => {
 
   const allDisplayModels = [...recommendedModels, ...otherModels];
   const selectedLabel = allDisplayModels.find((m) => m.id === value)?.name || value;
+
+  const isModelLocked = (model: DisplayModel) => isFreeUser && hasAdminModels && !model.is_free;
+
+  const handleSelect = (model: DisplayModel) => {
+    if (isModelLocked(model)) return;
+    onValueChange(model.id);
+    setOpen(false);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -122,33 +129,44 @@ const ModelCombobox = ({ value, onValueChange }: ModelComboboxProps) => {
               Không tìm thấy model nào.
             </CommandEmpty>
 
-            {/* Recommended models section */}
             {recommendedModels.length > 0 && (
               <CommandGroup heading="⭐ Đề xuất">
-                {recommendedModels.map((m) => (
-                  <CommandItem
-                    key={m.id}
-                    value={m.name}
-                    onSelect={() => {
-                      onValueChange(m.id);
-                      setOpen(false);
-                    }}
-                    className="text-foreground data-[selected=true]:bg-neon-purple/10 cursor-pointer"
-                  >
-                    <Check
+                {recommendedModels.map((m) => {
+                  const locked = isModelLocked(m);
+                  return (
+                    <CommandItem
+                      key={m.id}
+                      value={m.name}
+                      onSelect={() => handleSelect(m)}
                       className={cn(
-                        "mr-2 h-4 w-4",
-                        value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
+                        "text-foreground cursor-pointer",
+                        locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
                       )}
-                    />
-                    <span className="truncate flex-1">{m.name}</span>
-                    {m.is_free && (
-                      <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
-                        FREE
-                      </span>
-                    )}
-                  </CommandItem>
-                ))}
+                      disabled={locked}
+                    >
+                      {locked ? (
+                        <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
+                          )}
+                        />
+                      )}
+                      <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
+                      {m.is_free ? (
+                        <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
+                          FREE
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
+                          PRO
+                        </span>
+                      )}
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
             )}
 
@@ -156,39 +174,52 @@ const ModelCombobox = ({ value, onValueChange }: ModelComboboxProps) => {
               <CommandSeparator />
             )}
 
-            {/* All other allowed models */}
             <CommandGroup heading={hasAdminModels ? "Tất cả model" : "Model mặc định"}>
-              {otherModels.map((m) => (
-                <CommandItem
-                  key={m.id}
-                  value={m.name}
-                  onSelect={() => {
-                    onValueChange(m.id);
-                    setOpen(false);
-                  }}
-                  className="text-foreground data-[selected=true]:bg-neon-purple/10 cursor-pointer"
-                >
-                  <Check
+              {otherModels.map((m) => {
+                const locked = isModelLocked(m);
+                return (
+                  <CommandItem
+                    key={m.id}
+                    value={m.name}
+                    onSelect={() => handleSelect(m)}
                     className={cn(
-                      "mr-2 h-4 w-4",
-                      value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
+                      "text-foreground cursor-pointer",
+                      locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
                     )}
-                  />
-                  <span className="truncate flex-1">{m.name}</span>
-                  {m.is_free && (
-                    <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
-                      FREE
-                    </span>
-                  )}
-                </CommandItem>
-              ))}
+                    disabled={locked}
+                  >
+                    {locked ? (
+                      <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
+                        )}
+                      />
+                    )}
+                    <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
+                    {m.is_free ? (
+                      <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
+                        FREE
+                      </span>
+                    ) : hasAdminModels ? (
+                      <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
+                        PRO
+                      </span>
+                    ) : null}
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
         {hasAdminModels && (
           <div className="px-3 py-1.5 border-t border-gray-border">
             <p className="text-[10px] text-muted-foreground">
-              {allDisplayModels.length} model được admin cho phép
+              {isFreeUser
+                ? `${allDisplayModels.filter((m) => m.is_free).length} model miễn phí · Nâng cấp Pro để dùng tất cả`
+                : `${allDisplayModels.length} model khả dụng`}
             </p>
           </div>
         )}

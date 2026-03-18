@@ -5,7 +5,8 @@ import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Pl
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
-import { streamChat, getApiKey, isKeyVerified, verifyApiKey, markKeyVerified } from "@/services/openRouter";
+import { streamChatViaProxy } from "@/services/openRouter";
+import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
 import {
@@ -39,6 +40,9 @@ const ChatPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+
+  const { quota, refresh: refreshQuota } = useChatQuota();
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -311,28 +315,18 @@ const ChatPage = () => {
 
   const handleSend = useCallback(
     async (content: string) => {
-      const key = getApiKey();
-      if (!key) {
-        toast.error("Vui lòng nhập API Key của OpenRouter trong phần Cài Đặt.", {
-          action: { label: "Đi tới Cài Đặt", onClick: () => navigate("/settings") },
-        });
+      if (!user) {
+        toast.error("Vui lòng đăng nhập để chat.");
         return;
       }
 
-      if (!isKeyVerified()) {
-        const result = await verifyApiKey(key);
-        if (!result.valid) {
-          toast.error(result.error || "API Key không hợp lệ. Vui lòng kiểm tra lại.", {
-            action: { label: "Đi tới Cài Đặt", onClick: () => navigate("/settings") },
-          });
-          return;
-        }
-        markKeyVerified();
+      if (quota.remaining <= 0) {
+        setQuotaExceeded(true);
+        return;
       }
 
       if (!activeCharacter) return;
 
-      // Ensure session exists in DB (creates on first user message)
       let sessionId: string;
       try {
         sessionId = await ensureSession();
@@ -374,7 +368,7 @@ const ChatPage = () => {
         { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
-      streamChat(
+      streamChatViaProxy(
         apiMessages,
         {
           onDelta: (text) => {
@@ -393,11 +387,10 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
-              // message_count tự động tăng qua DB trigger khi INSERT chat_messages
             } else {
-              // Remove empty assistant message if stream produced no content
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
+            refreshQuota();
           },
           onError: (error) => {
             setIsStreaming(false);
@@ -405,13 +398,18 @@ const ChatPage = () => {
             if (!assistantContent) {
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
-            toast.error(error);
+            if (error === "__QUOTA_EXCEEDED__") {
+              setQuotaExceeded(true);
+              refreshQuota();
+            } else {
+              toast.error(error);
+            }
           },
         },
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, activeCharId, user, navigate, scenarioOverride]
+    [messages, activeCharacter, activeSessionId, activeCharId, user, navigate, scenarioOverride, quota.remaining, refreshQuota]
   );
 
   const handleRegenerate = useCallback(async () => {
@@ -439,7 +437,7 @@ const ChatPage = () => {
       { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
     ]);
 
-    streamChat(
+    streamChatViaProxy(
       apiMessages,
       {
         onDelta: (text) => {
@@ -458,8 +456,8 @@ const ChatPage = () => {
                 m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
               )
             );
-            // Don't increment message_count here — regenerate replaces, not adds
           }
+          refreshQuota();
         },
         onError: (error) => {
           setIsStreaming(false);
@@ -467,12 +465,17 @@ const ChatPage = () => {
           if (!assistantContent) {
             setMessages((prev) => prev.filter((m) => m.id !== assistantId));
           }
-          toast.error(error);
+          if (error === "__QUOTA_EXCEEDED__") {
+            setQuotaExceeded(true);
+            refreshQuota();
+          } else {
+            toast.error(error);
+          }
         },
       },
       controller.signal
     );
-  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride]);
+  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota]);
 
   const lastAssistantIdx = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -543,7 +546,7 @@ const ChatPage = () => {
         { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
-      streamChat(
+      streamChatViaProxy(
         apiMessages,
         {
           onDelta: (text) => {
@@ -562,8 +565,8 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
-              // Don't increment message_count here — edit-resend replaces, not adds
             }
+            refreshQuota();
           },
           onError: (error) => {
             setIsStreaming(false);
@@ -571,13 +574,18 @@ const ChatPage = () => {
             if (!assistantContent) {
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
-            toast.error(error);
+            if (error === "__QUOTA_EXCEEDED__") {
+              setQuotaExceeded(true);
+              refreshQuota();
+            } else {
+              toast.error(error);
+            }
           },
         },
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride]
+    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota]
   );
 
   const handleSelectSession = useCallback(
@@ -617,6 +625,7 @@ const ChatPage = () => {
       onCustomFirstMesChange={handleCustomFirstMesChange}
       isPendingChat={isPendingChat}
       defaultFirstMes={activeCharacter.first_mes}
+      userTier={quota.tier}
     />
   ) : null;
 
@@ -737,6 +746,16 @@ const ChatPage = () => {
               }} />
           </div>
           <div className="flex items-center gap-1 pr-2 shrink-0">
+            {/* Quota badge */}
+            <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+              quota.remaining <= 0
+                ? "bg-red-500/10 border-red-500/30 text-red-400"
+                : quota.remaining <= 5
+                  ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                  : "bg-neon-blue/10 border-neon-blue/30 text-neon-blue"
+            }`}>
+              {quota.remaining}/{quota.limit}
+            </div>
             {/* New chat */}
             <button onClick={handleNewChat}
               className="p-2 text-muted-foreground hover:text-neon-purple transition-colors">
@@ -889,7 +908,34 @@ const ChatPage = () => {
               {isStreaming && messages[messages.length - 1]?.content === "" && <TypingIndicator />}
             </div>
 
-            <ChatInput onSend={handleSend} disabled={isStreaming} />
+            {quotaExceeded && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mx-4 md:mx-6 mb-2 p-4 rounded-2xl border border-neon-purple/30 bg-gradient-to-r from-neon-purple/10 via-oled-surface to-neon-blue/10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-neon-purple/20 flex items-center justify-center shrink-0">
+                    <AlertTriangle size={20} className="text-neon-purple" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Hết lượt chat hôm nay!</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Bạn đã dùng hết {quota.limit} tin nhắn trong gói {quota.plan_name}. Nâng cấp Pro để chat 200 tin/ngày.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-neon-purple text-primary-foreground hover:shadow-neon-purple shrink-0"
+                    onClick={() => navigate("/settings")}
+                  >
+                    Nâng cấp
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            <ChatInput onSend={handleSend} disabled={isStreaming || quotaExceeded} />
           </div>
 
           {/* Desktop/Tablet right sidebar with animation */}

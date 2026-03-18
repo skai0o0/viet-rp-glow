@@ -13,7 +13,8 @@ export type ApprovalAction =
   | "knowledge_add"
   | "knowledge_edit"
   | "knowledge_delete"
-  | "chargen_publish";
+  | "chargen_publish"
+  | "card_create";
 
 export interface ApprovalPayload {
   action: ApprovalAction;
@@ -34,16 +35,18 @@ export const ACTION_LABELS: Record<string, string> = {
   knowledge_edit: "Sửa Knowledge Base",
   knowledge_delete: "Xoá Knowledge Base",
   chargen_publish: "Xuất bản nhân vật AI",
+  card_create: "Tạo nhân vật mới",
 };
 
 export async function createApproval(
   userId: string,
   title: string,
   payload: ApprovalPayload,
+  approvalType: "admin_edit" | "card_create" | "card_edit" = "admin_edit",
 ): Promise<void> {
   const { error } = await supabase.from("pending_approvals").insert({
     user_id: userId,
-    type: "admin_edit" as const,
+    type: approvalType,
     title,
     payload: payload as unknown as Record<string, unknown>,
     status: "pending" as const,
@@ -144,7 +147,8 @@ export async function applyApprovalPayload(
       if (error) throw error;
       break;
     }
-    case "chargen_publish": {
+    case "chargen_publish":
+    case "card_create": {
       const card = data.card as unknown as TavernCardV2;
       const ownerId = data.owner_id as string;
       const isPublic = data.is_public as boolean;
