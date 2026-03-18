@@ -212,30 +212,103 @@ const AdminDashboardPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
+  const fetchStatsFallback = useCallback(async (): Promise<DashboardStats> => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayIso = todayStart.toISOString();
+
+    const [
+      charsAll, charsPublic, usersAll, sessionsAll, messagesAll,
+      favsAll, ratingsAll, ratingsAvg,
+      newUsersToday, newCharsToday, newSessionsToday, newMessagesToday,
+    ] = await Promise.all([
+      supabase.from("characters").select("id", { count: "exact", head: true }),
+      supabase.from("characters").select("id", { count: "exact", head: true }).eq("is_public", true),
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
+      supabase.from("chat_sessions").select("id", { count: "exact", head: true }),
+      supabase.from("chat_messages").select("id", { count: "exact", head: true }),
+      supabase.from("user_favorites").select("id", { count: "exact", head: true }),
+      supabase.from("character_ratings").select("id", { count: "exact", head: true }),
+      supabase.from("character_ratings").select("value"),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
+      supabase.from("characters").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
+      supabase.from("chat_sessions").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
+      supabase.from("chat_messages").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
+    ]);
+
+    const totalChars = charsAll.count ?? 0;
+    const publicChars = charsPublic.count ?? 0;
+    const avgVal = ratingsAvg.data?.length
+      ? ratingsAvg.data.reduce((s: number, r: any) => s + (r.value || 0), 0) / ratingsAvg.data.length
+      : 0;
+
+    return {
+      total_characters: totalChars,
+      public_characters: publicChars,
+      private_characters: totalChars - publicChars,
+      total_users: usersAll.count ?? 0,
+      total_sessions: sessionsAll.count ?? 0,
+      total_messages: messagesAll.count ?? 0,
+      total_favorites: favsAll.count ?? 0,
+      total_ratings: ratingsAll.count ?? 0,
+      avg_rating: Math.round(avgVal * 10) / 10,
+      new_users_today: newUsersToday.count ?? 0,
+      new_chars_today: newCharsToday.count ?? 0,
+      new_sessions_today: newSessionsToday.count ?? 0,
+      new_messages_today: newMessagesToday.count ?? 0,
+      total_chat_messages_today: 0,
+      active_users_today: 0,
+      total_page_views_today: 0,
+      unique_visitors_today: 0,
+    };
+  }, []);
+
   const fetchAll = useCallback(async () => {
     try {
-      const [statsRes, analyticsRes, modelRes, topCharsRes, topPagesRes] = await Promise.all([
-        supabase.rpc("get_dashboard_stats"),
+      // Try RPC first, fall back to direct queries if RPCs don't exist
+      const statsRes = await supabase.rpc("get_dashboard_stats");
+
+      if (statsRes.error || !statsRes.data || (statsRes.data as any).error) {
+        console.warn("[AdminDashboard] RPC failed, using fallback:", statsRes.error?.message);
+        const fallback = await fetchStatsFallback();
+        setStats(fallback);
+      } else {
+        setStats(statsRes.data as unknown as DashboardStats);
+      }
+
+      // Analytics RPCs — optional, don't block if they fail
+      const [analyticsRes, modelRes, topCharsRes, topPagesRes] = await Promise.allSettled([
         supabase.rpc("get_usage_analytics", { p_days: 30 }),
         supabase.rpc("get_model_usage_stats", { p_days: 30 }),
         supabase.rpc("get_top_characters", { p_limit: 10 }),
         supabase.rpc("get_top_pages", { p_days: 7 }),
       ]);
 
-      if (statsRes.data && !(statsRes.data as any).error) {
-        setStats(statsRes.data as unknown as DashboardStats);
+      if (analyticsRes.status === "fulfilled" && analyticsRes.value.data && !(analyticsRes.value.data as any).error) {
+        setAnalytics(analyticsRes.value.data as unknown as UsageAnalytics);
       }
-      if (analyticsRes.data) setAnalytics(analyticsRes.data as unknown as UsageAnalytics);
-      if (modelRes.data) setModelStats(modelRes.data as unknown as ModelUsageStats);
-      if (topCharsRes.data) setTopChars((topCharsRes.data as unknown as TopChar[]) ?? []);
-      if (topPagesRes.data) setTopPages((topPagesRes.data as unknown as TopPage[]) ?? []);
+      if (modelRes.status === "fulfilled" && modelRes.value.data && !(modelRes.value.data as any).error) {
+        setModelStats(modelRes.value.data as unknown as ModelUsageStats);
+      }
+      if (topCharsRes.status === "fulfilled" && topCharsRes.value.data && !(topCharsRes.value.data as any).error) {
+        setTopChars((topCharsRes.value.data as unknown as TopChar[]) ?? []);
+      }
+      if (topPagesRes.status === "fulfilled" && topPagesRes.value.data && !(topPagesRes.value.data as any).error) {
+        setTopPages((topPagesRes.value.data as unknown as TopPage[]) ?? []);
+      }
     } catch (err) {
-      console.error("[AdminDashboard] fetch error:", err);
+      console.error("[AdminDashboard] fetch error, trying fallback:", err);
+      try {
+        const fallback = await fetchStatsFallback();
+        setStats(fallback);
+      } catch (fbErr) {
+        console.error("[AdminDashboard] fallback also failed:", fbErr);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [fetchStatsFallback]);
 
   useEffect(() => {
     if (!canViewAdminHub) return;
