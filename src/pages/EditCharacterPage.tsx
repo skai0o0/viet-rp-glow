@@ -540,11 +540,22 @@ const EditCharacterPage = () => {
                         </div>
                       </div>
                     )}
-                    <div className="flex justify-end pt-2">
-                      <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-neon-blue text-white font-medium text-sm hover:bg-neon-blue/80 hover:shadow-neon-blue transition-all duration-200 disabled:opacity-50">
+                    <div className="flex flex-col items-end gap-2 pt-2">
+                      <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium text-sm transition-all duration-200 disabled:opacity-50 ${
+                          isAdmin
+                            ? "bg-neon-blue text-white hover:bg-neon-blue/80 hover:shadow-neon-blue"
+                            : "bg-amber-600 text-white hover:bg-amber-700 hover:shadow-amber-600/30"
+                        }`}
+                      >
                         {isSaving ? <Loader2 size={16} className="animate-spin" /> : isAdmin ? <Save size={16} /> : <ShieldAlert size={16} />}
                         {isSaving ? "Đang gửi..." : isAdmin ? "Cập Nhật Nhân Vật" : "Gửi Duyệt"}
                       </button>
+                      {!isAdmin && (
+                        <p className="text-[10px] text-amber-400/70">Chỉnh sửa cần Admin duyệt trước khi áp dụng</p>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -553,37 +564,6 @@ const EditCharacterPage = () => {
             document.body
           )}
         </motion.div>
-      </div>
-
-      {/* Sticky bottom save bar */}
-      <div className="shrink-0 px-4 py-3 border-t border-gray-border bg-oled-surface/80 backdrop-blur-sm flex items-center justify-between gap-3">
-        {!isAdmin && (
-          <div className="flex items-center gap-1.5 text-xs text-amber-400">
-            <ShieldAlert size={14} />
-            <span>Cần Admin duyệt</span>
-          </div>
-        )}
-        <div className="flex-1" />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate("/profile")}
-          className="border-gray-border text-muted-foreground hover:text-foreground"
-        >
-          Hủy
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={isSaving}
-          className={isAdmin
-            ? "bg-neon-blue hover:bg-neon-blue/80 text-white"
-            : "bg-amber-600 hover:bg-amber-700 text-white"
-          }
-        >
-          {isSaving ? <Loader2 size={14} className="animate-spin mr-1" /> : isAdmin ? <Save size={14} className="mr-1" /> : <ShieldAlert size={14} className="mr-1" />}
-          {isSaving ? "Đang gửi..." : isAdmin ? "Lưu thay đổi" : "Gửi duyệt"}
-        </Button>
       </div>
     </div>
   );
