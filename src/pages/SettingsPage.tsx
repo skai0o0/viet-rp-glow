@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Settings, Check, Loader2, Info, Crown, Zap, MessageSquare } from "lucide-react";
@@ -7,11 +7,18 @@ import { toast } from "sonner";
 import { getSelectedTier, setSelectedTier } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import TierSelector from "@/components/TierSelector";
+import { useUserRole } from "@/hooks/useUserRole";
+import { deriveChatAccess } from "@/utils/chatAccess";
 
 const SettingsPage = () => {
   const navigate = useNavigate();
   const [tier, setTier] = useState("free");
   const { quota, loading: quotaLoading } = useChatQuota();
+  const { role } = useUserRole();
+  const { isSubscriptionUser, effectiveQuota } = useMemo(
+    () => deriveChatAccess(role, quota),
+    [role, quota]
+  );
 
   useEffect(() => {
     setTier(getSelectedTier());
@@ -23,8 +30,11 @@ const SettingsPage = () => {
     navigate("/");
   };
 
-  const isPro = quota.tier === "all" || quota.plan_name === "Pro";
-  const quotaPercent = quota.limit > 0 ? Math.round((quota.used / quota.limit) * 100) : 0;
+  const isByok = !isSubscriptionUser;
+  const isPro = isByok || effectiveQuota.tier === "all" || effectiveQuota.plan_name === "Pro";
+  const quotaPercent = isSubscriptionUser && effectiveQuota.limit > 0
+    ? Math.round((effectiveQuota.used / effectiveQuota.limit) * 100)
+    : 0;
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin bg-oled-base p-6">
@@ -56,6 +66,10 @@ const SettingsPage = () => {
             <div className="flex items-center justify-center py-6">
               <Loader2 size={20} className="animate-spin text-neon-purple" />
             </div>
+          ) : !isSubscriptionUser ? (
+            <div className="text-sm text-muted-foreground">
+              Vai trò <span className="text-foreground font-semibold">{role}</span> sử dụng BYOK (tự nhập API Key) nên không áp dụng giới hạn subscription.
+            </div>
           ) : (
             <>
               {/* Plan badge */}
@@ -69,7 +83,7 @@ const SettingsPage = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-foreground">{quota.plan_name}</span>
+                    <span className="text-lg font-bold text-foreground">{effectiveQuota.plan_name}</span>
                     {isPro && (
                       <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full">
                         PRO
@@ -90,9 +104,9 @@ const SettingsPage = () => {
                     Tin nhắn hôm nay
                   </span>
                   <span className={`font-medium ${
-                    quota.remaining <= 0 ? "text-red-400" : quota.remaining <= 5 ? "text-amber-400" : "text-foreground"
+                    effectiveQuota.remaining <= 0 ? "text-red-400" : effectiveQuota.remaining <= 5 ? "text-amber-400" : "text-foreground"
                   }`}>
-                    {quota.used}/{quota.limit}
+                    {effectiveQuota.used}/{effectiveQuota.limit}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-oled-elevated overflow-hidden">
@@ -110,7 +124,7 @@ const SettingsPage = () => {
                   />
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Còn lại <span className="text-foreground font-medium">{quota.remaining}</span> tin nhắn. Reset lúc 00:00 mỗi ngày.
+                  Còn lại <span className="text-foreground font-medium">{effectiveQuota.remaining}</span> tin nhắn. Reset lúc 00:00 mỗi ngày.
                 </p>
               </div>
 
@@ -149,7 +163,7 @@ const SettingsPage = () => {
             <h2 className="text-sm font-semibold text-foreground">Chất lượng AI</h2>
           </div>
 
-          <TierSelector value={tier} onValueChange={setTier} userTier={quota.tier} />
+          <TierSelector value={tier} onValueChange={setTier} userTier={effectiveQuota.tier} />
 
           <div className="bg-oled-elevated rounded-xl p-3">
             <div className="flex items-start gap-1.5">
