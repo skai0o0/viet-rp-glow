@@ -46,7 +46,19 @@ Deno.serve(async (req) => {
       return jsonError("Missing tier_key or messages", 400);
     }
 
-    // 1. Check quota
+    // 0. Check if user has a privileged role (admin / op / moderator) → unlimited quota.
+    //    One DB round-trip per request is acceptable at current scale; move to JWT
+    //    claims if this becomes a performance bottleneck.
+    const { data: userRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .in("role", ["admin", "op", "moderator"])
+      .maybeSingle();
+
+    const isPrivileged = userRole !== null;
+
+    // 1. Check quota (skip for privileged roles)
     const { data: quota, error: quotaError } = await supabaseAdmin.rpc(
       "check_chat_quota",
       { p_user_id: user.id },
@@ -57,7 +69,7 @@ Deno.serve(async (req) => {
       return jsonError("Could not check quota", 500);
     }
 
-    if (quota.remaining <= 0) {
+    if (!isPrivileged && quota.remaining <= 0) {
       return new Response(
         JSON.stringify({
           error: "quota_exceeded",

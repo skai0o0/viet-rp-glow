@@ -16,14 +16,32 @@ describe("deriveChatAccess", () => {
     expect(result.effectiveQuota).toBe(sampleQuota);
   });
 
-  it("switches to BYOK fallback for admin-like roles", () => {
+  it("routes admin through proxy with unlimited quota", () => {
     const result = deriveChatAccess("admin", sampleQuota);
-    expect(result.isSubscriptionUser).toBe(false);
+    expect(result.isSubscriptionUser).toBe(true);
+    expect(result.effectiveQuota).toEqual(BYOK_FALLBACK_QUOTA);
+  });
+
+  it("routes op through proxy with unlimited quota", () => {
+    const result = deriveChatAccess("op", sampleQuota);
+    expect(result.isSubscriptionUser).toBe(true);
+    expect(result.effectiveQuota).toEqual(BYOK_FALLBACK_QUOTA);
+  });
+
+  it("routes moderator through proxy with unlimited quota", () => {
+    const result = deriveChatAccess("moderator", sampleQuota);
+    expect(result.isSubscriptionUser).toBe(true);
     expect(result.effectiveQuota).toEqual(BYOK_FALLBACK_QUOTA);
   });
 
   it("can force BYOK even for user role", () => {
     const result = deriveChatAccess("user", sampleQuota, true);
+    expect(result.isSubscriptionUser).toBe(false);
+    expect(result.effectiveQuota).toEqual(BYOK_FALLBACK_QUOTA);
+  });
+
+  it("can force BYOK even for admin role", () => {
+    const result = deriveChatAccess("admin", sampleQuota, true);
     expect(result.isSubscriptionUser).toBe(false);
     expect(result.effectiveQuota).toEqual(BYOK_FALLBACK_QUOTA);
   });
