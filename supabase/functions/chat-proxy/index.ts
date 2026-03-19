@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
@@ -85,37 +86,53 @@ Deno.serve(async (req) => {
     }
 
     // 2. Resolve tier → actual model ID + access check
-    const { data: tierResult, error: tierError } = await supabaseAdmin.rpc(
-      "resolve_model_tier",
-      { p_tier_key: tier_key, p_user_id: user.id },
-    );
+    //    Privileged users bypass subscription restrictions and may use any active tier.
+    let resolvedModel: string;
+    if (isPrivileged) {
+      const { data: tierData, error: tierFetchError } = await supabaseAdmin
+        .from("model_tiers")
+        .select("model_id")
+        .eq("tier_key", tier_key)
+        .eq("is_active", true)
+        .maybeSingle();
 
-    if (tierError) {
-      console.error("Tier resolve failed:", tierError);
-      return jsonError("Could not resolve model tier", 500);
-    }
-
-    if (tierResult.error === "tier_not_found") {
-      return jsonError("Tier không tồn tại", 400);
-    }
-
-    if (tierResult.error === "tier_restricted") {
-      return new Response(
-        JSON.stringify({
-          error: "tier_restricted",
-          message:
-            tierResult.message ||
-            "Tier này yêu cầu gói Pro. Vui lòng nâng cấp.",
-          quota,
-        }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+      if (tierFetchError || !tierData) {
+        return jsonError("Tier không tồn tại", 400);
+      }
+      resolvedModel = tierData.model_id as string;
+    } else {
+      const { data: tierResult, error: tierError } = await supabaseAdmin.rpc(
+        "resolve_model_tier",
+        { p_tier_key: tier_key, p_user_id: user.id },
       );
-    }
 
-    const resolvedModel = tierResult.model_id as string;
+      if (tierError) {
+        console.error("Tier resolve failed:", tierError);
+        return jsonError("Could not resolve model tier", 500);
+      }
+
+      if (tierResult.error === "tier_not_found") {
+        return jsonError("Tier không tồn tại", 400);
+      }
+
+      if (tierResult.error === "tier_restricted") {
+        return new Response(
+          JSON.stringify({
+            error: "tier_restricted",
+            message:
+              tierResult.message ||
+              "Tier này yêu cầu gói Pro. Vui lòng nâng cấp.",
+            quota,
+          }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      resolvedModel = tierResult.model_id as string;
+    }
 
     // 3. Pick a random API key from the pool
     const { data: apiKey, error: keyError } = await supabaseAdmin.rpc(
@@ -216,7 +233,7 @@ Deno.serve(async (req) => {
 });
 
 function jsonError(message: string, status: number) {
-  return new Response(JSON.stringify({ error: message }), {
+  return new Response(JSON.stringify({ error: message, message }), {
     status,
     headers: {
       ...corsHeaders,
