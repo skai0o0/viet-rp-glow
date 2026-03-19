@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { createCharacter } from "@/services/characterDb";
+import { createCharacter, updateCharacter } from "@/services/characterDb";
 import type { TavernCardV2 } from "@/types/taverncard";
 
 export type ApprovalAction =
@@ -14,7 +14,8 @@ export type ApprovalAction =
   | "knowledge_edit"
   | "knowledge_delete"
   | "chargen_publish"
-  | "card_create";
+  | "card_create"
+  | "card_edit";
 
 export interface ApprovalPayload {
   action: ApprovalAction;
@@ -36,6 +37,7 @@ export const ACTION_LABELS: Record<string, string> = {
   knowledge_delete: "Xoá Knowledge Base",
   chargen_publish: "Xuất bản nhân vật AI",
   card_create: "Tạo nhân vật mới",
+  card_edit: "Chỉnh sửa nhân vật",
 };
 
 export async function createApproval(
@@ -154,6 +156,14 @@ export async function applyApprovalPayload(
       const isPublic = data.is_public as boolean;
       const avatarUrl = (data.avatar_url as string) || null;
       await createCharacter(card, ownerId, isPublic, undefined, avatarUrl);
+      break;
+    }
+    case "card_edit": {
+      if (!target_id) throw new Error("Thiếu target_id");
+      const card = data.card as unknown as TavernCardV2;
+      const isPublic = data.is_public as boolean;
+      const avatarUrl = data.avatar_url as string | null | undefined;
+      await updateCharacter(target_id, card, isPublic, undefined, avatarUrl);
       break;
     }
     default:
