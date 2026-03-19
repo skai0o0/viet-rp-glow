@@ -17,7 +17,7 @@ const SettingsPage = () => {
   const { role } = useUserRole();
   const { isSubscriptionUser, effectiveQuota } = useMemo(
     () => deriveChatAccess(role, quota),
-    [role, quota]
+    [role, quota],
   );
 
   useEffect(() => {
@@ -68,7 +68,7 @@ const SettingsPage = () => {
             </div>
           ) : !isSubscriptionUser ? (
             <div className="text-sm text-muted-foreground">
-              Vai trò <span className="text-foreground font-semibold">{role}</span> sử dụng BYOK (tự nhập API Key) nên không áp dụng giới hạn subscription.
+              Vai trò <span className="text-foreground font-semibold">{role}</span> sử dụng API Key riêng (BYOK) — không giới hạn tin nhắn. Quản lý key tại <span className="text-neon-purple font-medium">Admin Hub → API Global Settings</span>.
             </div>
           ) : (
             <>

@@ -666,12 +666,13 @@ const ChatPage = () => {
       isPendingChat={isPendingChat}
       defaultFirstMes={activeCharacter.first_mes}
       userTier={effectiveQuota.tier}
+      isByok={!isSubscriptionUser}
     />
   ) : null;
 
   const quotaBadgeText = isSubscriptionUser
     ? `${effectiveQuota.remaining}/${effectiveQuota.limit}`
-    : "BYOK";
+    : role.toUpperCase();
 
   const quotaBadgeClass = isSubscriptionUser
     ? effectiveQuota.remaining <= 0

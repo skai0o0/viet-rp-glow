@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import TierSelector from "@/components/TierSelector";
-import { getSelectedTier, setSelectedTier } from "@/services/openRouter";
+import ModelCombobox from "@/components/ModelCombobox";
+import { getSelectedTier, setSelectedTier, getModel, setModel } from "@/services/openRouter";
 
 const STORAGE_KEY_MAX_TOKENS = "vietrp_max_tokens";
 const STORAGE_KEY_RESPONSE_STYLE = "vietrp_response_style";
@@ -72,6 +73,7 @@ interface GenerationSettingsProps {
   isPendingChat?: boolean;
   defaultFirstMes?: string;
   userTier?: string;
+  isByok?: boolean;
 }
 
 const GenerationSettings = ({
@@ -84,8 +86,10 @@ const GenerationSettings = ({
   isPendingChat,
   defaultFirstMes,
   userTier,
+  isByok = false,
 }: GenerationSettingsProps) => {
   const [selectedTier, setSelectedTierState] = useState(getSelectedTier());
+  const [selectedModel, setSelectedModel] = useState(getModel());
   const [maxTokens, setMaxTokensState] = useState(getMaxTokens());
   const [responseStyle, setResponseStyleState] = useState(getResponseStyle());
 
@@ -210,12 +214,23 @@ const GenerationSettings = ({
             </div>
           )}
 
-          {/* Tier Switcher */}
+          {/* Model / Tier Switcher */}
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-              Chất lượng AI
+              {isByok ? "Model AI" : "Chất lượng AI"}
             </Label>
-            <TierSelector value={selectedTier} onValueChange={handleTierChange} userTier={userTier} />
+            {isByok ? (
+              <ModelCombobox
+                value={selectedModel}
+                onValueChange={(val) => {
+                  setSelectedModel(val);
+                  setModel(val);
+                }}
+                userTier="all"
+              />
+            ) : (
+              <TierSelector value={selectedTier} onValueChange={handleTierChange} userTier={userTier} />
+            )}
           </div>
 
           {/* Max Tokens Slider */}

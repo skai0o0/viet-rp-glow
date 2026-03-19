@@ -1245,7 +1245,7 @@ const AdminCharGenPage = () => {
                   >
                     <div className="bg-oled-surface border border-oled-border rounded-xl p-3 flex flex-col gap-2">
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Model AI</p>
-                      <ModelCombobox value={selectedModel} onValueChange={handleModelChange} />
+                      <ModelCombobox value={selectedModel} onValueChange={handleModelChange} userTier="all" />
                     </div>
                   </motion.div>
                 )}

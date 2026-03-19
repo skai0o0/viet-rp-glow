@@ -10,13 +10,14 @@ const STORAGE_KEY_VERIFIED = "vietrp_key_verified";
 const STORAGE_KEY_TIER = "vietrp_selected_tier";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const CHAT_PROXY_URL = `${SUPABASE_URL}/functions/v1/chat-proxy`;
 
-// Fallback models if API fetch fails
+// Fallback models if admin allowed_models list is empty
 export const AVAILABLE_MODELS = [
-  { id: "nousresearch/nous-hermes-2-mixtral-8x7b-dpo", label: "Nous Hermes 2 Mixtral 8x7B" },
-  { id: "anthropic/claude-3-haiku", label: "Claude 3 Haiku" },
-  { id: "google/gemini-pro", label: "Gemini Pro" },
+  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" },
+  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { id: "anthropic/claude-3.5-haiku", label: "Claude 3.5 Haiku" },
   { id: "gryphe/mythomax-l2-13b", label: "MythoMax L2 13B" },
 ] as const;
 
@@ -47,8 +48,16 @@ export function markKeyVerified() {
   localStorage.setItem(STORAGE_KEY_VERIFIED, "true");
 }
 
+const DEPRECATED_MODELS = [
+  "nousresearch/nous-hermes-2-mixtral-8x7b-dpo",
+  "google/gemini-pro",
+];
+
 export function getModel(): string {
-  return localStorage.getItem(STORAGE_KEY_MODEL) || AVAILABLE_MODELS[0].id;
+  const stored = localStorage.getItem(STORAGE_KEY_MODEL);
+  if (stored && !DEPRECATED_MODELS.includes(stored)) return stored;
+  if (stored) localStorage.removeItem(STORAGE_KEY_MODEL);
+  return AVAILABLE_MODELS[0].id;
 }
 
 export function setModel(model: string) {
@@ -189,6 +198,10 @@ export async function streamChat(
         callbacks.onError("API Key không hợp lệ. Vui lòng kiểm tra lại trong Cài Đặt.");
         return;
       }
+      if (response.status === 404) {
+        callbacks.onError(`Model "${model}" không tồn tại trên OpenRouter. Vui lòng chọn model khác.`);
+        return;
+      }
       if (response.status === 429) {
         callbacks.onError("Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau.");
         return;
@@ -265,7 +278,7 @@ export async function streamChat(
   } catch (err: any) {
     if (err.name === "AbortError") return;
     console.error("Stream error:", err);
-    callbacks.onError("Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.");
+    callbacks.onError(`Lỗi kết nối tới OpenRouter. Vui lòng kiểm tra API Key và kết nối mạng. (${err.message || "unknown"})`);
   }
 }
 
@@ -319,6 +332,7 @@ export async function streamChatViaProxy(
       method: "POST",
       headers: {
         "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -419,6 +433,6 @@ export async function streamChatViaProxy(
   } catch (err: any) {
     if (err.name === "AbortError") return;
     console.error("Proxy stream error:", err);
-    callbacks.onError("Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.");
+    callbacks.onError(`Lỗi kết nối tới Chat Proxy. Vui lòng kiểm tra mạng và thử lại. (${err.message || "unknown"})`);
   }
 }
