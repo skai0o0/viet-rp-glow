@@ -175,10 +175,8 @@ const AdminApprovalsPage = () => {
     if (!reviewDialog || !user) return;
     setSubmitting(true);
     try {
-      // Auto-apply changes when approving admin_edit or card_create type
       if (
         reviewDialog.action === "approved" &&
-        (reviewDialog.item.type === "admin_edit" || reviewDialog.item.type === "card_create") &&
         reviewDialog.item.payload
       ) {
         try {

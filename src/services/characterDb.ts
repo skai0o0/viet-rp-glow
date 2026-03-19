@@ -148,9 +148,13 @@ export async function getCharacterById(id: string): Promise<DbCharacter> {
 
 /** Fetch all characters owned by current user */
 export async function getMyCharacters(): Promise<CharacterSummary[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Chưa đăng nhập");
+
   const { data, error } = await supabase
     .from("characters")
     .select(SUMMARY_COLS_FULL)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (!error) return withStatDefaults(data ?? []);
@@ -158,6 +162,7 @@ export async function getMyCharacters(): Promise<CharacterSummary[]> {
   const fb = await supabase
     .from("characters")
     .select(SUMMARY_COLS_BASE)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
   if (fb.error) throw fb.error;
   return withStatDefaults(fb.data ?? []);

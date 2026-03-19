@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, ImagePlus } from "lucide-react";
+import { Pencil, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, ImagePlus, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getCharacterById, updateCharacter } from "@/services/characterDb";
+import { createApproval, type ApprovalPayload } from "@/services/approvalService";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/contexts/AuthContext";
 import { compressAvatar } from "@/utils/imageOptimization";
 import {
   TavernCardV2,
@@ -35,6 +38,8 @@ const sectionCard =
 const EditCharacterPage = () => {
   const navigate = useNavigate();
   const { characterId } = useParams<{ characterId: string }>();
+  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const [loading, setLoading] = useState(true);
   const [card, setCard] = useState<TavernCardV2>(createEmptyTavernCard());
   const [tagInput, setTagInput] = useState("");
@@ -159,7 +164,7 @@ const EditCharacterPage = () => {
   };
 
   const handleSave = async () => {
-    if (!characterId) return;
+    if (!characterId || !user) return;
     if (!data.name.trim()) {
       toast({ title: "Lỗi", description: "Vui lòng nhập tên nhân vật.", variant: "destructive" });
       return;
@@ -167,11 +172,9 @@ const EditCharacterPage = () => {
 
     setIsSaving(true);
     try {
-      let avatarUrl: string | null | undefined = undefined; // undefined = don't change
+      let avatarUrl: string | null | undefined = undefined;
       if (avatarFile) {
-        const { data: session } = await supabase.auth.getSession();
-        if (!session?.session?.user) throw new Error("Chưa đăng nhập");
-        const userId = session.session.user.id;
+        const userId = user.id;
         const ext = "webp";
         const filePath = `${userId}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
@@ -182,9 +185,33 @@ const EditCharacterPage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      await updateCharacter(characterId, card, isPublic, undefined, avatarUrl);
-      toast({ title: "Thành công! 🎉", description: "Đã cập nhật nhân vật!" });
-      navigate("/profile");
+      if (isAdmin) {
+        await updateCharacter(characterId, card, isPublic, undefined, avatarUrl);
+        toast({ title: "Thành công!", description: "Đã cập nhật nhân vật." });
+        navigate("/profile");
+      } else {
+        const payload: ApprovalPayload = {
+          action: "card_edit",
+          target_table: "characters",
+          target_id: characterId,
+          data: {
+            card: card as unknown as Record<string, unknown>,
+            is_public: isPublic,
+            ...(avatarUrl !== undefined && { avatar_url: avatarUrl }),
+          },
+        };
+        await createApproval(
+          user.id,
+          `Chỉnh sửa nhân vật "${data.name}"`,
+          payload,
+          "card_edit",
+        );
+        toast({
+          title: "Đã gửi yêu cầu duyệt",
+          description: "Bản chỉnh sửa sẽ được áp dụng sau khi Admin duyệt.",
+        });
+        navigate("/profile");
+      }
     } catch (err: any) {
       toast({ title: "Lỗi", description: err.message || "Không thể cập nhật.", variant: "destructive" });
     } finally {
@@ -225,6 +252,17 @@ const EditCharacterPage = () => {
       {/* Form Body */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-24 md:pb-6">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="max-w-2xl mx-auto space-y-6">
+          {!isAdmin && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+              <ShieldAlert size={18} className="text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-300">Cần Admin duyệt</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Mọi chỉnh sửa nhân vật sẽ được gửi đến Admin xét duyệt trước khi áp dụng.
+                </p>
+              </div>
+            </div>
+          )}
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="w-full bg-oled-surface border border-gray-border h-auto flex-wrap">
               <TabsTrigger value="basic" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1">Cơ bản</TabsTrigger>
@@ -504,8 +542,8 @@ const EditCharacterPage = () => {
                     )}
                     <div className="flex justify-end pt-2">
                       <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-neon-blue text-white font-medium text-sm hover:bg-neon-blue/80 hover:shadow-neon-blue transition-all duration-200 disabled:opacity-50">
-                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        {isSaving ? "Đang lưu..." : "Cập Nhật Nhân Vật"}
+                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : isAdmin ? <Save size={16} /> : <ShieldAlert size={16} />}
+                        {isSaving ? "Đang gửi..." : isAdmin ? "Cập Nhật Nhân Vật" : "Gửi Duyệt"}
                       </button>
                     </div>
                   </div>
@@ -515,6 +553,37 @@ const EditCharacterPage = () => {
             document.body
           )}
         </motion.div>
+      </div>
+
+      {/* Sticky bottom save bar */}
+      <div className="shrink-0 px-4 py-3 border-t border-gray-border bg-oled-surface/80 backdrop-blur-sm flex items-center justify-between gap-3">
+        {!isAdmin && (
+          <div className="flex items-center gap-1.5 text-xs text-amber-400">
+            <ShieldAlert size={14} />
+            <span>Cần Admin duyệt</span>
+          </div>
+        )}
+        <div className="flex-1" />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/profile")}
+          className="border-gray-border text-muted-foreground hover:text-foreground"
+        >
+          Hủy
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={isSaving}
+          className={isAdmin
+            ? "bg-neon-blue hover:bg-neon-blue/80 text-white"
+            : "bg-amber-600 hover:bg-amber-700 text-white"
+          }
+        >
+          {isSaving ? <Loader2 size={14} className="animate-spin mr-1" /> : isAdmin ? <Save size={14} className="mr-1" /> : <ShieldAlert size={14} className="mr-1" />}
+          {isSaving ? "Đang gửi..." : isAdmin ? "Lưu thay đổi" : "Gửi duyệt"}
+        </Button>
       </div>
     </div>
   );

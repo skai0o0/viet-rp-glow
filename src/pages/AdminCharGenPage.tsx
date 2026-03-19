@@ -233,12 +233,14 @@ const AdminCharGenPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
+    if (!user) return;
     setHistoryLoading(true);
     try {
       const { data, error } = await supabase
         .from("characters")
         .select("*")
         .eq("creator", "VietRP Charagen AI")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -249,7 +251,7 @@ const AdminCharGenPage = () => {
     } finally {
       setHistoryLoading(false);
     }
-  }, [])
+  }, [user])
 
   const handleDeleteChar = async (id: string, name: string) => {
     if (!confirm(`Xoá nhân vật "${name}"? Hành động này không thể hoàn tác.`)) return;
