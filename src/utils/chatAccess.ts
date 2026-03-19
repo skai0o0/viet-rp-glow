@@ -9,16 +9,18 @@ export const BYOK_FALLBACK_QUOTA: ChatQuota = {
   tier: "all",
 };
 
-/** Roles that bypass subscription quota and use the platform proxy with no limit */
+/** Privileged roles that use BYOK (own API key) instead of platform proxy */
 const PRIVILEGED_ROLES: UserRole[] = ["admin", "op", "moderator"];
 
-export function deriveChatAccess(role: UserRole, quota: ChatQuota, forceByok = false) {
-  if (forceByok) {
-    return { isSubscriptionUser: false, effectiveQuota: BYOK_FALLBACK_QUOTA };
-  }
-  // Privileged roles use the platform proxy (not BYOK) but have no quota limit
+/**
+ * Determine chat access mode:
+ * - Privileged roles (admin/op/moderator) with BYOK key → BYOK direct to OpenRouter
+ * - Privileged roles without key → error (must set key in Settings/API Settings)
+ * - Regular users → always Proxy with daily quota (no BYOK access)
+ */
+export function deriveChatAccess(role: UserRole, quota: ChatQuota) {
   if (PRIVILEGED_ROLES.includes(role)) {
-    return { isSubscriptionUser: true, effectiveQuota: BYOK_FALLBACK_QUOTA };
+    return { isSubscriptionUser: false, effectiveQuota: BYOK_FALLBACK_QUOTA };
   }
   return { isSubscriptionUser: true, effectiveQuota: quota };
 }
