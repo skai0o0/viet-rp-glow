@@ -10,6 +10,7 @@ const STORAGE_KEY_VERIFIED = "vietrp_key_verified";
 const STORAGE_KEY_TIER = "vietrp_selected_tier";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const CHAT_PROXY_URL = `${SUPABASE_URL}/functions/v1/chat-proxy`;
 
 // Fallback models if API fetch fails
@@ -319,6 +320,7 @@ export async function streamChatViaProxy(
       method: "POST",
       headers: {
         "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -352,7 +354,7 @@ export async function streamChatViaProxy(
         callbacks.onError("Quá nhiều yêu cầu. Vui lòng thử lại sau.");
         return;
       }
-      callbacks.onError(errBody.message || `Lỗi từ AI: ${response.status}`);
+      callbacks.onError(errBody.message || errBody.error || `Lỗi từ AI: ${response.status}`);
       return;
     }
 
