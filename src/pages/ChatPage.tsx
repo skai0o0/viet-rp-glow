@@ -5,7 +5,7 @@ import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Pl
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
-import { streamChatViaProxy } from "@/services/openRouter";
+import { streamChat, streamChatViaProxy } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
@@ -34,6 +34,8 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUserRole } from "@/hooks/useUserRole";
+import { deriveChatAccess } from "@/utils/chatAccess";
 
 const ChatPage = () => {
   const { characterId } = useParams<{ characterId: string }>();
@@ -43,6 +45,11 @@ const ChatPage = () => {
 
   const { quota, refresh: refreshQuota } = useChatQuota();
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const { role } = useUserRole();
+  const { isSubscriptionUser, effectiveQuota } = useMemo(
+    () => deriveChatAccess(role, quota),
+    [role, quota]
+  );
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -65,6 +72,16 @@ const ChatPage = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIdx, setSearchIdx] = useState(0);
+
+  useEffect(() => {
+    if (!isSubscriptionUser) {
+      setQuotaExceeded(false);
+      return;
+    }
+    if (effectiveQuota.remaining <= 0) {
+      setQuotaExceeded(true);
+    }
+  }, [isSubscriptionUser, effectiveQuota.remaining]);
 
   const searchMatches = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -320,7 +337,7 @@ const ChatPage = () => {
         return;
       }
 
-      if (quota.remaining <= 0) {
+      if (isSubscriptionUser && effectiveQuota.remaining <= 0) {
         setQuotaExceeded(true);
         return;
       }
@@ -368,7 +385,9 @@ const ChatPage = () => {
         { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
-      streamChatViaProxy(
+      const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+
+      streamFn(
         apiMessages,
         {
           onDelta: (text) => {
@@ -390,7 +409,9 @@ const ChatPage = () => {
             } else {
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
-            refreshQuota();
+            if (isSubscriptionUser) {
+              refreshQuota();
+            }
           },
           onError: (error) => {
             setIsStreaming(false);
@@ -398,7 +419,7 @@ const ChatPage = () => {
             if (!assistantContent) {
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
-            if (error === "__QUOTA_EXCEEDED__") {
+            if (error === "__QUOTA_EXCEEDED__" && isSubscriptionUser) {
               setQuotaExceeded(true);
               refreshQuota();
             } else {
@@ -409,7 +430,18 @@ const ChatPage = () => {
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, activeCharId, user, navigate, scenarioOverride, quota.remaining, refreshQuota]
+    [
+      messages,
+      activeCharacter,
+      activeSessionId,
+      activeCharId,
+      user,
+      navigate,
+      scenarioOverride,
+      effectiveQuota.remaining,
+      refreshQuota,
+      isSubscriptionUser,
+    ]
   );
 
   const handleRegenerate = useCallback(async () => {
@@ -437,7 +469,9 @@ const ChatPage = () => {
       { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
     ]);
 
-    streamChatViaProxy(
+    const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+
+    streamFn(
       apiMessages,
       {
         onDelta: (text) => {
@@ -457,7 +491,9 @@ const ChatPage = () => {
               )
             );
           }
-          refreshQuota();
+          if (isSubscriptionUser) {
+            refreshQuota();
+          }
         },
         onError: (error) => {
           setIsStreaming(false);
@@ -465,7 +501,7 @@ const ChatPage = () => {
           if (!assistantContent) {
             setMessages((prev) => prev.filter((m) => m.id !== assistantId));
           }
-          if (error === "__QUOTA_EXCEEDED__") {
+          if (error === "__QUOTA_EXCEEDED__" && isSubscriptionUser) {
             setQuotaExceeded(true);
             refreshQuota();
           } else {
@@ -475,7 +511,7 @@ const ChatPage = () => {
       },
       controller.signal
     );
-  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota]);
+  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser]);
 
   const lastAssistantIdx = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -546,7 +582,9 @@ const ChatPage = () => {
         { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
-      streamChatViaProxy(
+      const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+
+      streamFn(
         apiMessages,
         {
           onDelta: (text) => {
@@ -566,7 +604,9 @@ const ChatPage = () => {
                 )
               );
             }
-            refreshQuota();
+            if (isSubscriptionUser) {
+              refreshQuota();
+            }
           },
           onError: (error) => {
             setIsStreaming(false);
@@ -574,7 +614,7 @@ const ChatPage = () => {
             if (!assistantContent) {
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
-            if (error === "__QUOTA_EXCEEDED__") {
+            if (error === "__QUOTA_EXCEEDED__" && isSubscriptionUser) {
               setQuotaExceeded(true);
               refreshQuota();
             } else {
@@ -585,7 +625,7 @@ const ChatPage = () => {
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota]
+    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser]
   );
 
   const handleSelectSession = useCallback(
@@ -625,9 +665,21 @@ const ChatPage = () => {
       onCustomFirstMesChange={handleCustomFirstMesChange}
       isPendingChat={isPendingChat}
       defaultFirstMes={activeCharacter.first_mes}
-      userTier={quota.tier}
+      userTier={effectiveQuota.tier}
     />
   ) : null;
+
+  const quotaBadgeText = isSubscriptionUser
+    ? `${effectiveQuota.remaining}/${effectiveQuota.limit}`
+    : "BYOK";
+
+  const quotaBadgeClass = isSubscriptionUser
+    ? effectiveQuota.remaining <= 0
+      ? "bg-red-500/10 border-red-500/30 text-red-400"
+      : effectiveQuota.remaining <= 5
+        ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+        : "bg-neon-blue/10 border-neon-blue/30 text-neon-blue"
+    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
 
   // No character selected — show all sessions list
   if (!activeCharacter) {
@@ -747,14 +799,8 @@ const ChatPage = () => {
           </div>
           <div className="flex items-center gap-1 pr-2 shrink-0">
             {/* Quota badge */}
-            <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-              quota.remaining <= 0
-                ? "bg-red-500/10 border-red-500/30 text-red-400"
-                : quota.remaining <= 5
-                  ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                  : "bg-neon-blue/10 border-neon-blue/30 text-neon-blue"
-            }`}>
-              {quota.remaining}/{quota.limit}
+            <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${quotaBadgeClass}`}>
+              {quotaBadgeText}
             </div>
             {/* New chat */}
             <button onClick={handleNewChat}
@@ -908,7 +954,7 @@ const ChatPage = () => {
               {isStreaming && messages[messages.length - 1]?.content === "" && <TypingIndicator />}
             </div>
 
-            {quotaExceeded && (
+            {isSubscriptionUser && quotaExceeded && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -921,7 +967,7 @@ const ChatPage = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">Hết lượt chat hôm nay!</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Bạn đã dùng hết {quota.limit} tin nhắn trong gói {quota.plan_name}. Nâng cấp Pro để chat 200 tin/ngày.
+                      Bạn đã dùng hết {effectiveQuota.limit} tin nhắn trong gói {effectiveQuota.plan_name}. Nâng cấp Pro để tăng giới hạn tin nhắn mỗi ngày.
                     </p>
                   </div>
                   <Button
@@ -935,7 +981,7 @@ const ChatPage = () => {
               </motion.div>
             )}
 
-            <ChatInput onSend={handleSend} disabled={isStreaming || quotaExceeded} />
+            <ChatInput onSend={handleSend} disabled={isStreaming || (isSubscriptionUser && quotaExceeded)} />
           </div>
 
           {/* Desktop/Tablet right sidebar with animation */}
