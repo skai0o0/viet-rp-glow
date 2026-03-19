@@ -42,6 +42,9 @@ import { createApproval } from "@/services/approvalService";
 import {
   verifyApiKey,
   fetchOpenRouterModels,
+  getApiKey,
+  setApiKey,
+  markKeyVerified,
   type OpenRouterModel,
 } from "@/services/openRouter";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,10 +72,11 @@ const AdminApiSettingsPage = () => {
   const { isAdmin, isOp, canViewAdminHub, canEditAdminHub, checking } = useUserRole();
 
   // API verification
-  const [testApiKey, setTestApiKey] = useState("");
+  const [testApiKey, setTestApiKey] = useState(() => getApiKey());
   const [showKey, setShowKey] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
+  const [saved, setSaved] = useState(false);
 
   // OpenRouter models (full list)
   const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
@@ -159,6 +163,13 @@ const AdminApiSettingsPage = () => {
     } else {
       toast.error(result.error || "API Key không hợp lệ.");
     }
+  };
+
+  const handleSaveKey = () => {
+    setApiKey(testApiKey.trim());
+    if (verified === true) markKeyVerified();
+    setSaved(true);
+    toast.success("Đã lưu API Key vào trình duyệt!");
   };
 
   const allowedModelIds = useMemo(
@@ -318,14 +329,14 @@ const AdminApiSettingsPage = () => {
               <h2 className="text-sm font-semibold text-foreground">Verify OpenRouter API Key</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              Kiểm tra API Key có hợp lệ trước khi hướng dẫn người dùng. Key này KHÔNG được lưu trữ.
+              Nhập API Key OpenRouter, verify để kiểm tra, rồi lưu vào localStorage của trình duyệt.
             </p>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
                   type={showKey ? "text" : "password"}
                   value={testApiKey}
-                  onChange={(e) => { setTestApiKey(e.target.value); setVerified(null); }}
+                  onChange={(e) => { setTestApiKey(e.target.value); setVerified(null); setSaved(false); }}
                   placeholder="sk-or-v1-..."
                   className="bg-oled-elevated border-gray-border text-foreground pr-10 focus:border-neon-blue focus:ring-neon-blue/30"
                 />
@@ -351,6 +362,19 @@ const AdminApiSettingsPage = () => {
               >
                 {verifying ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-1" />}
                 {verified === true ? "Hợp lệ ✓" : verified === false ? "Lỗi ✗" : "Verify"}
+              </Button>
+              <Button
+                onClick={handleSaveKey}
+                disabled={verified !== true || saved}
+                className={`min-w-[80px] ${
+                  saved
+                    ? "bg-green-500/20 text-green-400 border-green-500/30"
+                    : "bg-neon-purple/10 text-neon-purple border-neon-purple/30 hover:bg-neon-purple/20"
+                }`}
+                variant="outline"
+              >
+                <Save size={14} className="mr-1" />
+                {saved ? "Đã lưu" : "Lưu"}
               </Button>
             </div>
           </CardContent>
