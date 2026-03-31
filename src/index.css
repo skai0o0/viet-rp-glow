@@ -49,9 +49,12 @@
     --oled-base: 0 0% 0%;
     --oled-surface: 0 0% 4%;
     --oled-elevated: 0 0% 7%;
+    --oled-border: 0 0% 12%;
     --gray-border: 0 0% 12%;
     --neon-blue: 184 100% 50%;
     --neon-purple: 275 100% 56%;
+    --neon-rose: 343 100% 58%;
+    --neon-green: 151 100% 61%;
   }
 }
 
