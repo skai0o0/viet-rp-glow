@@ -72,12 +72,12 @@ export default {
         "neon-green": "hsl(var(--neon-green))",
       },
       boxShadow: {
-        "neon-blue": "0 0 10px rgba(0, 240, 255, 0.4), 0 0 20px rgba(0, 240, 255, 0.2)",
-        "neon-purple": "0 0 10px rgba(176, 38, 255, 0.4), 0 0 20px rgba(176, 38, 255, 0.2)",
-        "neon-rose": "0 0 10px rgba(255, 38, 100, 0.4), 0 0 20px rgba(255, 38, 100, 0.2)",
-        "neon-blue-lg": "0 0 15px rgba(0, 240, 255, 0.5), 0 0 30px rgba(0, 240, 255, 0.3)",
-        "neon-purple-lg": "0 0 15px rgba(176, 38, 255, 0.5), 0 0 30px rgba(176, 38, 255, 0.3)",
-        "neon-rose-lg": "0 0 15px rgba(255, 38, 100, 0.5), 0 0 30px rgba(255, 38, 100, 0.3)",
+        "neon-blue": "0 0 10px hsl(var(--neon-blue) / 0.4), 0 0 20px hsl(var(--neon-blue) / 0.2)",
+        "neon-purple": "0 0 10px hsl(var(--neon-purple) / 0.4), 0 0 20px hsl(var(--neon-purple) / 0.2)",
+        "neon-rose": "0 0 10px hsl(var(--neon-rose) / 0.4), 0 0 20px hsl(var(--neon-rose) / 0.2)",
+        "neon-blue-lg": "0 0 15px hsl(var(--neon-blue) / 0.5), 0 0 30px hsl(var(--neon-blue) / 0.3)",
+        "neon-purple-lg": "0 0 15px hsl(var(--neon-purple) / 0.5), 0 0 30px hsl(var(--neon-purple) / 0.3)",
+        "neon-rose-lg": "0 0 15px hsl(var(--neon-rose) / 0.5), 0 0 30px hsl(var(--neon-rose) / 0.3)",
       },
       borderRadius: {
         lg: "var(--radius)",
