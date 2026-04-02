@@ -101,6 +101,11 @@ JSON
     "alternate_greetings": []
   }
 }
+You MUST output ONLY in Vietnamese and English. 
+NEVER use any Chinese characters (Hán tự / 汉字), Chinese punctuation, or mixed Chinese words in the output. 
+If you accidentally generate any Chinese text, immediately correct it to pure Vietnamese before finishing the response.
+All fields: description, personality, scenario, first_mes, mes_example, post_history_instructions must be 100% tiếng Việt tự nhiên, không lẫn một chữ Trung nào.
+Output must be clean, valid JSON with no Chinese contamination.
 Now, generate the card based on the user’s next message.
 `;
 
