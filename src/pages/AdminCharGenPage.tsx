@@ -286,8 +286,10 @@ const AdminCharGenPage = () => {
 
   // Init target to current user once loaded
   useEffect(() => {
-    if (user && !targetUserId) setTargetUserId(user.id);
-  }, [user, targetUserId]);
+    if (user && targetUserId === "") {
+      setTargetUserId(user.id);
+    }
+  }, [user]); // Chỉ depend vào user thôi
 
   const searchUsers = useCallback(async (q: string) => {
     if (!q.trim()) { setUserResults([]); return; }
@@ -383,7 +385,7 @@ const AdminCharGenPage = () => {
     };
 
     await streamChat(apiMessages, callbacks, controller.signal, 4096);
-  }, [input, streaming, messages]);
+  }, [input, streaming, messages, cloneMode, fetchHistory, user]);
 
   const handleStop = () => {
     abortRef.current?.abort();
@@ -560,7 +562,9 @@ const AdminCharGenPage = () => {
     "bg-oled-base border-oled-border text-foreground font-mono text-xs resize-y min-h-[80px]";
 
   /* ---------- Review Panel Content (shared between desktop sidebar & mobile sheet) ---------- */
-  const reviewContent = generatedCard ? (
+  const reviewContent = (() => {
+    if (!generatedCard) return null;
+    return (
     <div className="h-full flex flex-col bg-oled-base">
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-border">
         <div className="flex items-center gap-2">
@@ -782,7 +786,8 @@ const AdminCharGenPage = () => {
         </Card>
       </div>
     </div>
-  ) : null;
+    );
+  })();
 
   /* ---------- History Panel Content ---------- */
   const historyContent = (
