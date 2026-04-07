@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
           top_p,
           top_k,
           repetition_penalty,
+          reasoning: { effort: "high", exclude: true },
         }),
       },
     );
