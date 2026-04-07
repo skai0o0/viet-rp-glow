@@ -189,7 +189,7 @@ export async function streamChat(
         top_p: samplingParams.top_p,
         top_k: samplingParams.top_k,
         repetition_penalty: samplingParams.repetition_penalty,
-        reasoning: { effort: "high" },
+        reasoning: { effort: "high", exclude: true },
       }),
       signal,
     });
