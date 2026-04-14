@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 let cachedPrompt: string | null = null;
 
 export async function fetchGlobalSystemPrompt(): Promise<string> {
+  if (cachedPrompt !== null) return cachedPrompt;
   const { data } = await supabase
     .from("global_settings")
     .select("value")
