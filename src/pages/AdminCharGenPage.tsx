@@ -132,7 +132,7 @@ Determine if the text is:
 - System_prompt: Core directive. Instruct AI to stay in first-person (Type A) OR act as an impartial GM enforcing world rules (Type B).
 
 ### STEP 4: JSON OUTPUT FORMAT
-Output ONLY a raw, strictly valid JSON object. Do not include markdown formatting like ```json or trailing text. Use the exact keys below:
+Output ONLY a raw, strictly valid JSON object. Do not include markdown formatting (like code blocks) or trailing text. Use the exact keys below:
 
 {
   "spec": "chara_card_v2",
