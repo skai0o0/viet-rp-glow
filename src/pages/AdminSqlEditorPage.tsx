@@ -22,7 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 const HISTORY_KEY = "vietrp_sql_history";
 const MAX_HISTORY = 20;
 
-const SETUP_SQL = `-- Run this ONCE in Supabase SQL Editor to enable the in-app SQL editor
+const SETUP_SQL = `-- Run this ONCE in Supabase SQL Editor to enable the in-app SQL editor (READ-ONLY)
 CREATE OR REPLACE FUNCTION exec_sql(query text)
 RETURNS json
 LANGUAGE plpgsql
@@ -31,26 +31,21 @@ SET search_path = public
 AS $$
 DECLARE
   result json;
-  affected int;
-  is_select boolean;
 BEGIN
   -- Admin-only check via has_role
   IF NOT (SELECT has_role(auth.uid(), 'admin')) THEN
     RAISE EXCEPTION 'Unauthorized: Admin access required';
   END IF;
 
-  is_select := lower(trim(query)) ~ '^(select|with|explain)';
-
-  IF is_select THEN
-    EXECUTE format(
-      'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (%s) t',
-      query
-    ) INTO result;
-  ELSE
-    EXECUTE query;
-    GET DIAGNOSTICS affected = ROW_COUNT;
-    result := json_build_object('affected_rows', affected, 'status', 'ok');
+  -- Read-only: only allow SELECT, WITH, EXPLAIN
+  IF NOT (lower(trim(query)) ~ '^(select|with|explain)') THEN
+    RAISE EXCEPTION 'Chỉ cho phép truy vấn đọc (SELECT/WITH/EXPLAIN). Sử dụng Supabase Dashboard cho thao tác ghi.';
   END IF;
+
+  EXECUTE format(
+    'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (%s) t',
+    query
+  ) INTO result;
 
   RETURN result;
 EXCEPTION
@@ -126,6 +121,12 @@ const AdminSqlEditorPage = () => {
   const executeQuery = useCallback(async () => {
     const trimmed = sql.trim().replace(/;\s*$/, "");
     if (!trimmed || running) return;
+
+    // Client-side read-only validation
+    if (!/^(select|with|explain)\b/i.test(trimmed)) {
+      setError("Chỉ cho phép truy vấn đọc (SELECT/WITH/EXPLAIN). Sử dụng Supabase Dashboard cho thao tác ghi.");
+      return;
+    }
 
     setRunning(true);
     setError(null);
@@ -208,9 +209,17 @@ const AdminSqlEditorPage = () => {
           <div>
             <h1 className="text-xl font-bold text-foreground">SQL Editor</h1>
             <p className="text-xs text-muted-foreground">
-              Truy vấn Database từ Supabase trực tiếp từ website 
+              Truy vấn Database từ Supabase trực tiếp từ website — chỉ đọc (SELECT)
             </p>
           </div>
+        </div>
+
+        {/* Read-only warning */}
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex items-center gap-2">
+          <AlertTriangle size={14} className="text-blue-400 shrink-0" />
+          <p className="text-xs text-blue-300">
+            Chế độ chỉ đọc — chỉ cho phép SELECT, WITH, EXPLAIN. Mọi thao tác ghi dữ liệu (INSERT/UPDATE/DELETE) cần dùng Supabase Dashboard.
+          </p>
         </div>
 
         {/* Setup warning */}

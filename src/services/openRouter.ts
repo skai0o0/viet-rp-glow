@@ -9,6 +9,47 @@ const STORAGE_KEY_MODEL = "vietrp_openrouter_model";
 const STORAGE_KEY_VERIFIED = "vietrp_key_verified";
 const STORAGE_KEY_TIER = "vietrp_selected_tier";
 
+// ─── Secure storage helpers (sessionStorage + obfuscation) ───
+// Migrate old localStorage keys to sessionStorage on first load
+(function migrateSensitiveKeys() {
+  try {
+    const oldKey = localStorage.getItem(STORAGE_KEY_API);
+    if (oldKey) {
+      sessionStorage.setItem(STORAGE_KEY_API, oldKey);
+      localStorage.removeItem(STORAGE_KEY_API);
+    }
+    const oldVerified = localStorage.getItem(STORAGE_KEY_VERIFIED);
+    if (oldVerified) {
+      sessionStorage.setItem(STORAGE_KEY_VERIFIED, oldVerified);
+      localStorage.removeItem(STORAGE_KEY_VERIFIED);
+    }
+  } catch { /* ignore */ }
+})();
+
+/** Simple XOR-based obfuscation for sessionStorage (not crypto-secure, but prevents casual DevTools reading) */
+function obfuscate(value: string): string {
+  const mask = "vietrp";
+  let result = "";
+  for (let i = 0; i < value.length; i++) {
+    result += String.fromCharCode(value.charCodeAt(i) ^ mask.charCodeAt(i % mask.length));
+  }
+  return btoa(result);
+}
+
+function deobfuscate(encoded: string): string {
+  try {
+    const masked = atob(encoded);
+    const mask = "vietrp";
+    let result = "";
+    for (let i = 0; i < masked.length; i++) {
+      result += String.fromCharCode(masked.charCodeAt(i) ^ mask.charCodeAt(i % mask.length));
+    }
+    return result;
+  } catch {
+    return "";
+  }
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const CHAT_PROXY_URL = `${SUPABASE_URL}/functions/v1/chat-proxy`;
@@ -31,21 +72,27 @@ export interface OpenRouterModel {
 }
 
 export function getApiKey(): string {
-  return localStorage.getItem(STORAGE_KEY_API) || "";
+  const stored = sessionStorage.getItem(STORAGE_KEY_API);
+  if (!stored) return "";
+  return deobfuscate(stored);
 }
 
 export function setApiKey(key: string) {
-  const old = localStorage.getItem(STORAGE_KEY_API);
-  localStorage.setItem(STORAGE_KEY_API, key);
-  if (key !== old) localStorage.removeItem(STORAGE_KEY_VERIFIED);
+  const old = getApiKey();
+  if (key) {
+    sessionStorage.setItem(STORAGE_KEY_API, obfuscate(key));
+  } else {
+    sessionStorage.removeItem(STORAGE_KEY_API);
+  }
+  if (key !== old) sessionStorage.removeItem(STORAGE_KEY_VERIFIED);
 }
 
 export function isKeyVerified(): boolean {
-  return localStorage.getItem(STORAGE_KEY_VERIFIED) === "true";
+  return sessionStorage.getItem(STORAGE_KEY_VERIFIED) === "true";
 }
 
 export function markKeyVerified() {
-  localStorage.setItem(STORAGE_KEY_VERIFIED, "true");
+  sessionStorage.setItem(STORAGE_KEY_VERIFIED, "true");
 }
 
 const DEPRECATED_MODELS = [

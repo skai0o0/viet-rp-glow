@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { TavernCardV2 } from "@/types/taverncard";
+import { CharacterCard } from "@/types/character";
 
 export type DbCharacter = {
   id: string;
@@ -329,5 +330,6 @@ export function dbCharToCard(char: DbCharacter) {
     system_prompt: char.system_prompt,
     mes_example: char.mes_example,
     post_history_instructions: char.post_history_instructions,
+    character_book: char.character_book as CharacterCard["character_book"],
   };
 }

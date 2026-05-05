@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx -p typescript tsc --noEmit)",
+      "Bash(node -e \"const ts = require\\('./node_modules/typescript'\\); console.log\\(ts.version\\)\")",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

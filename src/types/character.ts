@@ -1,3 +1,5 @@
+import { CharacterBook } from "./taverncard";
+
 export interface CharacterCard {
   name: string;
   description: string;
@@ -6,6 +8,7 @@ export interface CharacterCard {
   scenario: string;
   avatar: string;
   tags: string[];
+  character_book?: CharacterBook;
 }
 
 export interface ChatMessage {
