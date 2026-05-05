@@ -176,13 +176,13 @@ const MessageBubble = ({
             </span>
 
             {!isStreaming && message.content && (
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+              <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ml-1">
                 <button
                   onClick={handleCopy}
-                  className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                   title="Sao chép"
                 >
-                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
                 </button>
 
                 {/* Edit - only for last user message */}
@@ -191,9 +191,9 @@ const MessageBubble = ({
                     <TooltipTrigger asChild>
                       <button
                         onClick={handleStartEdit}
-                        className="p-1 rounded text-muted-foreground hover:text-neon-blue hover:drop-shadow-[0_0_4px_rgba(0,170,255,0.5)] transition-all"
+                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue hover:drop-shadow-[0_0_4px_rgba(0,170,255,0.5)] transition-all min-w-[32px] min-h-[32px] flex items-center justify-center"
                       >
-                        <Edit2 size={12} />
+                        <Edit2 size={14} />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground">
@@ -208,9 +208,9 @@ const MessageBubble = ({
                     <TooltipTrigger asChild>
                       <button
                         onClick={onDelete}
-                        className="p-1 rounded text-muted-foreground hover:text-neon-rose hover:drop-shadow-[0_0_4px_rgba(255,38,100,0.5)] transition-all"
+                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-rose active:text-neon-rose hover:drop-shadow-[0_0_4px_rgba(255,38,100,0.5)] transition-all min-w-[32px] min-h-[32px] flex items-center justify-center"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={14} />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground">
@@ -222,10 +222,10 @@ const MessageBubble = ({
                 {!isUser && isLastAssistant && onRegenerate && (
                   <button
                     onClick={onRegenerate}
-                    className="p-1 rounded text-muted-foreground hover:text-neon-purple transition-colors"
+                    className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-purple active:text-neon-purple transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                     title="Tạo lại"
                   >
-                    <RotateCcw size={12} />
+                    <RotateCcw size={14} />
                   </button>
                 )}
 
@@ -234,9 +234,9 @@ const MessageBubble = ({
                     <TooltipTrigger asChild>
                       <button
                         onClick={onBranch}
-                        className="p-1 rounded text-muted-foreground hover:text-neon-blue transition-colors"
+                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                       >
-                        <GitBranch size={12} />
+                        <GitBranch size={14} />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground">

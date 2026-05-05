@@ -285,7 +285,7 @@ const ProfilePage = () => {
                   <p className="text-xs mt-1">Bấm vào biểu tượng tim trên card nhân vật để thêm vào danh sách yêu thích.</p>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(160px, 100%), 1fr))" }}>
                   {favorites.map((char) => (
                     <div key={char.id} className="relative group">
                       <CharacterCard
@@ -320,17 +320,17 @@ const ProfilePage = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(160px, 100%), 1fr))" }}>
                   {characters.map((char) => (
                     <div key={char.id} className="relative group">
                       <CharacterCard character={char} onClick={() => setPreviewCharacter(char)} />
-                        <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/edit/${char.id}`);
                             }}
-                            className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-neon-blue/40 text-neon-blue hover:bg-neon-blue/20 transition-colors"
+                            className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl bg-oled-base/80 backdrop-blur border border-neon-blue/40 text-neon-blue active:bg-neon-blue/20 hover:bg-neon-blue/20 transition-colors"
                           >
                             <Pencil size={14} />
                           </button>
@@ -338,7 +338,7 @@ const ProfilePage = () => {
                             <AlertDialogTrigger asChild>
                               <button
                                 onClick={(e) => e.stopPropagation()}
-                                className="p-2 rounded-xl bg-oled-base/80 backdrop-blur border border-destructive/40 text-destructive hover:bg-destructive/20 transition-colors"
+                                className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl bg-oled-base/80 backdrop-blur border border-destructive/40 text-destructive active:bg-destructive/20 hover:bg-destructive/20 transition-colors"
                               >
                                 <Trash2 size={14} />
                               </button>

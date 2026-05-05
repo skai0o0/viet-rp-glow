@@ -868,7 +868,7 @@ const ChatPage = () => {
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
-                        className="p-1.5 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                        className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded text-muted-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 active:text-red-400 hover:text-red-400 transition-all"
                       >
                         <Trash2 size={14} />
                       </button>
