@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/select";
 import TierSelector from "@/components/TierSelector";
 import ModelCombobox from "@/components/ModelCombobox";
-import { getSelectedTier, setSelectedTier, getModel, setModel } from "@/services/openRouter";
+import {
+  getSelectedTier, setSelectedTier, getModel, setModel,
+  getActiveProvider, setActiveProvider, type Provider,
+} from "@/services/openRouter";
 
 const STORAGE_KEY_MAX_TOKENS = "vietrp_max_tokens";
 const STORAGE_KEY_RESPONSE_STYLE = "vietrp_response_style";
@@ -92,6 +95,7 @@ const GenerationSettings = ({
   const [selectedModel, setSelectedModel] = useState(getModel());
   const [maxTokens, setMaxTokensState] = useState(getMaxTokens());
   const [responseStyle, setResponseStyleState] = useState(getResponseStyle());
+  const [activeProvider, setActiveProviderState] = useState<Provider>(getActiveProvider());
 
   const handleTierChange = (val: string) => {
     setSelectedTierState(val);
@@ -214,6 +218,38 @@ const GenerationSettings = ({
             </div>
           )}
 
+          {/* Provider Selector — only for BYOK users */}
+          {isByok && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                API Provider
+              </Label>
+              <div className="flex gap-1.5">
+                {([
+                  { id: "openrouter" as Provider, label: "OpenRouter" },
+                  { id: "mimo" as Provider, label: "Xiaomi Mimo" },
+                ]).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setActiveProviderState(p.id);
+                      setActiveProvider(p.id);
+                    }}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                      activeProvider === p.id
+                        ? p.id === "mimo"
+                          ? "bg-neon-rose/15 border-neon-rose/40 text-neon-rose"
+                          : "bg-neon-purple/15 border-neon-purple/40 text-neon-purple"
+                        : "bg-oled-elevated border-gray-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Model / Tier Switcher */}
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground uppercase tracking-wider">
@@ -227,6 +263,7 @@ const GenerationSettings = ({
                   setModel(val);
                 }}
                 userTier="all"
+                provider={activeProvider}
               />
             ) : (
               <TierSelector value={selectedTier} onValueChange={handleTierChange} userTier={userTier} />

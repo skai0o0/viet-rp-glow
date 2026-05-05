@@ -18,6 +18,9 @@ import {
 } from "@/components/ui/popover";
 import {
   AVAILABLE_MODELS,
+  fetchMimoModels,
+  type Provider,
+  type OpenRouterModel,
 } from "@/services/openRouter";
 import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
 
@@ -25,6 +28,7 @@ interface ModelComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
   userTier?: string;
+  provider?: Provider;
 }
 
 type DisplayModel = {
@@ -35,53 +39,66 @@ type DisplayModel = {
   provider?: string;
 };
 
-const ModelCombobox = ({ value, onValueChange, userTier = "free" }: ModelComboboxProps) => {
+const ModelCombobox = ({ value, onValueChange, userTier = "free", provider }: ModelComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [adminModels, setAdminModels] = useState<AllowedModel[]>([]);
+  const [mimoModels, setMimoModels] = useState<OpenRouterModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasAdminModels, setHasAdminModels] = useState(false);
 
   const isFreeUser = userTier === "free";
+  const isMimo = provider === "mimo";
 
   useEffect(() => {
-    fetchAllowedModels()
-      .then((allowed) => {
-        if (allowed.length > 0) {
-          setAdminModels(allowed);
-          setHasAdminModels(true);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    if (isMimo) {
+      fetchMimoModels()
+        .then((models) => setMimoModels(models))
+        .finally(() => setLoading(false));
+    } else {
+      fetchAllowedModels()
+        .then((allowed) => {
+          if (allowed.length > 0) {
+            setAdminModels(allowed);
+            setHasAdminModels(true);
+          }
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [isMimo]);
 
-  const recommendedModels: DisplayModel[] = hasAdminModels
-    ? adminModels
-        .filter((m) => m.is_recommended)
-        .map((m) => ({
-          id: m.model_id,
-          name: m.model_name,
-          is_recommended: true,
-          is_free: m.is_free,
-          provider: m.provider,
-        }))
-    : [];
+  const recommendedModels: DisplayModel[] = isMimo
+    ? []
+    : hasAdminModels
+      ? adminModels
+          .filter((m) => m.is_recommended)
+          .map((m) => ({
+            id: m.model_id,
+            name: m.model_name,
+            is_recommended: true,
+            is_free: m.is_free,
+            provider: m.provider,
+          }))
+      : [];
 
-  const otherModels: DisplayModel[] = hasAdminModels
-    ? adminModels
-        .filter((m) => !m.is_recommended)
-        .map((m) => ({
-          id: m.model_id,
-          name: m.model_name,
-          is_recommended: false,
-          is_free: m.is_free,
-          provider: m.provider,
-        }))
-    : AVAILABLE_MODELS.map((m) => ({ id: m.id, name: m.label }));
+  const otherModels: DisplayModel[] = isMimo
+    ? mimoModels.map((m) => ({ id: m.id, name: m.name }))
+    : hasAdminModels
+      ? adminModels
+          .filter((m) => !m.is_recommended)
+          .map((m) => ({
+            id: m.model_id,
+            name: m.model_name,
+            is_recommended: false,
+            is_free: m.is_free,
+            provider: m.provider,
+          }))
+      : AVAILABLE_MODELS.map((m) => ({ id: m.id, name: m.label }));
 
   const allDisplayModels = [...recommendedModels, ...otherModels];
   const selectedLabel = allDisplayModels.find((m) => m.id === value)?.name || value;
 
-  const isModelLocked = (model: DisplayModel) => isFreeUser && hasAdminModels && !model.is_free;
+  const isModelLocked = (model: DisplayModel) => !isMimo && isFreeUser && hasAdminModels && !model.is_free;
 
   const handleSelect = (model: DisplayModel) => {
     if (isModelLocked(model)) return;
@@ -174,7 +191,7 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free" }: ModelCombobo
               <CommandSeparator />
             )}
 
-            <CommandGroup heading={hasAdminModels ? "Tất cả model" : "Model mặc định"}>
+            <CommandGroup heading={isMimo ? "Xiaomi Mimo Models" : hasAdminModels ? "Tất cả model" : "Model mặc định"}>
               {otherModels.map((m) => {
                 const locked = isModelLocked(m);
                 return (
@@ -214,12 +231,14 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free" }: ModelCombobo
             </CommandGroup>
           </CommandList>
         </Command>
-        {hasAdminModels && (
+        {(hasAdminModels || isMimo) && (
           <div className="px-3 py-1.5 border-t border-gray-border">
             <p className="text-[10px] text-muted-foreground">
-              {isFreeUser
-                ? `${allDisplayModels.filter((m) => m.is_free).length} model miễn phí · Nâng cấp Pro để dùng tất cả`
-                : `${allDisplayModels.length} model khả dụng`}
+              {isMimo
+                ? `${allDisplayModels.length} model khả dụng`
+                : isFreeUser
+                  ? `${allDisplayModels.filter((m) => m.is_free).length} model miễn phí · Nâng cấp Pro để dùng tất cả`
+                  : `${allDisplayModels.length} model khả dụng`}
             </p>
           </div>
         )}

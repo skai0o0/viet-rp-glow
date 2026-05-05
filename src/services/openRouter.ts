@@ -9,6 +9,16 @@ const STORAGE_KEY_MODEL = "vietrp_openrouter_model";
 const STORAGE_KEY_VERIFIED = "vietrp_key_verified";
 const STORAGE_KEY_TIER = "vietrp_selected_tier";
 
+// ─── Xiaomi Mimo provider ───
+const MIMO_BASE = "https://token-plan-sgp.xiaomimimo.com/v1";
+const MIMO_API_URL = `${MIMO_BASE}/chat/completions`;
+const MIMO_MODELS_URL = `${MIMO_BASE}/models`;
+const MIMO_STORAGE_KEY_API = "vietrp_mimo_key";
+const MIMO_STORAGE_KEY_VERIFIED = "vietrp_mimo_key_verified";
+const STORAGE_KEY_PROVIDER = "vietrp_active_provider";
+
+export type Provider = "openrouter" | "mimo";
+
 // ─── Secure storage helpers (sessionStorage + obfuscation) ───
 // Migrate old localStorage keys to sessionStorage on first load
 (function migrateSensitiveKeys() {
@@ -25,6 +35,17 @@ const STORAGE_KEY_TIER = "vietrp_selected_tier";
     }
   } catch { /* ignore */ }
 })();
+
+// ─── Provider selection ───
+export function getActiveProvider(): Provider {
+  const stored = localStorage.getItem(STORAGE_KEY_PROVIDER);
+  if (stored === "mimo") return "mimo";
+  return "openrouter";
+}
+
+export function setActiveProvider(provider: Provider) {
+  localStorage.setItem(STORAGE_KEY_PROVIDER, provider);
+}
 
 /** Simple XOR-based obfuscation for sessionStorage (not crypto-secure, but prevents casual DevTools reading) */
 function obfuscate(value: string): string {
@@ -93,6 +114,37 @@ export function isKeyVerified(): boolean {
 
 export function markKeyVerified() {
   sessionStorage.setItem(STORAGE_KEY_VERIFIED, "true");
+}
+
+// ─── Xiaomi Mimo key management ───
+export function getMimoApiKey(): string {
+  const stored = sessionStorage.getItem(MIMO_STORAGE_KEY_API);
+  if (!stored) return "";
+  return deobfuscate(stored);
+}
+
+export function setMimoApiKey(key: string) {
+  const old = getMimoApiKey();
+  if (key) {
+    sessionStorage.setItem(MIMO_STORAGE_KEY_API, obfuscate(key));
+  } else {
+    sessionStorage.removeItem(MIMO_STORAGE_KEY_API);
+  }
+  if (key !== old) sessionStorage.removeItem(MIMO_STORAGE_KEY_VERIFIED);
+}
+
+export function isMimoKeyVerified(): boolean {
+  return sessionStorage.getItem(MIMO_STORAGE_KEY_VERIFIED) === "true";
+}
+
+export function markMimoKeyVerified() {
+  sessionStorage.setItem(MIMO_STORAGE_KEY_VERIFIED, "true");
+}
+
+/** Get the API key for the active provider */
+export function getApiKeyForProvider(provider?: Provider): string {
+  const p = provider ?? getActiveProvider();
+  return p === "mimo" ? getMimoApiKey() : getApiKey();
 }
 
 const DEPRECATED_MODELS = [
@@ -191,6 +243,44 @@ export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
   }
 }
 
+// ─── Xiaomi Mimo API functions ───
+
+/** Verify Xiaomi Mimo API key by calling /models endpoint */
+export async function verifyMimoApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const res = await fetch(MIMO_MODELS_URL, {
+      headers: { "Authorization": `Bearer ${key}` },
+    });
+    if (res.ok) return { valid: true };
+    if (res.status === 401) return { valid: false, error: "API Key không hợp lệ." };
+    return { valid: false, error: `Lỗi: ${res.status}` };
+  } catch {
+    return { valid: false, error: "Không thể kết nối tới Xiaomi Mimo." };
+  }
+}
+
+/** Fetch all available models from Xiaomi Mimo */
+export async function fetchMimoModels(): Promise<OpenRouterModel[]> {
+  const key = getMimoApiKey();
+  if (!key) return [];
+  try {
+    const res = await fetch(MIMO_MODELS_URL, {
+      headers: { "Authorization": `Bearer ${key}` },
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const models: OpenRouterModel[] = (json.data || []).map((m: any) => ({
+      id: m.id,
+      name: m.name || m.id,
+      pricing: m.pricing,
+    }));
+    models.sort((a, b) => a.name.localeCompare(b.name));
+    return models;
+  } catch {
+    return [];
+  }
+}
+
 export interface StreamCallbacks {
   onDelta: (text: string) => void;
   onDone: () => void;
@@ -198,20 +288,24 @@ export interface StreamCallbacks {
 }
 
 /**
- * Stream chat completions from OpenRouter via SSE
+ * Stream chat completions via SSE (supports OpenRouter and Xiaomi Mimo)
  */
 export async function streamChat(
   messages: OpenRouterMessage[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
-  maxTokensOverride?: number
+  maxTokensOverride?: number,
+  provider?: Provider,
 ) {
-  const apiKey = getApiKey();
+  const activeProvider = provider ?? getActiveProvider();
+  const apiKey = getApiKeyForProvider(activeProvider);
   if (!apiKey) {
-    callbacks.onError("Vui lòng nhập API Key của OpenRouter trong phần Cài Đặt.");
+    const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
+    callbacks.onError(`Vui lòng nhập API Key của ${providerLabel} trong phần Cài Đặt.`);
     return;
   }
 
+  const apiUrl = activeProvider === "mimo" ? MIMO_API_URL : OPENROUTER_API_URL;
   const model = getModel();
   const maxTokens = maxTokensOverride ?? parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
 
@@ -219,14 +313,19 @@ export async function streamChat(
     // Get sampling parameters from global settings
     const samplingParams = getCachedSamplingParameters();
 
-    const response = await fetch(OPENROUTER_API_URL, {
+    const headers: Record<string, string> = {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+    // OpenRouter-specific headers
+    if (activeProvider === "openrouter") {
+      headers["HTTP-Referer"] = "https://vietrp.com";
+      headers["X-Title"] = "VietRP";
+    }
+
+    const response = await fetch(apiUrl, {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://vietrp.com",
-        "X-Title": "VietRP",
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         model,
         messages,
@@ -242,12 +341,13 @@ export async function streamChat(
     });
 
     if (!response.ok) {
+      const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
       if (response.status === 401) {
         callbacks.onError("API Key không hợp lệ. Vui lòng kiểm tra lại trong Cài Đặt.");
         return;
       }
       if (response.status === 404) {
-        callbacks.onError(`Model "${model}" không tồn tại trên OpenRouter. Vui lòng chọn model khác.`);
+        callbacks.onError(`Model "${model}" không tồn tại trên ${providerLabel}. Vui lòng chọn model khác.`);
         return;
       }
       if (response.status === 429) {
@@ -255,7 +355,7 @@ export async function streamChat(
         return;
       }
       if (response.status === 402) {
-        callbacks.onError("Tài khoản OpenRouter hết credits. Vui lòng nạp thêm.");
+        callbacks.onError(`Tài khoản ${providerLabel} hết credits. Vui lòng nạp thêm.`);
         return;
       }
       const errorText = await response.text();
@@ -326,7 +426,8 @@ export async function streamChat(
   } catch (err: any) {
     if (err.name === "AbortError") return;
     console.error("Stream error:", err);
-    callbacks.onError(`Lỗi kết nối tới OpenRouter. Vui lòng kiểm tra API Key và kết nối mạng. (${err.message || "unknown"})`);
+    const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
+    callbacks.onError(`Lỗi kết nối tới ${providerLabel}. Vui lòng kiểm tra API Key và kết nối mạng. (${err.message || "unknown"})`);
   }
 }
 
