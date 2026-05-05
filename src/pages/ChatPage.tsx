@@ -4,7 +4,7 @@ import { getCachedUserPersona, isProfileIncomplete } from "@/services/profileDb"
 import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Plus, AlertTriangle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
-import { buildMessages, replaceMacros } from "@/utils/promptBuilder";
+import { buildMessages, replaceMacros, truncateMessages } from "@/utils/promptBuilder";
 import { streamChat, streamChatViaProxy } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useChatMemory } from "@/hooks/useChatMemory";
 import { deriveChatAccess } from "@/utils/chatAccess";
 
 const ChatPage = () => {
@@ -46,6 +47,7 @@ const ChatPage = () => {
   const { quota, refresh: refreshQuota } = useChatQuota();
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const { role } = useUserRole();
+  const { summary, facts, loadMemory, clearMemory, triggerSummarize } = useChatMemory();
   const { isSubscriptionUser, effectiveQuota } = useMemo(
     () => deriveChatAccess(role, quota),
     [role, quota]
@@ -56,6 +58,7 @@ const ChatPage = () => {
   const [activeCharacter, setActiveCharacter] = useState<CharacterCard | null>(null);
   const [activeCharId, setActiveCharId] = useState<string | null>(characterId || null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessions, setSessions] = useState<DbChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -67,6 +70,9 @@ const ChatPage = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const customFirstMesRef = useRef("");
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const lastStreamRef = useRef<{ apiMessages: any[]; assistantId: string } | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
 
   // Message search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -242,6 +248,7 @@ const ChatPage = () => {
           timestamp: new Date(m.created_at),
         }))
       );
+      loadMemory(sessionId);
     } catch {
       toast.error("Không thể tải tin nhắn");
     }
@@ -252,6 +259,7 @@ const ChatPage = () => {
     abortRef.current?.abort();
     setIsStreaming(false);
     setActiveSessionId(null);
+    clearMemory();
     setCustomFirstMes(activeCharacter.first_mes);
     customFirstMesRef.current = activeCharacter.first_mes;
 
@@ -369,13 +377,16 @@ const ChatPage = () => {
       const assistantId = "streaming-" + Date.now();
       let assistantContent = "";
 
-      const allMessages = [...messages, userMsg];
-      const apiMessages = buildMessages(
+      const allMessages = [...messagesRef.current, userMsg];
+      const rawMessages = buildMessages(
         activeCharacter,
         allMessages.map((m) => ({ role: m.role, content: m.content })),
         undefined,
-        scenarioOverride
+        scenarioOverride,
+        summary,
+        facts,
       );
+      const apiMessages = truncateMessages(rawMessages);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -385,6 +396,9 @@ const ChatPage = () => {
         { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
+      setStreamError(null);
+      lastStreamRef.current = { apiMessages, assistantId };
+
       const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
 
       streamFn(
@@ -392,13 +406,18 @@ const ChatPage = () => {
         {
           onDelta: (text) => {
             assistantContent += text;
-            setMessages((prev) =>
-              prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
-            );
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.id === assistantId) {
+                return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+              }
+              return prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m));
+            });
           },
           onDone: async () => {
             setIsStreaming(false);
             abortRef.current = null;
+            lastStreamRef.current = null;
             if (assistantContent) {
               const saved = await addMessage(sessionId, "assistant", assistantContent);
               setMessages((prev) =>
@@ -406,6 +425,7 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
+              triggerSummarize(sessionId, messagesRef.current);
             } else {
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
@@ -423,6 +443,7 @@ const ChatPage = () => {
               setQuotaExceeded(true);
               refreshQuota();
             } else {
+              setStreamError(error);
               toast.error(error);
             }
           },
@@ -431,7 +452,6 @@ const ChatPage = () => {
       );
     },
     [
-      messages,
       activeCharacter,
       activeSessionId,
       activeCharId,
@@ -441,6 +461,8 @@ const ChatPage = () => {
       effectiveQuota.remaining,
       refreshQuota,
       isSubscriptionUser,
+      summary,
+      facts,
     ]
   );
 
@@ -454,12 +476,14 @@ const ChatPage = () => {
     const assistantId = "streaming-" + Date.now();
     let assistantContent = "";
 
-    const apiMessages = buildMessages(
+    const apiMessages = truncateMessages(buildMessages(
       activeCharacter,
       withoutLast.map((m) => ({ role: m.role, content: m.content })),
       undefined,
-      scenarioOverride
-    );
+      scenarioOverride,
+      summary,
+      facts,
+    ));
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -469,6 +493,9 @@ const ChatPage = () => {
       { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
     ]);
 
+    setStreamError(null);
+    lastStreamRef.current = { apiMessages, assistantId };
+
     const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
 
     streamFn(
@@ -476,13 +503,18 @@ const ChatPage = () => {
       {
         onDelta: (text) => {
           assistantContent += text;
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
-          );
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.id === assistantId) {
+              return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+            }
+            return prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m));
+          });
         },
         onDone: async () => {
           setIsStreaming(false);
           abortRef.current = null;
+          lastStreamRef.current = null;
           if (assistantContent) {
             const saved = await addMessage(activeSessionId, "assistant", assistantContent);
             setMessages((prev) =>
@@ -490,6 +522,7 @@ const ChatPage = () => {
                 m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
               )
             );
+            triggerSummarize(activeSessionId, messagesRef.current);
           }
           if (isSubscriptionUser) {
             refreshQuota();
@@ -505,13 +538,14 @@ const ChatPage = () => {
             setQuotaExceeded(true);
             refreshQuota();
           } else {
+            setStreamError(error);
             toast.error(error);
           }
         },
       },
       controller.signal
     );
-  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser]);
+  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser, summary, facts]);
 
   const lastAssistantIdx = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -567,12 +601,14 @@ const ChatPage = () => {
       const assistantId = "streaming-" + Date.now();
       let assistantContent = "";
 
-      const apiMessages = buildMessages(
+      const apiMessages = truncateMessages(buildMessages(
         activeCharacter,
         updatedMessages.map((m) => ({ role: m.role, content: m.content })),
         undefined,
-        scenarioOverride
-      );
+        scenarioOverride,
+        summary,
+        facts,
+      ));
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -582,6 +618,9 @@ const ChatPage = () => {
         { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
+      setStreamError(null);
+      lastStreamRef.current = { apiMessages, assistantId };
+
       const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
 
       streamFn(
@@ -589,13 +628,18 @@ const ChatPage = () => {
         {
           onDelta: (text) => {
             assistantContent += text;
-            setMessages((prev) =>
-              prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m))
-            );
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.id === assistantId) {
+                return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+              }
+              return prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m));
+            });
           },
           onDone: async () => {
             setIsStreaming(false);
             abortRef.current = null;
+            lastStreamRef.current = null;
             if (assistantContent) {
               const saved = await addMessage(activeSessionId, "assistant", assistantContent);
               setMessages((prev) =>
@@ -603,6 +647,7 @@ const ChatPage = () => {
                   m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
                 )
               );
+              triggerSummarize(activeSessionId, messagesRef.current);
             }
             if (isSubscriptionUser) {
               refreshQuota();
@@ -618,6 +663,7 @@ const ChatPage = () => {
               setQuotaExceeded(true);
               refreshQuota();
             } else {
+              setStreamError(error);
               toast.error(error);
             }
           },
@@ -625,8 +671,75 @@ const ChatPage = () => {
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser]
+    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser, summary, facts]
   );
+
+  const handleRetry = useCallback(() => {
+    if (!lastStreamRef.current || isStreaming) return;
+    const { apiMessages } = lastStreamRef.current;
+
+    setIsStreaming(true);
+    setStreamError(null);
+
+    const assistantId = "streaming-" + Date.now();
+    let assistantContent = "";
+
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
+    ]);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    lastStreamRef.current = { apiMessages, assistantId };
+
+    const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+
+    streamFn(
+      apiMessages,
+      {
+        onDelta: (text) => {
+          assistantContent += text;
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.id === assistantId) {
+              return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+            }
+            return prev.map((m) => (m.id === assistantId ? { ...m, content: assistantContent } : m));
+          });
+        },
+        onDone: async () => {
+          setIsStreaming(false);
+          abortRef.current = null;
+          lastStreamRef.current = null;
+          if (assistantContent && activeSessionId) {
+            const saved = await addMessage(activeSessionId, "assistant", assistantContent);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, id: saved.id, timestamp: new Date(saved.created_at) } : m
+              )
+            );
+          }
+          if (isSubscriptionUser) refreshQuota();
+        },
+        onError: (error) => {
+          setIsStreaming(false);
+          abortRef.current = null;
+          if (!assistantContent) {
+            setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          }
+          if (error === "__QUOTA_EXCEEDED__" && isSubscriptionUser) {
+            setQuotaExceeded(true);
+            refreshQuota();
+          } else {
+            setStreamError(error);
+            toast.error(error);
+          }
+        },
+      },
+      controller.signal
+    );
+  }, [isStreaming, activeSessionId, isSubscriptionUser, refreshQuota]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
@@ -979,6 +1092,26 @@ const ChatPage = () => {
                     Nâng cấp
                   </Button>
                 </div>
+              </motion.div>
+            )}
+
+            {/* Stream error retry */}
+            {streamError && !isStreaming && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mx-4 md:mx-6 mb-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10 flex items-center gap-3"
+              >
+                <AlertTriangle size={16} className="text-red-400 shrink-0" />
+                <p className="text-xs text-red-400 flex-1">Lỗi khi gửi tin nhắn. Thử lại?</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-500/30 text-red-400 hover:bg-red-500/20 h-7 px-3"
+                  onClick={handleRetry}
+                >
+                  Thử lại
+                </Button>
               </motion.div>
             )}
 

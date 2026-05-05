@@ -5,6 +5,8 @@ export interface UserProfile {
   user_id: string;
   display_name: string;
   user_description: string;
+  gender: string;
+  sexuality: string;
   nsfw_mode: boolean;
   created_at: string;
   updated_at: string;
@@ -27,7 +29,7 @@ export async function getMyProfile(): Promise<UserProfile | null> {
 /** Upsert (create or update) current user's profile */
 export async function upsertProfile(
   userId: string,
-  updates: { display_name?: string; user_description?: string; nsfw_mode?: boolean }
+  updates: { display_name?: string; user_description?: string; nsfw_mode?: boolean; gender?: string; sexuality?: string }
 ): Promise<UserProfile> {
   const { data, error } = await supabase
     .from("profiles")

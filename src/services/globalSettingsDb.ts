@@ -52,7 +52,6 @@ export async function fetchAllowedModels(): Promise<AllowedModel[]> {
     .order("sort_order", { ascending: true })
     .order("model_name", { ascending: true });
   if (error) {
-    console.warn("[globalSettingsDb] fetchAllowedModels error:", error.message);
     return cachedAllowedModels ?? [];
   }
   cachedAllowedModels = (data ?? []) as AllowedModel[];

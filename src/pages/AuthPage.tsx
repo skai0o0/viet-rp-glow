@@ -13,6 +13,7 @@ const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const { user, login, register } = useAuth();
@@ -35,7 +36,7 @@ const AuthPage = () => {
     setLoading(true);
     const result = isLogin
       ? await login(email, password)
-      : await register(email, password);
+      : await register(email, password, displayName.trim() || undefined);
     setLoading(false);
 
     if (result.error) {
@@ -83,6 +84,19 @@ const AuthPage = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <Label className="text-sm font-medium text-foreground">Tên hiển thị</Label>
+                <Input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Nhập tên của bạn"
+                  className="bg-oled-base border-gray-border text-foreground placeholder:text-muted-foreground focus:border-neon-blue focus:ring-neon-blue/30"
+                  required={!isLogin}
+                />
+              </div>
+            )}
             <div>
               <Label className="text-sm font-medium text-foreground">Email</Label>
               <Input

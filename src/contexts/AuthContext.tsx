@@ -8,7 +8,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
-  register: (email: string, password: string) => Promise<{ error?: string }>;
+  register: (email: string, password: string, displayName?: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loadPersona = (u: User | null) => {
       if (u) {
         getMyProfile().then((p) => {
-          if (p) setCachedUserPersona(p.display_name, p.user_description);
+          if (p) setCachedUserPersona(p.display_name, p.user_description, p.gender as any, p.sexuality as any);
         }).catch(() => {});
       }
     };
@@ -53,8 +53,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {};
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+  const register = useCallback(async (email: string, password: string, displayName?: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: displayName ? { display_name: displayName } : undefined,
+      },
+    });
     if (error) return { error: error.message };
     return {};
   }, []);

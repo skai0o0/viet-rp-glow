@@ -23,9 +23,16 @@ import {
   Layers,
   Crown,
   Sparkles,
+  Key,
+  ToggleLeft,
+  ToggleRight,
+  Terminal,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +44,11 @@ import {
   removeAllowedModel,
   toggleModelRecommended,
   AllowedModel,
+  fetchGlobalSystemPrompt,
+  saveGlobalSystemPrompt,
+  fetchSamplingParameters,
+  saveSamplingParameters,
+  type SamplingParameters,
 } from "@/services/globalSettingsDb";
 import { createApproval } from "@/services/approvalService";
 import {
@@ -49,9 +61,22 @@ import {
   getMimoApiKey,
   setMimoApiKey,
   markMimoKeyVerified,
+  getMimoEndpoint,
+  setMimoEndpoint,
   type OpenRouterModel,
 } from "@/services/openRouter";
 import { supabase } from "@/integrations/supabase/client";
+
+/* ── Platform Key type ───────────────────────────────────── */
+interface PlatformKey {
+  id: string;
+  key_name: string;
+  api_key: string;
+  is_active: boolean;
+  request_count: number;
+  last_used_at: string | null;
+  created_at: string;
+}
 
 /* ── Tier config ─────────────────────────────────────────── */
 interface DbModelTier {
@@ -71,7 +96,7 @@ const TIER_META: Record<string, { icon: React.ElementType; color: string }> = {
   ultra: { icon: Sparkles,  color: "text-neon-rose bg-neon-rose/10" },
 };
 
-const AdminApiSettingsPage = () => {
+const AdminAiConfigPage = () => {
   const { user, isLoading } = useAuth();
   const { isAdmin, isOp, canViewAdminHub, canEditAdminHub, checking } = useUserRole();
 
@@ -88,6 +113,10 @@ const AdminApiSettingsPage = () => {
   const [verifyingMimo, setVerifyingMimo] = useState(false);
   const [verifiedMimo, setVerifiedMimo] = useState<boolean | null>(null);
   const [savedMimo, setSavedMimo] = useState(false);
+
+  // Xiaomi Mimo custom endpoint
+  const [mimoEndpoint, setMimoEndpointState] = useState(() => getMimoEndpoint());
+  const [savedMimoEndpoint, setSavedMimoEndpoint] = useState(false);
 
   // OpenRouter models (full list)
   const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
@@ -107,6 +136,27 @@ const AdminApiSettingsPage = () => {
   const [tierEdits, setTierEdits] = useState<Record<string, string>>({});
   const [savingTier, setSavingTier] = useState<string | null>(null);
 
+  // Platform API Keys (admin-only)
+  const [platformKeys, setPlatformKeys] = useState<PlatformKey[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState(true);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyValue, setNewKeyValue] = useState("");
+  const [addingKey, setAddingKey] = useState(false);
+  const [showKeyId, setShowKeyId] = useState<string | null>(null);
+
+  // Global System Prompt
+  const [prompt, setPrompt] = useState("");
+  const [savingPrompt, setSavingPrompt] = useState(false);
+
+  // Sampling Parameters
+  const [samplingParams, setSamplingParams] = useState<SamplingParameters>({
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 40,
+    repetition_penalty: 1.0,
+  });
+  const [savingSamplingParams, setSavingSamplingParams] = useState(false);
+
   useEffect(() => {
     fetchAllowedModels().then((m) => {
       setAllowedModels(m);
@@ -123,7 +173,19 @@ const AdminApiSettingsPage = () => {
         setTierEdits(edits);
         setLoadingTiers(false);
       });
-  }, []);
+    fetchGlobalSystemPrompt().then(setPrompt);
+    fetchSamplingParameters().then(setSamplingParams);
+    if (isAdmin) {
+      supabase
+        .from("platform_api_keys")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .then(({ data, error }) => {
+          if (!error) setPlatformKeys((data ?? []) as PlatformKey[]);
+          setLoadingKeys(false);
+        });
+    }
+  }, [isAdmin]);
 
   const handleSaveTierModel = async (tier: DbModelTier) => {
     const newModelId = (tierEdits[tier.tier_key] ?? tier.model_id).trim();
@@ -206,6 +268,99 @@ const AdminApiSettingsPage = () => {
     if (verifiedMimo === true) markMimoKeyVerified();
     setSavedMimo(true);
     toast.success("Đã lưu Mimo API Key vào trình duyệt!");
+  };
+
+  const handleSaveMimoEndpoint = () => {
+    const url = mimoEndpoint.trim();
+    if (!url) { toast.error("Endpoint không được để trống."); return; }
+    try { new URL(url); } catch { toast.error("Endpoint không hợp lệ."); return; }
+    setMimoEndpoint(url);
+    setSavedMimoEndpoint(true);
+    toast.success("Đã lưu Mimo endpoint!");
+  };
+
+  // ── Platform Keys handlers (admin-only) ──
+  const fetchPlatformKeys = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("platform_api_keys")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (error) {
+      toast.error("Không thể tải danh sách API keys");
+      return;
+    }
+    setPlatformKeys((data ?? []) as PlatformKey[]);
+  }, []);
+
+  const handleAddKey = async () => {
+    if (!newKeyName.trim() || !newKeyValue.trim()) {
+      toast.error("Vui lòng nhập tên và API key.");
+      return;
+    }
+    setAddingKey(true);
+    const { error } = await supabase.from("platform_api_keys").insert({
+      key_name: newKeyName.trim(),
+      api_key: newKeyValue.trim(),
+    });
+    if (error) {
+      toast.error("Không thể thêm key: " + error.message);
+    } else {
+      toast.success("Đã thêm API key!");
+      setNewKeyName("");
+      setNewKeyValue("");
+      await fetchPlatformKeys();
+    }
+    setAddingKey(false);
+  };
+
+  const handleToggleKey = async (key: PlatformKey) => {
+    const { error } = await supabase
+      .from("platform_api_keys")
+      .update({ is_active: !key.is_active })
+      .eq("id", key.id);
+    if (error) {
+      toast.error("Không thể cập nhật trạng thái");
+    } else {
+      setPlatformKeys((prev) =>
+        prev.map((k) => (k.id === key.id ? { ...k, is_active: !k.is_active } : k)),
+      );
+    }
+  };
+
+  const handleDeleteKey = async (id: string) => {
+    const { error } = await supabase.from("platform_api_keys").delete().eq("id", id);
+    if (error) {
+      toast.error("Không thể xóa key");
+    } else {
+      setPlatformKeys((prev) => prev.filter((k) => k.id !== id));
+      toast.success("Đã xóa API key");
+    }
+  };
+
+  // ── Global System Prompt handler ──
+  const handleSavePrompt = async () => {
+    setSavingPrompt(true);
+    try {
+      await saveGlobalSystemPrompt(prompt);
+      toast.success("Đã lưu cấu hình thành công!");
+    } catch {
+      toast.error("Lưu cấu hình thất bại!");
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
+  // ── Sampling Parameters handler ──
+  const handleSaveSamplingParams = async () => {
+    setSavingSamplingParams(true);
+    try {
+      await saveSamplingParameters(samplingParams);
+      toast.success("Đã lưu sampling parameters thành công!");
+    } catch {
+      toast.error("Lưu sampling parameters thất bại!");
+    } finally {
+      setSavingSamplingParams(false);
+    }
   };
 
   const allowedModelIds = useMemo(
@@ -346,13 +501,13 @@ const AdminApiSettingsPage = () => {
               <ArrowLeft size={20} />
             </Button>
           </Link>
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-neon-blue to-cyan-500 flex items-center justify-center shadow-lg">
             <Zap className="text-white" size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">API Global Settings</h1>
+            <h1 className="text-2xl font-bold text-foreground">AI Configuration</h1>
             <p className="text-sm text-muted-foreground">
-              Verify API & quản lý danh sách model cho người dùng
+              API Keys, Models, Prompts & Sampling
             </p>
           </div>
         </div>
@@ -427,8 +582,31 @@ const AdminApiSettingsPage = () => {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              BYOK cho Xiaomi Mimo. API endpoint: <code className="text-neon-rose/80">https://token-plan-sgp.xiaomimimo.com/v1</code>
+              BYOK cho Xiaomi Mimo. Endpoint có thể tùy chỉnh bên dưới.
             </p>
+            {/* Mimo API Endpoint */}
+            <div className="flex gap-2">
+              <Input
+                value={mimoEndpoint}
+                onChange={(e) => { setMimoEndpointState(e.target.value); setSavedMimoEndpoint(false); }}
+                placeholder="https://token-plan-sgp.xiaomimimo.com/v1"
+                className="bg-oled-elevated border-gray-border text-foreground text-xs font-mono focus:border-neon-rose focus:ring-neon-rose/30"
+              />
+              <Button
+                onClick={handleSaveMimoEndpoint}
+                disabled={savedMimoEndpoint}
+                className={`min-w-[80px] ${
+                  savedMimoEndpoint
+                    ? "bg-green-500/20 text-green-400 border-green-500/30"
+                    : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
+                }`}
+                variant="outline"
+              >
+                <Save size={14} className="mr-1" />
+                {savedMimoEndpoint ? "Đã lưu" : "Lưu"}
+              </Button>
+            </div>
+            {/* Mimo API Key */}
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
@@ -477,6 +655,91 @@ const AdminApiSettingsPage = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* ═══════ Platform API Keys (admin-only) ═══════ */}
+        {isAdmin && (
+          <Card className="bg-oled-surface border-oled-border">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px] shadow-amber-400" />
+                <h2 className="text-sm font-semibold text-foreground">Platform API Keys</h2>
+                <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400 py-0 h-5">
+                  Admin only
+                </Badge>
+                <Badge variant="outline" className="text-[10px] border-green-500/30 text-green-400 py-0 h-5">
+                  {platformKeys.filter((k) => k.is_active).length} active
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pool OpenRouter API keys — Edge Function xoay vòng giữa các key active khi user chat.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  placeholder="Tên (VD: Key #1)"
+                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 flex-[0.3]"
+                />
+                <Input
+                  value={newKeyValue}
+                  onChange={(e) => setNewKeyValue(e.target.value)}
+                  placeholder="sk-or-v1-..."
+                  type="password"
+                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 flex-[0.7] font-mono"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleAddKey}
+                  disabled={addingKey}
+                  className="h-9 bg-amber-500 hover:bg-amber-600 text-white shrink-0"
+                >
+                  {addingKey ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                </Button>
+              </div>
+
+              {loadingKeys ? (
+                <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-neon-purple" /></div>
+              ) : platformKeys.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-6">Chưa có API key nào. Thêm key ở trên.</p>
+              ) : (
+                <div className="space-y-2">
+                  {platformKeys.map((k) => (
+                    <div key={k.id} className={`flex items-center gap-3 bg-oled-elevated rounded-xl px-3 py-2.5 ${!k.is_active ? "opacity-50" : ""}`}>
+                      <button onClick={() => handleToggleKey(k)} className="shrink-0" title={k.is_active ? "Tắt" : "Bật"}>
+                        {k.is_active ? <ToggleRight size={22} className="text-green-400" /> : <ToggleLeft size={22} className="text-muted-foreground" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">{k.key_name}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {showKeyId === k.id ? k.api_key : `${k.api_key.slice(0, 12)}...${k.api_key.slice(-4)}`}
+                          </span>
+                          <button onClick={() => setShowKeyId(showKeyId === k.id ? null : k.id)} className="text-muted-foreground hover:text-foreground">
+                            {showKeyId === k.id ? <EyeOff size={12} /> : <Eye size={12} />}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5">
+                          <span>{k.request_count.toLocaleString()} requests</span>
+                          {k.last_used_at && <span>· Last: {new Date(k.last_used_at).toLocaleDateString("vi-VN")}</span>}
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-400" onClick={() => handleDeleteKey(k.id)}>
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex justify-center">
+                <Button variant="ghost" size="sm" onClick={() => { setLoadingKeys(true); fetchPlatformKeys().finally(() => setLoadingKeys(false)); }}
+                  className="text-xs text-muted-foreground hover:text-neon-blue">
+                  <RefreshCw size={12} className="mr-1.5" /> Làm mới
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ═══════ Model Tiers (Fixed: free / pro / ultra) ═══════ */}
         <Card className="bg-oled-surface border-oled-border">
@@ -739,9 +1002,138 @@ const AdminApiSettingsPage = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* ═══════ Global System Prompt ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-blue shadow-[0_0_6px] shadow-neon-blue" />
+              <h2 className="text-sm font-semibold text-foreground">Global System Prompt</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Prompt này sẽ được âm thầm thêm vào đầu mọi cuộc trò chuyện để định hướng hành vi cốt lõi của AI.
+            </p>
+            <Textarea
+              rows={10}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Nhập global system prompt tại đây..."
+              className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[160px]"
+            />
+            <Button
+              onClick={handleSavePrompt}
+              disabled={savingPrompt}
+              className="bg-neon-blue hover:bg-neon-blue/80 text-white font-semibold"
+            >
+              {savingPrompt ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+              Lưu cấu hình
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ═══════ Sampling Parameters ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-purple shadow-[0_0_6px] shadow-neon-purple" />
+              <h2 className="text-sm font-semibold text-foreground">Sampling Parameters</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Các thông số này điều chỉnh <strong>độ sáng tạo</strong> và <strong>tính đa dạng</strong> của phản hồi AI. Giá trị cao = sáng tạo hơn, giá trị thấp = nhất quán hơn.
+            </p>
+            <div className="space-y-4">
+              {/* Temperature */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground">Temperature (độ sáng tạo)</Label>
+                  <span className="text-xs text-neon-purple font-mono">{samplingParams.temperature.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.05"
+                  value={samplingParams.temperature}
+                  onChange={(e) => setSamplingParams({ ...samplingParams, temperature: parseFloat(e.target.value) })}
+                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                />
+                <p className="text-[10px] text-muted-foreground">0.0 = Đáp ứng xác định / 2.0 = Cực kì sáng tạo</p>
+              </div>
+
+              {/* Top-P */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground">Top-P (Nucleus Sampling)</Label>
+                  <span className="text-xs text-neon-purple font-mono">{samplingParams.top_p.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={samplingParams.top_p}
+                  onChange={(e) => setSamplingParams({ ...samplingParams, top_p: parseFloat(e.target.value) })}
+                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                />
+                <p className="text-[10px] text-muted-foreground">0.9 = Cân bằng sáng tạo & nhất quán / 1.0 = Không có giới hạn</p>
+              </div>
+
+              {/* Top-K */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground">Top-K (Diversity)</Label>
+                  <span className="text-xs text-neon-purple font-mono">{Math.round(samplingParams.top_k)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={samplingParams.top_k}
+                  onChange={(e) => setSamplingParams({ ...samplingParams, top_k: parseFloat(e.target.value) })}
+                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                />
+                <p className="text-[10px] text-muted-foreground">Số từ tốt nhất cần xem xét (40 = cân bằng tốt)</p>
+              </div>
+
+              {/* Repetition Penalty */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground">Repetition Penalty</Label>
+                  <span className="text-xs text-neon-purple font-mono">{samplingParams.repetition_penalty.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.8"
+                  max="2"
+                  step="0.05"
+                  value={samplingParams.repetition_penalty}
+                  onChange={(e) => setSamplingParams({ ...samplingParams, repetition_penalty: parseFloat(e.target.value) })}
+                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                />
+                <p className="text-[10px] text-muted-foreground">1.0 = Không phạt / 1.2+ = Tránh lặp lại từ (tốt cho roleplay)</p>
+              </div>
+            </div>
+
+            <div className="bg-oled-base/50 border border-oled-border rounded-lg p-3 mt-4">
+              <p className="text-[10px] text-muted-foreground">
+                <strong>Gợi ý:</strong> Temperature 0.8-1.0 + Top-P 0.85-0.95 + Repetition Penalty 1.1-1.2 = Roleplay tốt với sáng tạo phù hợp
+              </p>
+            </div>
+
+            <Button
+              onClick={handleSaveSamplingParams}
+              disabled={savingSamplingParams}
+              className="w-full bg-neon-purple hover:bg-neon-purple/80 text-white font-semibold"
+            >
+              {savingSamplingParams ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+              Lưu Sampling Parameters
+            </Button>
+          </CardContent>
+        </Card>
       </motion.div>
     </ScrollArea>
   );
 };
 
-export default AdminApiSettingsPage;
+export default AdminAiConfigPage;

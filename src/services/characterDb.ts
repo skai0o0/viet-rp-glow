@@ -219,18 +219,12 @@ export async function incrementMessageCount(characterId: string) {
       char_id: characterId,
     });
     if (error) {
-      console.warn("[characterDb] RPC increment failed, trying direct update:", error.message);
       // Atomic increment via fallback RPC to avoid race conditions
-      const { error: rpcErr } = await supabase.rpc("increment_character_message_count_fallback", {
+      await supabase.rpc("increment_character_message_count_fallback", {
         char_id: characterId,
       });
-      if (rpcErr) {
-        console.warn("[characterDb] Fallback RPC also failed:", rpcErr.message);
-      }
     }
-  } catch (e) {
-    console.warn("[characterDb] incrementMessageCount failed:", e);
-  }
+  } catch { /* fire-and-forget */ }
 }
 
 /** Decrement message_count for a character (fire-and-forget, never goes below 0) */
@@ -240,12 +234,8 @@ export async function decrementMessageCount(characterId: string, count: number =
       char_id: characterId,
       amount: count,
     });
-    if (error) {
-      console.warn("[characterDb] decrement RPC failed:", error.message);
-    }
-  } catch (e) {
-    console.warn("[characterDb] decrementMessageCount failed:", e);
-  }
+    if (error) { /* fire-and-forget */ }
+  } catch { /* fire-and-forget */ }
 }
 
 /** Fetch top characters by message_count (trending) */

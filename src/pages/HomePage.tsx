@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CharacterCard from "@/components/CharacterCard";
 import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
-import { getPublicCharacters, getTrendingCharacters, getWeeklyTrendingCharacters, getMostFavoritedCharacters, CharacterSummary } from "@/services/characterDb";
+import { getPublicCharactersPaginated, getTrendingCharacters, getWeeklyTrendingCharacters, getMostFavoritedCharacters, CharacterSummary } from "@/services/characterDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { getActiveBanner, BannerData } from "@/services/bannerDb";
 import { getFavoritedIds } from "@/services/favoriteDb";
@@ -27,6 +27,9 @@ const HomePage = () => {
   const [tagFilter, setTagFilter] = useState("");
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [serverPage, setServerPage] = useState(0);
   const [banner, setBanner] = useState<BannerData | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -73,10 +76,16 @@ const HomePage = () => {
     );
   };
 
+  // Load first page of characters (server-side pagination)
   useEffect(() => {
-    getPublicCharacters()
-      .then(setCharacters)
-      .catch(() => setCharacters([]))
+    setLoading(true);
+    setServerPage(0);
+    getPublicCharactersPaginated(0)
+      .then(({ data, hasMore: more }) => {
+        setCharacters(data);
+        setHasMore(more);
+      })
+      .catch(() => { setCharacters([]); setHasMore(false); })
       .finally(() => setLoading(false));
     getTrendingCharacters(10).then(setTrending).catch(() => {});
     getWeeklyTrendingCharacters(10).then(setWeeklyTrending).catch(() => {});
@@ -88,6 +97,20 @@ const HomePage = () => {
       getFavoritedIds().then(setFavIds).catch(() => {});
     }
   }, [user]);
+
+  // Load more characters (next server page)
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = serverPage + 1;
+      const { data, hasMore: more } = await getPublicCharactersPaginated(nextPage);
+      setCharacters((prev) => [...prev, ...data]);
+      setServerPage(nextPage);
+      setHasMore(more);
+    } catch { /* ignore */ }
+    finally { setLoadingMore(false); }
+  }, [hasMore, loadingMore, serverPage]);
 
   // Dynamically calculate items per page based on grid width + screen size
   useEffect(() => {
@@ -589,6 +612,20 @@ const HomePage = () => {
               ))
           }
         </div>
+
+        {/* Load more button */}
+        {!loading && hasMore && !searchQuery && selectedTags.length === 0 && (
+          <div className="flex justify-center mt-6">
+            <Button
+              variant="outline"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="border-gray-border text-muted-foreground hover:border-neon-purple hover:text-neon-purple"
+            >
+              {loadingMore ? "Đang tải..." : "Tải thêm nhân vật"}
+            </Button>
+          </div>
+        )}
 
         {/* Pagination */}
         {!loading && filteredCharacters.length > perPage && (

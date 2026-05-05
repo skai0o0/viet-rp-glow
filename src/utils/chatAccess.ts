@@ -10,13 +10,12 @@ export const BYOK_FALLBACK_QUOTA: ChatQuota = {
 };
 
 /** Privileged roles that use BYOK (own API key) instead of platform proxy */
-const PRIVILEGED_ROLES: UserRole[] = ["admin", "op", "moderator"];
+const PRIVILEGED_ROLES: UserRole[] = ["admin", "op"];
 
 /**
  * Determine chat access mode:
- * - Privileged roles (admin/op/moderator) with BYOK key → BYOK direct to OpenRouter
- * - Privileged roles without key → error (must set key in Settings/API Settings)
- * - Regular users → always Proxy with daily quota (no BYOK access)
+ * - Privileged roles (admin/op) → BYOK direct to OpenRouter/Mimo
+ * - Moderator & user → Proxy with daily quota + credits
  */
 export function deriveChatAccess(role: UserRole, quota: ChatQuota) {
   if (PRIVILEGED_ROLES.includes(role)) {

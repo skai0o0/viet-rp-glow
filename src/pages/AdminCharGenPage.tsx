@@ -56,6 +56,7 @@ import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKey, getModel, setModel, streamChat, getActiveProvider, setActiveProvider, getApiKeyForProvider, type StreamCallbacks, type Provider } from "@/services/openRouter";
 import JSON5 from "json5";
+import { readJsonFile, parseTavernCardJson } from "@/utils/importCharacterJson";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
 import { createApproval } from "@/services/approvalService";
 
@@ -281,6 +282,13 @@ const AdminCharGenPage = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Import Character Cards
+  const [showImport, setShowImport] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [rawJson, setRawJson] = useState("");
+  const [importingRaw, setImportingRaw] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchHistory = useCallback(async () => {
     if (!user) return;
     setHistoryLoading(true);
@@ -314,6 +322,55 @@ const AdminCharGenPage = () => {
       toast.error(err.message || "Xoá thất bại!");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ── Import Character Cards handlers ──
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const card = await readJsonFile(file);
+      if (!card.data.name.trim()) {
+        toast.error("File JSON thiếu trường 'name'.");
+        return;
+      }
+      const saved = await createCharacter(card, user!.id, true);
+      toast.success(`Đã import nhân vật công khai: ${saved.name}`);
+    } catch (err: any) {
+      toast.error(err.message || "Import thất bại.");
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleImportRawJson = async () => {
+    const trimmed = rawJson.trim();
+    if (!trimmed) {
+      toast.error("Vui lòng dán JSON vào ô bên dưới.");
+      return;
+    }
+    setImportingRaw(true);
+    try {
+      const parsed = JSON5.parse(trimmed);
+      const card = parseTavernCardJson(parsed);
+      if (!card.data.name.trim()) {
+        toast.error("JSON thiếu trường 'name'.");
+        return;
+      }
+      const saved = await createCharacter(card, user!.id, true);
+      toast.success(`Đã import nhân vật công khai: ${saved.name}`);
+      setRawJson("");
+    } catch (err: any) {
+      toast.error(err.message || "JSON không hợp lệ.");
+    } finally {
+      setImportingRaw(false);
     }
   };
 
@@ -1024,6 +1081,70 @@ const AdminCharGenPage = () => {
           </TabsList>
         </Tabs>
       </div>
+
+      {/* ═══════ Import Character Cards (collapsible) ═══════ */}
+      {canEditAdminHub && (
+        <div className="shrink-0 border-b border-gray-border bg-oled-surface/30">
+          <button
+            onClick={() => setShowImport(!showImport)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Upload size={14} />
+            <span className="font-medium">Import Character Cards</span>
+            <ChevronDown size={14} className={`ml-auto transition-transform duration-200 ${showImport ? "rotate-180" : ""}`} />
+          </button>
+          {showImport && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="px-3 pb-3 space-y-3"
+            >
+              <p className="text-[11px] text-muted-foreground">
+                Chọn file JSON TavernCardV2 hoặc dán raw JSON.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImportClick}
+                  disabled={importing}
+                  className="border-neon-blue/30 text-neon-blue hover:bg-neon-blue/10"
+                >
+                  {importing ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Upload size={14} className="mr-1.5" />}
+                  Chọn file JSON
+                </Button>
+                <span className="text-[10px] text-muted-foreground self-center">hoặc dán JSON:</span>
+              </div>
+              <div className="flex gap-2">
+                <Textarea
+                  rows={3}
+                  value={rawJson}
+                  onChange={(e) => setRawJson(e.target.value)}
+                  placeholder='{"spec":"chara_card_v2","data":{"name":"...", ...}}'
+                  className="bg-oled-base border-gray-border text-foreground font-mono text-xs resize-none flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImportRawJson}
+                  disabled={importingRaw || !rawJson.trim()}
+                  className="border-neon-purple/30 text-neon-purple hover:bg-neon-purple/10 shrink-0"
+                >
+                  {importingRaw ? <Loader2 size={14} className="animate-spin" /> : <ClipboardPaste size={14} />}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      )}
 
       {/* ═══════ Main content area — flex row ═══════ */}
       <div className="flex-1 flex overflow-hidden">

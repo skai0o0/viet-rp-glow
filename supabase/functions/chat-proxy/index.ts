@@ -1,10 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://vietrp.com",
+  "https://www.vietrp.com",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+const corsHeaders = (origin: string | null) => ({
+  "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin ?? "") ? origin! : ALLOWED_ORIGINS[0],
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+});
 
 // Reuse Supabase client across requests (module-level singleton)
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -12,8 +18,11 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("Origin");
+  const headers = corsHeaders(origin);
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers });
   }
 
   try {
@@ -75,7 +84,7 @@ Deno.serve(async (req) => {
         }),
         {
           status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...headers, "Content-Type": "application/json" },
         },
       );
     }
@@ -96,7 +105,7 @@ Deno.serve(async (req) => {
         }),
         {
           status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...headers, "Content-Type": "application/json" },
         },
       );
     }
@@ -153,7 +162,7 @@ Deno.serve(async (req) => {
         }),
         {
           status: status === 429 ? 429 : status === 402 ? 402 : 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...headers, "Content-Type": "application/json" },
         },
       );
     }
@@ -184,7 +193,7 @@ Deno.serve(async (req) => {
     // Stream SSE response back to client
     return new Response(orResponse.body, {
       headers: {
-        ...corsHeaders,
+        ...headers,
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
       },
@@ -202,7 +211,7 @@ function jsonError(message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: {
-      ...corsHeaders,
+      ...headers,
       "Content-Type": "application/json",
     },
   });

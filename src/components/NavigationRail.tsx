@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert } from "lucide-react";
+import { Home, MessageSquare, PlusCircle, Settings, User, LogOut, Key, UserCheck, UserX, ShieldCheck, FileText, Palette, ShieldAlert, Coins } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePendingApprovalCount } from "@/hooks/usePendingApprovalCount";
+import { useUserCredits } from "@/hooks/useUserCredits";
 import { Switch } from "@/components/ui/switch";
 import { upsertProfile } from "@/services/profileDb";
 import { dispatchNsfwModeChange } from "@/hooks/useNsfwMode";
@@ -73,8 +74,9 @@ const NavItem = ({
 
 const NavigationRail = () => {
   const { user, logout } = useAuth();
-  const { isAdmin, isOp, isModerator, canViewAdminHub } = useUserRole();
+  const { isAdmin, isOp, isModerator, canViewAdminHub, isAdminOrOp } = useUserRole();
   const pendingCount = usePendingApprovalCount(isAdmin);
+  const { balance: creditBalance } = useUserCredits();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -233,6 +235,18 @@ const NavigationRail = () => {
               <DropdownMenuItem onClick={() => navigate("/settings")} className="text-foreground focus:bg-oled-surface cursor-pointer">
                 <Key size={14} className="mr-2" /> Thẻ API của tôi
               </DropdownMenuItem>
+              {!isAdminOrOp && (
+                <DropdownMenuItem className="text-foreground focus:bg-oled-surface cursor-default">
+                  <Coins size={14} className="mr-2 text-neon-purple" />
+                  <span className="flex-1">Credit</span>
+                  <span className="font-mono font-semibold text-neon-purple text-xs">{creditBalance.toLocaleString()}</span>
+                </DropdownMenuItem>
+              )}
+              {isAdminOrOp && (
+                <DropdownMenuItem onClick={() => navigate("/admin/credits")} className="text-foreground focus:bg-oled-surface cursor-pointer">
+                  <Coins size={14} className="mr-2 text-neon-purple" /> Quản lý Credit
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator className="bg-gray-border" />
               <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Cài đặt hệ thống</DropdownMenuLabel>
               <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-foreground focus:bg-oled-surface cursor-pointer">

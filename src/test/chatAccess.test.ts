@@ -28,9 +28,9 @@ describe("deriveChatAccess", () => {
     expect(result.effectiveQuota).toEqual(BYOK_FALLBACK_QUOTA);
   });
 
-  it("routes moderator to BYOK (direct OpenRouter)", () => {
+  it("routes moderator to proxy with quota (not BYOK)", () => {
     const result = deriveChatAccess("moderator", sampleQuota);
-    expect(result.isSubscriptionUser).toBe(false);
-    expect(result.effectiveQuota).toEqual(BYOK_FALLBACK_QUOTA);
+    expect(result.isSubscriptionUser).toBe(true);
+    expect(result.effectiveQuota).toBe(sampleQuota);
   });
 });

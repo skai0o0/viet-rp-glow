@@ -130,8 +130,13 @@ export function hasNsfwContent(
   if (!raw) return false;
   const lower = raw.toLowerCase();
 
-  if (SUBSTRING_KEYWORDS.some((kw) => lower.includes(kw))) return true;
-  if (boundaryPatterns.some((re) => re.test(raw))) return true;
+  // Single pass: check substring keywords first (cheaper), then boundary patterns
+  for (let i = 0; i < SUBSTRING_KEYWORDS.length; i++) {
+    if (lower.includes(SUBSTRING_KEYWORDS[i])) return true;
+  }
+  for (let i = 0; i < boundaryPatterns.length; i++) {
+    if (boundaryPatterns[i].test(raw)) return true;
+  }
 
   return false;
 }

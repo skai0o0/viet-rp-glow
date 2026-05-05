@@ -54,14 +54,12 @@ export async function getMyRating(characterId: string): Promise<number> {
   return data?.value ?? 0;
 }
 
-/** Get the average rating for a character */
+/** Get the average rating for a character (server-side via RPC) */
 export async function getAverageRating(characterId: string): Promise<number> {
-  const { data } = await supabase
-    .from("character_ratings")
-    .select("value")
-    .eq("character_id", characterId);
+  const { data, error } = await supabase.rpc("get_average_rating", {
+    p_character_id: characterId,
+  } as any);
 
-  if (!data || data.length === 0) return 0;
-  const sum = data.reduce((acc, r) => acc + r.value, 0);
-  return Math.round((sum / data.length) * 10) / 10;
+  if (error || data === null || data === undefined) return 0;
+  return Number(data);
 }
