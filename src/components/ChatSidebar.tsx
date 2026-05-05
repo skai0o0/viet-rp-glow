@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquare, Plus, X, Trash2, MoreVertical } from "lucide-react";
+import { MessageSquare, Plus, X, Trash2, MoreVertical, Brain, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DbChatSession } from "@/services/chatDb";
 import { CharacterSummary } from "@/services/characterDb";
@@ -20,6 +20,12 @@ interface ChatSidebarProps {
   onNewChat: () => void;
   onDeleteSession: (sessionId: string) => void;
   characterName?: string;
+  /** Rolling summary of current session (from chat memory system) */
+  summary?: string;
+  /** Key facts extracted from current session */
+  facts?: string[];
+  /** Whether the current user can view memory (admin/op) */
+  canViewMemory?: boolean;
 }
 
 const ChatSidebar = ({
@@ -32,7 +38,13 @@ const ChatSidebar = ({
   onNewChat,
   onDeleteSession,
   characterName,
+  summary,
+  facts,
+  canViewMemory,
 }: ChatSidebarProps) => {
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const hasMemory = !!summary || (facts && facts.length > 0);
+
   return (
     <>
       {/* Overlay for mobile */}
@@ -188,6 +200,78 @@ const ChatSidebar = ({
                 );
               })}
             </div>
+
+            {/* Memory section (admin/op only) */}
+            {canViewMemory && activeSessionId && (
+              <div className="border-t border-gray-border">
+                <button
+                  onClick={() => setMemoryOpen(!memoryOpen)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Brain size={14} className="text-emerald-400" />
+                  <span className="font-medium flex-1 text-left">Chat Memory</span>
+                  {hasMemory && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  )}
+                  {memoryOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </button>
+
+                <AnimatePresence>
+                  {memoryOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-4 pb-3 space-y-3 max-h-[40vh] overflow-y-auto scrollbar-thin">
+                        {!hasMemory && (
+                          <p className="text-[11px] text-muted-foreground/60 italic">
+                            Chưa có dữ liệu memory cho session này.
+                          </p>
+                        )}
+
+                        {/* Rolling Summary */}
+                        {summary && (
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Sparkles size={10} className="text-emerald-400" />
+                              <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">
+                                Rolling Summary
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-foreground/70 leading-relaxed bg-oled-base rounded-lg p-2.5 border border-emerald-400/10 whitespace-pre-wrap">
+                              {summary}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Key Facts */}
+                        {facts && facts.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Brain size={10} className="text-teal-400" />
+                              <span className="text-[10px] font-semibold text-teal-400 uppercase tracking-wider">
+                                Key Facts ({facts.length})
+                              </span>
+                            </div>
+                            <ul className="space-y-1">
+                              {facts.map((fact, i) => (
+                                <li key={i} className="text-[11px] text-foreground/70 flex items-start gap-1.5">
+                                  <span className="text-teal-400/60 mt-0.5">-</span>
+                                  <span>{fact}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Footer */}
             <div className="p-3 border-t border-gray-border">

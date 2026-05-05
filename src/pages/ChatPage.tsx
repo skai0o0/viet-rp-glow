@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCachedUserPersona, isProfileIncomplete } from "@/services/profileDb";
-import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Plus, AlertTriangle } from "lucide-react";
+import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, ChevronRight, Plus, AlertTriangle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros, truncateMessages } from "@/utils/promptBuilder";
@@ -106,6 +106,52 @@ const ChatPage = () => {
     () => (activeCharId ? sessions.filter((s) => s.character_id === activeCharId) : []),
     [sessions, activeCharId]
   );
+
+  // Tree view: group sessions by character, sorted by most recent activity
+  const characterGroups = useMemo(() => {
+    const groupMap = new Map<string, { characterId: string; sessions: DbChatSession[]; latestUpdate: string }>();
+    for (const session of sessions) {
+      const existing = groupMap.get(session.character_id);
+      if (existing) {
+        existing.sessions.push(session);
+        if (session.updated_at > existing.latestUpdate) {
+          existing.latestUpdate = session.updated_at;
+        }
+      } else {
+        groupMap.set(session.character_id, {
+          characterId: session.character_id,
+          sessions: [session],
+          latestUpdate: session.updated_at,
+        });
+      }
+    }
+    // Sort sessions within each group by updated_at desc
+    for (const group of groupMap.values()) {
+      group.sessions.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    }
+    // Sort groups by most recent activity
+    return Array.from(groupMap.values()).sort(
+      (a, b) => new Date(b.latestUpdate).getTime() - new Date(a.latestUpdate).getTime()
+    );
+  }, [sessions]);
+
+  // Expand the most recent character group by default
+  const [expandedChars, setExpandedChars] = useState<Set<string>>(new Set());
+  const toggleCharExpand = useCallback((charId: string) => {
+    setExpandedChars((prev) => {
+      const next = new Set(prev);
+      if (next.has(charId)) next.delete(charId);
+      else next.add(charId);
+      return next;
+    });
+  }, []);
+
+  // Auto-expand first group when groups change
+  useEffect(() => {
+    if (characterGroups.length > 0 && expandedChars.size === 0) {
+      setExpandedChars(new Set([characterGroups[0].characterId]));
+    }
+  }, [characterGroups]);
 
   const isPendingChat = !activeSessionId && !!activeCharacter && messages.length > 0 && messages[0]?.id === "pending-first-mes";
 
@@ -803,6 +849,7 @@ const ChatPage = () => {
           open={sidebarOpen} onClose={() => setSidebarOpen(false)}
           sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
           onSelectSession={handleSelectSession} onNewChat={() => {}} onDeleteSession={handleDeleteSession}
+          summary={summary} facts={facts} canViewMemory={role === "admin" || role === "op"}
         />
         <div className="flex-1 flex flex-col min-w-0">
           <div className="h-14 flex items-center px-4 md:px-6 border-b border-gray-border flex-shrink-0">
@@ -827,52 +874,104 @@ const ChatPage = () => {
                 </Button>
               </div>
             ) : (
-              <div className="max-w-2xl mx-auto space-y-2">
-                {sessions.map((session) => {
-                  const char = charMap.get(session.character_id);
+              <div className="max-w-4xl mx-auto space-y-3">
+                {characterGroups.map((group) => {
+                  const char = charMap.get(group.characterId);
                   const initial = char?.name?.charAt(0)?.toUpperCase() || "?";
-                  const displayTitle = session.title || char?.name || "Cuộc trò chuyện";
-                  const timeStr = new Date(session.updated_at).toLocaleDateString("vi-VN", {
+                  const isExpanded = expandedChars.has(group.characterId);
+                  const latestTimeStr = new Date(group.latestUpdate).toLocaleDateString("vi-VN", {
                     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
                   });
 
                   return (
-                    <motion.div
-                      key={session.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-border bg-oled-surface hover:bg-oled-elevated hover:border-neon-purple/30 transition-all duration-200 cursor-pointer active:scale-[0.98]"
-                      onClick={() => {
-                        handleSelectSession(session.id);
-                        if (!characterId) {
-                          navigate(`/chat/${session.character_id}`);
-                        }
-                      }}
-                    >
-                      {char?.avatar_url && char.avatar_url.startsWith("http") ? (
-                        <img
-                          src={char.avatar_url}
-                          alt={char.name}
-                          className="w-10 h-10 rounded-full object-cover border border-neon-purple/20 flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold bg-oled-elevated text-neon-purple border border-neon-purple/20 flex-shrink-0">
-                          {initial}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{displayTitle}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {char?.name || "..."} · {timeStr}
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
-                        className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded text-muted-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 active:text-red-400 hover:text-red-400 transition-all"
+                    <div key={group.characterId} className="rounded-xl border border-gray-border bg-oled-surface overflow-hidden">
+                      {/* Character header */}
+                      <motion.button
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => toggleCharExpand(group.characterId)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-oled-elevated transition-colors text-left"
                       >
-                        <Trash2 size={14} />
-                      </button>
-                    </motion.div>
+                        {char?.avatar_url && char.avatar_url.startsWith("http") ? (
+                          <img
+                            src={char.avatar_url}
+                            alt={char.name}
+                            className="w-10 h-10 rounded-full object-cover border border-neon-purple/20 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold bg-oled-elevated text-neon-purple border border-neon-purple/20 flex-shrink-0">
+                            {initial}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-foreground truncate">{char?.name || "Nhân vật"}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {group.sessions.length} cuộc trò chuyện · Hoạt động: {latestTimeStr}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] bg-neon-purple/15 text-neon-purple border border-neon-purple/30 px-1.5 py-0.5 rounded-full font-medium">
+                            {group.sessions.length}
+                          </span>
+                          <motion.div
+                            animate={{ rotate: isExpanded ? 90 : 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <ChevronRight size={16} className="text-muted-foreground" />
+                          </motion.div>
+                        </div>
+                      </motion.button>
+
+                      {/* Sessions list (collapsible) */}
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className="border-t border-gray-border/50 px-2 py-1.5 space-y-1">
+                              {group.sessions.map((session) => {
+                                const displayTitle = session.title || char?.name || "Cuộc trò chuyện";
+                                const timeStr = new Date(session.updated_at).toLocaleDateString("vi-VN", {
+                                  day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                                });
+
+                                return (
+                                  <motion.div
+                                    key={session.id}
+                                    initial={{ opacity: 0, x: -8 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className="group flex items-center gap-3 pl-10 pr-3 py-2.5 rounded-lg hover:bg-oled-elevated cursor-pointer transition-colors relative active:scale-[0.98]"
+                                    onClick={() => {
+                                      handleSelectSession(session.id);
+                                      if (!characterId) {
+                                        navigate(`/chat/${session.character_id}`);
+                                      }
+                                    }}
+                                  >
+                                    {/* Timeline dot */}
+                                    <div className="absolute left-[18px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-gray-border group-hover:bg-neon-purple/60 transition-colors" />
+
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm text-foreground truncate">{displayTitle}</p>
+                                      <p className="text-[10px] text-muted-foreground">{timeStr}</p>
+                                    </div>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
+                                      className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded text-muted-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 active:text-red-400 hover:text-red-400 transition-all"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </motion.div>
+                                );
+                              })}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   );
                 })}
               </div>
@@ -892,6 +991,7 @@ const ChatPage = () => {
         onSelectSession={(id) => { handleSelectSession(id); setSidebarOpen(false); }}
         onNewChat={handleNewChat} onDeleteSession={handleDeleteSession}
         characterName={activeCharacter.name}
+        summary={summary} facts={facts} canViewMemory={role === "admin" || role === "op"}
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

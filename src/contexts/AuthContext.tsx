@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyProfile, setCachedUserPersona } from "@/services/profileDb";
+import { syncKeysFromSupabase } from "@/services/openRouter";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
@@ -25,6 +26,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         getMyProfile().then((p) => {
           if (p) setCachedUserPersona(p.display_name, p.user_description, p.gender as any, p.sexuality as any);
         }).catch(() => {});
+        // Sync BYOK keys from Supabase → sessionStorage
+        syncKeysFromSupabase(u.id).catch(() => {});
       }
     };
 

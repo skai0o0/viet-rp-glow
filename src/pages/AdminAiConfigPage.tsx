@@ -63,6 +63,7 @@ import {
   markMimoKeyVerified,
   getMimoEndpoint,
   setMimoEndpoint,
+  syncKeysFromSupabase,
   type OpenRouterModel,
 } from "@/services/openRouter";
 import { supabase } from "@/integrations/supabase/client";
@@ -175,6 +176,14 @@ const AdminAiConfigPage = () => {
       });
     fetchGlobalSystemPrompt().then(setPrompt);
     fetchSamplingParameters().then(setSamplingParams);
+    // Sync BYOK keys from Supabase → populate sessionStorage + inputs
+    if (user) {
+      syncKeysFromSupabase(user.id).then(() => {
+        setTestApiKey(getApiKey());
+        setTestMimoKey(getMimoApiKey());
+        setMimoEndpointState(getMimoEndpoint());
+      });
+    }
     if (isAdmin) {
       supabase
         .from("platform_api_keys")
@@ -239,10 +248,10 @@ const AdminAiConfigPage = () => {
   };
 
   const handleSaveKey = () => {
-    setApiKey(testApiKey.trim());
+    setApiKey(testApiKey.trim(), user?.id);
     if (verified === true) markKeyVerified();
     setSaved(true);
-    toast.success("Đã lưu API Key vào trình duyệt!");
+    toast.success("Đã lưu API Key!");
   };
 
   // ── Xiaomi Mimo handlers ──
@@ -264,17 +273,17 @@ const AdminAiConfigPage = () => {
   };
 
   const handleSaveMimoKey = () => {
-    setMimoApiKey(testMimoKey.trim());
+    setMimoApiKey(testMimoKey.trim(), user?.id);
     if (verifiedMimo === true) markMimoKeyVerified();
     setSavedMimo(true);
-    toast.success("Đã lưu Mimo API Key vào trình duyệt!");
+    toast.success("Đã lưu Mimo API Key!");
   };
 
   const handleSaveMimoEndpoint = () => {
     const url = mimoEndpoint.trim();
     if (!url) { toast.error("Endpoint không được để trống."); return; }
     try { new URL(url); } catch { toast.error("Endpoint không hợp lệ."); return; }
-    setMimoEndpoint(url);
+    setMimoEndpoint(url, user?.id);
     setSavedMimoEndpoint(true);
     toast.success("Đã lưu Mimo endpoint!");
   };
@@ -520,7 +529,7 @@ const AdminAiConfigPage = () => {
               <h2 className="text-sm font-semibold text-foreground">Verify OpenRouter API Key</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              Nhập API Key OpenRouter, verify để kiểm tra, rồi lưu vào localStorage của trình duyệt.
+              Nhập API Key OpenRouter, verify để kiểm tra, rồi lưu (mã hoá) lên Supabase.
             </p>
             <div className="flex gap-2">
               <div className="relative flex-1">
