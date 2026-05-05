@@ -137,7 +137,7 @@ const AdminPage = () => {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-4 md:p-8 max-w-3xl mx-auto w-full space-y-6 pb-24"
+        className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-6 pb-24"
       >
         {/* Header */}
         <div className="flex items-center gap-3">
