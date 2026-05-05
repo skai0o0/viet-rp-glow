@@ -285,7 +285,7 @@ const ProfilePage = () => {
                   <p className="text-xs mt-1">Bấm vào biểu tượng tim trên card nhân vật để thêm vào danh sách yêu thích.</p>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(160px, 100%), 1fr))" }}>
+                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
                   {favorites.map((char) => (
                     <div key={char.id} className="relative group">
                       <CharacterCard
@@ -320,7 +320,7 @@ const ProfilePage = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(160px, 100%), 1fr))" }}>
+                <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
                   {characters.map((char) => (
                     <div key={char.id} className="relative group">
                       <CharacterCard character={char} onClick={() => setPreviewCharacter(char)} />

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,27 +11,28 @@ import { fetchGlobalSystemPrompt, fetchSamplingParameters } from "@/services/glo
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { lazyWithRetry } from "@/utils/lazyWithRetry";
 
-// Lazy-loaded pages
-const HomePage = lazy(() => import("@/pages/HomePage"));
-const ChatPage = lazy(() => import("@/pages/ChatPage"));
-const CreatePage = lazy(() => import("@/pages/CreatePage"));
-const EditCharacterPage = lazy(() => import("@/pages/EditCharacterPage"));
-const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
-const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
-const AuthPage = lazy(() => import("@/pages/AuthPage"));
-const AdminPage = lazy(() => import("@/pages/AdminPage"));
-const AdminRoadmapPage = lazy(() => import("@/pages/AdminRoadmapPage"));
-const AdminKnowledgePage = lazy(() => import("@/pages/AdminKnowledgePage"));
-const AdminSqlEditorPage = lazy(() => import("@/pages/AdminSqlEditorPage"));
-const AdminDashboardPage = lazy(() => import("@/pages/AdminDashboardPage"));
-const AdminCharGenPage = lazy(() => import("@/pages/AdminCharGenPage"));
-const AdminAiConfigPage = lazy(() => import("@/pages/AdminAiConfigPage"));
-const AdminApprovalsPage = lazy(() => import("@/pages/AdminApprovalsPage"));
-const AdminCreditsPage = lazy(() => import("@/pages/AdminCreditsPage"));
-const CharacterPage = lazy(() => import("@/pages/CharacterPage"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
-const TermsPage = lazy(() => import("@/pages/TermsPage"));
+// Lazy-loaded pages with retry for stale chunk errors
+const HomePage = lazyWithRetry(() => import("@/pages/HomePage"));
+const ChatPage = lazyWithRetry(() => import("@/pages/ChatPage"));
+const CreatePage = lazyWithRetry(() => import("@/pages/CreatePage"));
+const EditCharacterPage = lazyWithRetry(() => import("@/pages/EditCharacterPage"));
+const SettingsPage = lazyWithRetry(() => import("@/pages/SettingsPage"));
+const ProfilePage = lazyWithRetry(() => import("@/pages/ProfilePage"));
+const AuthPage = lazyWithRetry(() => import("@/pages/AuthPage"));
+const AdminPage = lazyWithRetry(() => import("@/pages/AdminPage"));
+const AdminRoadmapPage = lazyWithRetry(() => import("@/pages/AdminRoadmapPage"));
+const AdminKnowledgePage = lazyWithRetry(() => import("@/pages/AdminKnowledgePage"));
+const AdminSqlEditorPage = lazyWithRetry(() => import("@/pages/AdminSqlEditorPage"));
+const AdminDashboardPage = lazyWithRetry(() => import("@/pages/AdminDashboardPage"));
+const AdminCharGenPage = lazyWithRetry(() => import("@/pages/AdminCharGenPage"));
+const AdminAiConfigPage = lazyWithRetry(() => import("@/pages/AdminAiConfigPage"));
+const AdminApprovalsPage = lazyWithRetry(() => import("@/pages/AdminApprovalsPage"));
+const AdminCreditsPage = lazyWithRetry(() => import("@/pages/AdminCreditsPage"));
+const CharacterPage = lazyWithRetry(() => import("@/pages/CharacterPage"));
+const NotFound = lazyWithRetry(() => import("@/pages/NotFound"));
+const TermsPage = lazyWithRetry(() => import("@/pages/TermsPage"));
 
 const queryClient = new QueryClient();
 

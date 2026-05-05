@@ -798,13 +798,13 @@ const ChatPage = () => {
   // No character selected — show all sessions list
   if (!activeCharacter) {
     return (
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-w-0">
         <ChatSidebar
           open={sidebarOpen} onClose={() => setSidebarOpen(false)}
           sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
           onSelectSession={handleSelectSession} onNewChat={() => {}} onDeleteSession={handleDeleteSession}
         />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <div className="h-14 flex items-center px-4 md:px-6 border-b border-gray-border flex-shrink-0">
             <button onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 mr-2 text-muted-foreground hover:text-foreground transition-colors md:hidden">
@@ -885,7 +885,7 @@ const ChatPage = () => {
 
   return (
     <>
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden min-w-0">
       <ChatSidebar
         open={sidebarOpen} onClose={() => setSidebarOpen(false)}
         sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
@@ -1001,7 +1001,7 @@ const ChatPage = () => {
           )}
         </AnimatePresence>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-w-0">
           {/* Chat messages area */}
           <div className="flex-1 flex flex-col min-w-0">
             <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">

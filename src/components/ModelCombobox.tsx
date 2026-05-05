@@ -17,12 +17,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   AVAILABLE_MODELS,
   fetchMimoModels,
   type Provider,
   type OpenRouterModel,
 } from "@/services/openRouter";
 import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ModelComboboxProps {
   value: string;
@@ -45,6 +51,7 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free", provider }: Mo
   const [mimoModels, setMimoModels] = useState<OpenRouterModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasAdminModels, setHasAdminModels] = useState(false);
+  const isMobile = useIsMobile();
 
   const isFreeUser = userTier === "free";
   const isMimo = provider === "mimo";
@@ -106,142 +113,168 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free", provider }: Mo
     setOpen(false);
   };
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between bg-oled-elevated border-gray-border text-foreground hover:bg-oled-elevated/80 focus:border-neon-purple focus:ring-neon-purple/30"
-        >
-          {loading ? (
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 size={14} className="animate-spin" /> Đang tải...
-            </span>
-          ) : (
-            <span className="truncate flex items-center gap-1.5">
-              {selectedLabel}
-              {allDisplayModels.find((m) => m.id === value)?.is_recommended && (
-                <BadgeCheck size={14} className="text-yellow-500 shrink-0" />
-              )}
-              {allDisplayModels.find((m) => m.id === value)?.is_free && (
-                <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1 py-0 rounded-full shrink-0">
-                  FREE
-                </span>
-              )}
+  const triggerButton = (
+    <Button
+      variant="outline"
+      role="combobox"
+      aria-expanded={open}
+      className="w-full justify-between bg-oled-elevated border-gray-border text-foreground hover:bg-oled-elevated/80 focus:border-neon-purple focus:ring-neon-purple/30"
+    >
+      {loading ? (
+        <span className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 size={14} className="animate-spin" /> Đang tải...
+        </span>
+      ) : (
+        <span className="truncate flex items-center gap-1.5">
+          {selectedLabel}
+          {allDisplayModels.find((m) => m.id === value)?.is_recommended && (
+            <BadgeCheck size={14} className="text-yellow-500 shrink-0" />
+          )}
+          {allDisplayModels.find((m) => m.id === value)?.is_free && (
+            <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1 py-0 rounded-full shrink-0">
+              FREE
             </span>
           )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+        </span>
+      )}
+      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+    </Button>
+  );
+
+  const modelListContent = (
+    <>
+      <CommandInput placeholder="Tìm model..." className="text-foreground" />
+      <CommandList className="max-h-[60vh] md:max-h-60">
+        <CommandEmpty className="text-muted-foreground">
+          Không tìm thấy model nào.
+        </CommandEmpty>
+
+        {recommendedModels.length > 0 && (
+          <CommandGroup heading="⭐ Đề xuất">
+            {recommendedModels.map((m) => {
+              const locked = isModelLocked(m);
+              return (
+                <CommandItem
+                  key={m.id}
+                  value={m.name}
+                  onSelect={() => handleSelect(m)}
+                  className={cn(
+                    "text-foreground cursor-pointer",
+                    locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
+                  )}
+                  disabled={locked}
+                >
+                  {locked ? (
+                    <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
+                      )}
+                    />
+                  )}
+                  <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
+                  {m.is_free ? (
+                    <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
+                      FREE
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
+                      PRO
+                    </span>
+                  )}
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        )}
+
+        {recommendedModels.length > 0 && otherModels.length > 0 && (
+          <CommandSeparator />
+        )}
+
+        <CommandGroup heading={isMimo ? "Xiaomi Mimo Models" : hasAdminModels ? "Tất cả model" : "Model mặc định"}>
+          {otherModels.map((m) => {
+            const locked = isModelLocked(m);
+            return (
+              <CommandItem
+                key={m.id}
+                value={m.name}
+                onSelect={() => handleSelect(m)}
+                className={cn(
+                  "text-foreground cursor-pointer",
+                  locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
+                )}
+                disabled={locked}
+              >
+                {locked ? (
+                  <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
+                    )}
+                  />
+                )}
+                <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
+                {m.is_free ? (
+                  <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
+                    FREE
+                  </span>
+                ) : hasAdminModels ? (
+                  <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
+                    PRO
+                  </span>
+                ) : null}
+              </CommandItem>
+            );
+          })}
+        </CommandGroup>
+      </CommandList>
+      {(hasAdminModels || isMimo) && (
+        <div className="px-3 py-1.5 border-t border-gray-border">
+          <p className="text-[10px] text-muted-foreground">
+            {isMimo
+              ? `${allDisplayModels.length} model khả dụng`
+              : isFreeUser
+                ? `${allDisplayModels.filter((m) => m.is_free).length} model miễn phí · Nâng cấp Pro để dùng tất cả`
+                : `${allDisplayModels.length} model khả dụng`}
+          </p>
+        </div>
+      )}
+    </>
+  );
+
+  // Mobile: use bottom Sheet to avoid nested portal scroll lock
+  if (isMobile) {
+    return (
+      <>
+        <div onClick={() => setOpen(true)}>{triggerButton}</div>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent
+            side="bottom"
+            className="p-0 bg-oled-elevated border-gray-border rounded-t-2xl max-h-[80vh] flex flex-col"
+          >
+            <SheetTitle className="sr-only">Chọn model</SheetTitle>
+            <Command className="bg-oled-elevated flex-1 overflow-hidden">
+              {modelListContent}
+            </Command>
+          </SheetContent>
+        </Sheet>
+      </>
+    );
+  }
+
+  // Desktop: use Popover
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-oled-elevated border-gray-border z-50" align="start">
         <Command className="bg-oled-elevated">
-          <CommandInput
-            placeholder="Tìm model..."
-            className="text-foreground"
-          />
-          <CommandList className="max-h-60">
-            <CommandEmpty className="text-muted-foreground">
-              Không tìm thấy model nào.
-            </CommandEmpty>
-
-            {recommendedModels.length > 0 && (
-              <CommandGroup heading="⭐ Đề xuất">
-                {recommendedModels.map((m) => {
-                  const locked = isModelLocked(m);
-                  return (
-                    <CommandItem
-                      key={m.id}
-                      value={m.name}
-                      onSelect={() => handleSelect(m)}
-                      className={cn(
-                        "text-foreground cursor-pointer",
-                        locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
-                      )}
-                      disabled={locked}
-                    >
-                      {locked ? (
-                        <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
-                          )}
-                        />
-                      )}
-                      <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
-                      {m.is_free ? (
-                        <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
-                          FREE
-                        </span>
-                      ) : (
-                        <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
-                          PRO
-                        </span>
-                      )}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            )}
-
-            {recommendedModels.length > 0 && otherModels.length > 0 && (
-              <CommandSeparator />
-            )}
-
-            <CommandGroup heading={isMimo ? "Xiaomi Mimo Models" : hasAdminModels ? "Tất cả model" : "Model mặc định"}>
-              {otherModels.map((m) => {
-                const locked = isModelLocked(m);
-                return (
-                  <CommandItem
-                    key={m.id}
-                    value={m.name}
-                    onSelect={() => handleSelect(m)}
-                    className={cn(
-                      "text-foreground cursor-pointer",
-                      locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
-                    )}
-                    disabled={locked}
-                  >
-                    {locked ? (
-                      <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
-                        )}
-                      />
-                    )}
-                    <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
-                    {m.is_free ? (
-                      <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
-                        FREE
-                      </span>
-                    ) : hasAdminModels ? (
-                      <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
-                        PRO
-                      </span>
-                    ) : null}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
+          {modelListContent}
         </Command>
-        {(hasAdminModels || isMimo) && (
-          <div className="px-3 py-1.5 border-t border-gray-border">
-            <p className="text-[10px] text-muted-foreground">
-              {isMimo
-                ? `${allDisplayModels.length} model khả dụng`
-                : isFreeUser
-                  ? `${allDisplayModels.filter((m) => m.is_free).length} model miễn phí · Nâng cấp Pro để dùng tất cả`
-                  : `${allDisplayModels.length} model khả dụng`}
-            </p>
-          </div>
-        )}
       </PopoverContent>
     </Popover>
   );
