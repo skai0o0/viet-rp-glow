@@ -54,7 +54,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
-import { getApiKey, getModel, setModel, streamChat, type StreamCallbacks } from "@/services/openRouter";
+import { getApiKey, getModel, setModel, streamChat, getActiveProvider, setActiveProvider, getApiKeyForProvider, type StreamCallbacks, type Provider } from "@/services/openRouter";
 import JSON5 from "json5";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
 import { createApproval } from "@/services/approvalService";
@@ -364,6 +364,7 @@ const AdminCharGenPage = () => {
   // Model settings
   const [selectedModel, setSelectedModel] = useState(() => getModel());
   const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
+  const [activeProvider, setActiveProviderState] = useState<Provider>(() => getActiveProvider());
 
   const handleModelChange = useCallback((value: string) => {
     setModel(value);
@@ -380,8 +381,9 @@ const AdminCharGenPage = () => {
     const text = input.trim();
     if (!text || streaming) return;
 
-    if (!getApiKey()) {
-      toast.error("Chưa nhập API Key. Vào Cài Đặt để thêm.");
+    if (!getApiKeyForProvider(activeProvider)) {
+      const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
+      toast.error(`Chưa nhập API Key ${providerLabel}. Vào API Settings để thêm.`);
       return;
     }
 
@@ -433,8 +435,8 @@ const AdminCharGenPage = () => {
       },
     };
 
-    await streamChat(apiMessages, callbacks, controller.signal, 4096);
-  }, [input, streaming, messages, cloneMode, fetchHistory, user]);
+    await streamChat(apiMessages, callbacks, controller.signal, 4096, activeProvider);
+  }, [input, streaming, messages, cloneMode, fetchHistory, user, activeProvider]);
 
   const handleStop = () => {
     abortRef.current?.abort();
@@ -1302,6 +1304,14 @@ const AdminCharGenPage = () => {
                     className={`transition-transform duration-200 ${modelSettingsOpen ? "rotate-180" : ""}`}
                   />
                 </button>
+                {/* Provider badge */}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                  activeProvider === "mimo"
+                    ? "bg-neon-rose/15 text-neon-rose border border-neon-rose/30"
+                    : "bg-neon-blue/15 text-neon-blue border border-neon-blue/30"
+                }`}>
+                  {activeProvider === "mimo" ? "Mimo" : "OpenRouter"}
+                </span>
                 {/* Show selected model name as a compact badge when collapsed */}
                 {!modelSettingsOpen && (
                   <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">
@@ -1322,8 +1332,32 @@ const AdminCharGenPage = () => {
                     className="overflow-hidden mb-2"
                   >
                     <div className="bg-oled-surface border border-oled-border rounded-xl p-3 flex flex-col gap-2">
+                      {/* Provider toggle */}
+                      <div className="flex gap-1.5">
+                        {([
+                          { id: "openrouter" as Provider, label: "OpenRouter" },
+                          { id: "mimo" as Provider, label: "Xiaomi Mimo" },
+                        ]).map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              setActiveProviderState(p.id);
+                              setActiveProvider(p.id);
+                            }}
+                            className={`flex-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 border ${
+                              activeProvider === p.id
+                                ? p.id === "mimo"
+                                  ? "bg-neon-rose/15 border-neon-rose/40 text-neon-rose"
+                                  : "bg-neon-purple/15 border-neon-purple/40 text-neon-purple"
+                                : "bg-oled-elevated border-gray-border text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Model AI</p>
-                      <ModelCombobox value={selectedModel} onValueChange={handleModelChange} userTier="all" />
+                      <ModelCombobox value={selectedModel} onValueChange={handleModelChange} userTier="all" provider={activeProvider} />
                     </div>
                   </motion.div>
                 )}

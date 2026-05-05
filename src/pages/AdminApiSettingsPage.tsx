@@ -45,6 +45,10 @@ import {
   getApiKey,
   setApiKey,
   markKeyVerified,
+  verifyMimoApiKey,
+  getMimoApiKey,
+  setMimoApiKey,
+  markMimoKeyVerified,
   type OpenRouterModel,
 } from "@/services/openRouter";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,6 +81,13 @@ const AdminApiSettingsPage = () => {
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Xiaomi Mimo key verification
+  const [testMimoKey, setTestMimoKey] = useState(() => getMimoApiKey());
+  const [showMimoKey, setShowMimoKey] = useState(false);
+  const [verifyingMimo, setVerifyingMimo] = useState(false);
+  const [verifiedMimo, setVerifiedMimo] = useState<boolean | null>(null);
+  const [savedMimo, setSavedMimo] = useState(false);
 
   // OpenRouter models (full list)
   const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
@@ -170,6 +181,31 @@ const AdminApiSettingsPage = () => {
     if (verified === true) markKeyVerified();
     setSaved(true);
     toast.success("Đã lưu API Key vào trình duyệt!");
+  };
+
+  // ── Xiaomi Mimo handlers ──
+  const handleVerifyMimo = async () => {
+    if (!testMimoKey.trim()) {
+      toast.error("Vui lòng nhập Mimo API Key để verify.");
+      return;
+    }
+    setVerifyingMimo(true);
+    setVerifiedMimo(null);
+    const result = await verifyMimoApiKey(testMimoKey);
+    setVerifyingMimo(false);
+    setVerifiedMimo(result.valid);
+    if (result.valid) {
+      toast.success("Mimo API Key hợp lệ! ✓");
+    } else {
+      toast.error(result.error || "Mimo API Key không hợp lệ.");
+    }
+  };
+
+  const handleSaveMimoKey = () => {
+    setMimoApiKey(testMimoKey.trim());
+    if (verifiedMimo === true) markMimoKeyVerified();
+    setSavedMimo(true);
+    toast.success("Đã lưu Mimo API Key vào trình duyệt!");
   };
 
   const allowedModelIds = useMemo(
@@ -375,6 +411,68 @@ const AdminApiSettingsPage = () => {
               >
                 <Save size={14} className="mr-1" />
                 {saved ? "Đã lưu" : "Lưu"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Xiaomi Mimo API Key */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-rose shadow-[0_0_6px] shadow-neon-rose" />
+              <h2 className="text-sm font-semibold text-foreground">Xiaomi Mimo API Key</h2>
+              <Badge variant="outline" className="text-[10px] border-neon-rose/30 text-neon-rose py-0 h-5">
+                Mod/Op/Admin
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              BYOK cho Xiaomi Mimo. API endpoint: <code className="text-neon-rose/80">https://token-plan-sgp.xiaomimimo.com/v1</code>
+            </p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  type={showMimoKey ? "text" : "password"}
+                  value={testMimoKey}
+                  onChange={(e) => { setTestMimoKey(e.target.value); setVerifiedMimo(null); setSavedMimo(false); }}
+                  placeholder="Nhập Xiaomi Mimo API Key..."
+                  className="bg-oled-elevated border-gray-border text-foreground pr-10 focus:border-neon-rose focus:ring-neon-rose/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowMimoKey(!showMimoKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showMimoKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <Button
+                onClick={handleVerifyMimo}
+                disabled={verifyingMimo || !testMimoKey.trim()}
+                className={`min-w-[100px] ${
+                  verifiedMimo === true
+                    ? "bg-green-500/20 text-green-400 border-green-500/30"
+                    : verifiedMimo === false
+                    ? "bg-destructive/20 text-destructive border-destructive/30"
+                    : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
+                }`}
+                variant="outline"
+              >
+                {verifyingMimo ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-1" />}
+                {verifiedMimo === true ? "Hợp lệ ✓" : verifiedMimo === false ? "Lỗi ✗" : "Verify"}
+              </Button>
+              <Button
+                onClick={handleSaveMimoKey}
+                disabled={verifiedMimo !== true || savedMimo}
+                className={`min-w-[80px] ${
+                  savedMimo
+                    ? "bg-green-500/20 text-green-400 border-green-500/30"
+                    : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
+                }`}
+                variant="outline"
+              >
+                <Save size={14} className="mr-1" />
+                {savedMimo ? "Đã lưu" : "Lưu"}
               </Button>
             </div>
           </CardContent>
