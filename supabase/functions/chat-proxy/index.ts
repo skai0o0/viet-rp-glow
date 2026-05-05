@@ -6,6 +6,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Reuse Supabase client across requests (module-level singleton)
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -17,10 +22,7 @@ Deno.serve(async (req) => {
       return jsonError("Missing or invalid authorization header", 401);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-
+    // Call 1: Auth (required — cannot be combined)
     const token = authHeader.replace("Bearer ", "");
     const {
       data: { user },
@@ -46,29 +48,23 @@ Deno.serve(async (req) => {
       return jsonError("Missing tier_key or messages", 400);
     }
 
-    // 0. Check if user has a privileged role (admin / op / moderator) → unlimited quota.
-    //    One DB round-trip per request is acceptable at current scale; move to JWT
-    //    claims if this becomes a performance bottleneck.
-    const { data: userRole } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .in("role", ["admin", "op", "moderator"])
-      .maybeSingle();
-
-    const isPrivileged = userRole !== null;
-
-    // 1. Check quota (skip for privileged roles)
-    const { data: quota, error: quotaError } = await supabaseAdmin.rpc(
-      "check_chat_quota",
-      { p_user_id: user.id },
+    // Call 2: Combined RPC — role + quota + tier + API key in ONE call
+    const { data: ctx, error: ctxError } = await supabaseAdmin.rpc(
+      "prepare_chat_context",
+      { p_user_id: user.id, p_tier_key: tier_key },
     );
 
-    if (quotaError) {
-      console.error("Quota check failed:", quotaError);
-      return jsonError("Could not check quota", 500);
+    if (ctxError) {
+      console.error("prepare_chat_context failed:", ctxError);
+      return jsonError("Could not prepare chat context", 500);
     }
 
+    const isPrivileged = ctx.is_privileged as boolean;
+    const quota = ctx.quota;
+    const tierResult = ctx.tier;
+    const apiKey = ctx.api_key as string | null;
+
+    // Check quota (skip for privileged roles)
     if (!isPrivileged && quota.remaining <= 0) {
       return new Response(
         JSON.stringify({
@@ -84,17 +80,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Resolve tier → actual model ID + access check
-    const { data: tierResult, error: tierError } = await supabaseAdmin.rpc(
-      "resolve_model_tier",
-      { p_tier_key: tier_key, p_user_id: user.id },
-    );
-
-    if (tierError) {
-      console.error("Tier resolve failed:", tierError);
-      return jsonError("Could not resolve model tier", 500);
-    }
-
+    // Check tier errors
     if (tierResult.error === "tier_not_found") {
       return jsonError("Tier không tồn tại", 400);
     }
@@ -117,20 +103,16 @@ Deno.serve(async (req) => {
 
     const resolvedModel = tierResult.model_id as string;
 
-    // 3. Pick a random API key from the pool
-    const { data: apiKey, error: keyError } = await supabaseAdmin.rpc(
-      "pick_random_api_key",
-    );
-
-    if (keyError || !apiKey) {
-      console.error("No API key available:", keyError);
+    // Check API key availability
+    if (!apiKey) {
+      console.error("No API key available in pool");
       return jsonError(
         "Không có API key nào khả dụng. Liên hệ admin.",
         500,
       );
     }
 
-    // 4. Proxy to OpenRouter
+    // Proxy to OpenRouter
     const orResponse = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -176,7 +158,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 5. Increment usage (fire-and-forget)
+    // Fire-and-forget: increment usage + log
     supabaseAdmin
       .rpc("increment_chat_count", { p_user_id: user.id })
       .then(({ error }) => {
@@ -199,7 +181,7 @@ Deno.serve(async (req) => {
         if (error) console.error("usage_log insert error:", error);
       });
 
-    // 6. Stream SSE response back to client
+    // Stream SSE response back to client
     return new Response(orResponse.body, {
       headers: {
         ...corsHeaders,
