@@ -167,6 +167,14 @@ const CreatePage = () => {
       toast({ title: "Lỗi", description: "Vui lòng nhập tên nhân vật trước khi lưu.", variant: "destructive" });
       return;
     }
+    if (!data.description.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập mô tả nhân vật.", variant: "destructive" });
+      return;
+    }
+    if (!data.first_mes.trim()) {
+      toast({ title: "Lỗi", description: "Vui lòng nhập lời chào đầu tiên.", variant: "destructive" });
+      return;
+    }
 
     setIsSaving(true);
     try {

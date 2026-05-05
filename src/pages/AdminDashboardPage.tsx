@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate, Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import {
   Loader2,
@@ -32,6 +33,9 @@ import {
   Layers,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { buildMessages, buildLayeredPrompt, estimateTokens, type PromptSection } from "@/utils/promptBuilder";
+import { dbCharToCard } from "@/services/characterDb";
+import type { CharacterCard } from "@/types/character";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -212,6 +216,34 @@ const AdminDashboardPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Debug tab (Prompt Inspector)
+  const [debugChars, setDebugChars] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCharId, setSelectedCharId] = useState<string>("");
+  const [builtMessages, setBuiltMessages] = useState<any[] | null>(null);
+  const [layeredSections, setLayeredSections] = useState<PromptSection[] | null>(null);
+  const [inspectView, setInspectView] = useState<"layered" | "raw">("layered");
+  const [inspectLoading, setInspectLoading] = useState(false);
+  const [debugCharsLoaded, setDebugCharsLoaded] = useState(false);
+
+  const roleColors: Record<string, string> = {
+    system: "text-neon-blue border-neon-blue/30 bg-neon-blue/5",
+    user: "text-neon-green border-neon-green/30 bg-neon-green/5",
+    assistant: "text-neon-rose border-neon-rose/30 bg-neon-rose/5",
+  };
+
+  const sectionColors: Record<string, string> = {
+    main_prompt: "text-cyan-400 border-cyan-400/30 bg-cyan-400/5",
+    world_info_before: "text-amber-400 border-amber-400/30 bg-amber-400/5",
+    user_persona: "text-neon-green border-neon-green/30 bg-neon-green/5",
+    char_description: "text-neon-purple border-neon-purple/30 bg-neon-purple/5",
+    char_personality: "text-pink-400 border-pink-400/30 bg-pink-400/5",
+    scenario: "text-yellow-400 border-yellow-400/30 bg-yellow-400/5",
+    char_system_prompt: "text-orange-400 border-orange-400/30 bg-orange-400/5",
+    world_info_after: "text-amber-400 border-amber-400/30 bg-amber-400/5",
+    rolling_summary: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5",
+    key_facts: "text-teal-400 border-teal-400/30 bg-teal-400/5",
+  };
+
   const fetchStatsFallback = useCallback(async (): Promise<DashboardStats> => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -320,6 +352,48 @@ const AdminDashboardPage = () => {
     fetchAll();
   };
 
+  // ── Debug tab: Prompt Inspector ──
+  const loadDebugCharacters = useCallback(async () => {
+    if (debugCharsLoaded) return;
+    const { data } = await supabase
+      .from("characters")
+      .select("id, name")
+      .order("name");
+    if (data) {
+      setDebugChars(data);
+      setDebugCharsLoaded(true);
+    }
+  }, [debugCharsLoaded]);
+
+  useEffect(() => {
+    if (activeTab === "debug") loadDebugCharacters();
+  }, [activeTab, loadDebugCharacters]);
+
+  const handleInspect = async () => {
+    if (!selectedCharId) return;
+    setInspectLoading(true);
+    try {
+      const { data } = await supabase.from("characters").select("*").eq("id", selectedCharId).single();
+      if (!data) throw new Error("Character not found");
+      const card = dbCharToCard(data as any) as CharacterCard;
+      const sampleHistory = [
+        { role: "assistant" as const, content: card.first_mes || "(first message)" },
+        { role: "user" as const, content: "Xin chào!" },
+      ];
+      // Build both views
+      const sections = buildLayeredPrompt(card, "User", sampleHistory);
+      setLayeredSections(sections);
+      const msgs = buildMessages(card, sampleHistory);
+      setBuiltMessages(msgs);
+    } catch (err: any) {
+      console.error(err);
+      setBuiltMessages(null);
+      setLayeredSections(null);
+    } finally {
+      setInspectLoading(false);
+    }
+  };
+
   if (isLoading || checking) {
     return (
       <div className="flex-1 flex items-center justify-center bg-oled-base">
@@ -380,6 +454,9 @@ const AdminDashboardPage = () => {
                 </TabsTrigger>
                 <TabsTrigger value="models" className="data-[state=active]:bg-neon-rose/20 data-[state=active]:text-neon-rose">
                   Models & API
+                </TabsTrigger>
+                <TabsTrigger value="debug" className="data-[state=active]:bg-cyan-400/20 data-[state=active]:text-cyan-400">
+                  Debug
                 </TabsTrigger>
               </TabsList>
 
@@ -773,6 +850,144 @@ const AdminDashboardPage = () => {
                       <p className="text-xs text-muted-foreground/60 mt-1">Data sẽ xuất hiện khi users bắt đầu chat qua platform proxy.</p>
                     </CardContent>
                   </Card>
+                )}
+              </TabsContent>
+
+              {/* ═══════════════ TAB: DEBUG ═══════════════ */}
+              <TabsContent value="debug" className="space-y-4">
+                <Card className="bg-oled-surface border-oled-border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Prompt Inspector</CardTitle>
+                    <CardDescription>Chọn nhân vật để xem cấu trúc prompt phân tầng (SillyTavern-style) và raw messages gửi tới AI.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col sm:flex-row gap-3">
+                    <Select value={selectedCharId} onValueChange={setSelectedCharId}>
+                      <SelectTrigger className="flex-1 bg-oled-base border-oled-border">
+                        <SelectValue placeholder="Chọn nhân vật..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {debugChars.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={handleInspect}
+                      disabled={!selectedCharId || inspectLoading}
+                      className="bg-neon-purple hover:bg-neon-purple/80 text-white font-semibold"
+                    >
+                      {inspectLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : <Eye size={14} className="mr-2" />}
+                      Xem Payload
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {(builtMessages || layeredSections) && (
+                  <div className="space-y-3">
+                    {/* View toggle */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setInspectView("layered")}
+                          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                            inspectView === "layered"
+                              ? "bg-neon-purple/20 border-neon-purple/50 text-neon-purple"
+                              : "border-oled-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Layers size={12} className="inline mr-1" />
+                          Layered Sections
+                        </button>
+                        <button
+                          onClick={() => setInspectView("raw")}
+                          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                            inspectView === "raw"
+                              ? "bg-neon-blue/20 border-neon-blue/50 text-neon-blue"
+                              : "border-oled-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Raw Messages
+                        </button>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        ~{estimateTokens(
+                          inspectView === "layered"
+                            ? (layeredSections?.map(s => s.content).join("\n\n") ?? "")
+                            : (builtMessages?.map(m => m.content).join("\n\n") ?? "")
+                        )} tokens
+                      </span>
+                    </div>
+
+                    {/* Layered view */}
+                    {inspectView === "layered" && layeredSections && (
+                      <div className="space-y-3">
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                          Prompt Sections ({layeredSections.length} layers)
+                        </h2>
+                        {layeredSections.map((section, i) => (
+                          <motion.div
+                            key={section.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                          >
+                            <Card className={`border ${sectionColors[section.id] || "border-oled-border"}`}>
+                              <CardHeader className="pb-2 pt-3 px-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold uppercase tracking-wider">
+                                    #{section.order + 1} — {section.id.replace(/_/g, " ")}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {estimateTokens(section.content)} tokens · {section.content.length} chars
+                                  </span>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="px-4 pb-3">
+                                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground/80 max-h-96 overflow-auto">
+                                  {section.content}
+                                </pre>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Raw messages view */}
+                    {inspectView === "raw" && builtMessages && (
+                      <div className="space-y-3">
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                          Messages Array ({builtMessages.length} items)
+                        </h2>
+                        {builtMessages.map((msg, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                          >
+                            <Card className={`border ${roleColors[msg.role] || "border-oled-border"}`}>
+                              <CardHeader className="pb-2 pt-3 px-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold uppercase tracking-wider">
+                                    [{i}] {msg.role}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {msg.content?.length || 0} chars
+                                  </span>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="px-4 pb-3">
+                                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground/80 max-h-96 overflow-auto">
+                                  {msg.content}
+                                </pre>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>

@@ -10,6 +10,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { fetchGlobalSystemPrompt, fetchSamplingParameters } from "@/services/globalSettingsDb";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { Loader2 } from "lucide-react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy-loaded pages
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -21,14 +22,13 @@ const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
 const AdminRoadmapPage = lazy(() => import("@/pages/AdminRoadmapPage"));
-const AdminChatSettingsPage = lazy(() => import("@/pages/AdminChatSettingsPage"));
 const AdminKnowledgePage = lazy(() => import("@/pages/AdminKnowledgePage"));
 const AdminSqlEditorPage = lazy(() => import("@/pages/AdminSqlEditorPage"));
 const AdminDashboardPage = lazy(() => import("@/pages/AdminDashboardPage"));
 const AdminCharGenPage = lazy(() => import("@/pages/AdminCharGenPage"));
-const AdminApiSettingsPage = lazy(() => import("@/pages/AdminApiSettingsPage"));
+const AdminAiConfigPage = lazy(() => import("@/pages/AdminAiConfigPage"));
 const AdminApprovalsPage = lazy(() => import("@/pages/AdminApprovalsPage"));
-const AdminPlatformKeysPage = lazy(() => import("@/pages/AdminPlatformKeysPage"));
+const AdminCreditsPage = lazy(() => import("@/pages/AdminCreditsPage"));
 const CharacterPage = lazy(() => import("@/pages/CharacterPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const TermsPage = lazy(() => import("@/pages/TermsPage"));
@@ -61,6 +61,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <PageTracker>
+        <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route element={<AppLayout />}>
@@ -75,19 +76,19 @@ const App = () => (
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
                 <Route path="/admin/roadmap" element={<ProtectedRoute><AdminRoadmapPage /></ProtectedRoute>} />
-                <Route path="/admin/chatSettings" element={<ProtectedRoute><AdminChatSettingsPage /></ProtectedRoute>} />
                 <Route path="/admin/knowledge" element={<ProtectedRoute><AdminKnowledgePage /></ProtectedRoute>} />
                 <Route path="/admin/sql" element={<ProtectedRoute><AdminSqlEditorPage /></ProtectedRoute>} />
                 <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboardPage /></ProtectedRoute>} />
                 <Route path="/admin/chargen" element={<ProtectedRoute><AdminCharGenPage /></ProtectedRoute>} />
-                <Route path="/admin/api-settings" element={<ProtectedRoute><AdminApiSettingsPage /></ProtectedRoute>} />
+                <Route path="/admin/api-settings" element={<ProtectedRoute><AdminAiConfigPage /></ProtectedRoute>} />
                 <Route path="/admin/approvals" element={<ProtectedRoute><AdminApprovalsPage /></ProtectedRoute>} />
-                <Route path="/admin/platform-keys" element={<ProtectedRoute><AdminPlatformKeysPage /></ProtectedRoute>} />
+                <Route path="/admin/credits" element={<ProtectedRoute><AdminCreditsPage /></ProtectedRoute>} />
                 <Route path="/terms" element={<TermsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+        </ErrorBoundary>
           </PageTracker>
         </BrowserRouter>
       </TooltipProvider>

@@ -55,12 +55,9 @@ const ProfilePage = () => {
         setDisplayName(p.display_name);
         setUserDescription(p.user_description);
         localStorage.setItem("vietrp_nsfw_mode", String(p.nsfw_mode));
+        if (p.gender) setGender(p.gender as UserGender);
+        if (p.sexuality) setSexuality(p.sexuality as UserSexuality);
       }
-      // Load gender & sexuality from localStorage
-      const g = localStorage.getItem("vietrp_gender") || "";
-      const s = localStorage.getItem("vietrp_sexuality") || "";
-      setGender(g as UserGender);
-      setSexuality(s as UserSexuality);
     });
 
     // Load characters
@@ -94,6 +91,8 @@ const ProfilePage = () => {
       await upsertProfile(user.id, {
         display_name: displayName,
         user_description: userDescription,
+        gender,
+        sexuality,
       });
       setCachedUserPersona(displayName, userDescription, gender, sexuality);
       toast.success("Đã lưu hồ sơ Roleplay!");

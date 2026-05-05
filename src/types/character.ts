@@ -9,6 +9,8 @@ export interface CharacterCard {
   avatar: string;
   tags: string[];
   character_book?: CharacterBook;
+  system_prompt?: string;
+  mes_example?: string;
 }
 
 export interface ChatMessage {

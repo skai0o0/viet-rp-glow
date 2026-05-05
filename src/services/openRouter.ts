@@ -10,12 +10,24 @@ const STORAGE_KEY_VERIFIED = "vietrp_key_verified";
 const STORAGE_KEY_TIER = "vietrp_selected_tier";
 
 // ─── Xiaomi Mimo provider ───
-const MIMO_BASE = "https://token-plan-sgp.xiaomimimo.com/v1";
-const MIMO_API_URL = `${MIMO_BASE}/chat/completions`;
-const MIMO_MODELS_URL = `${MIMO_BASE}/models`;
+const MIMO_DEFAULT_BASE = "https://token-plan-sgp.xiaomimimo.com/v1";
 const MIMO_STORAGE_KEY_API = "vietrp_mimo_key";
 const MIMO_STORAGE_KEY_VERIFIED = "vietrp_mimo_key_verified";
+const MIMO_STORAGE_KEY_ENDPOINT = "vietrp_mimo_endpoint";
 const STORAGE_KEY_PROVIDER = "vietrp_active_provider";
+
+export function getMimoEndpoint(): string {
+  return localStorage.getItem(MIMO_STORAGE_KEY_ENDPOINT) || MIMO_DEFAULT_BASE;
+}
+
+export function setMimoEndpoint(endpoint: string) {
+  const trimmed = endpoint.trim().replace(/\/+$/, ""); // strip trailing slashes
+  if (trimmed && trimmed !== MIMO_DEFAULT_BASE) {
+    localStorage.setItem(MIMO_STORAGE_KEY_ENDPOINT, trimmed);
+  } else {
+    localStorage.removeItem(MIMO_STORAGE_KEY_ENDPOINT); // revert to default
+  }
+}
 
 export type Provider = "openrouter" | "mimo";
 
@@ -193,7 +205,6 @@ export async function fetchModelTiers(): Promise<ModelTier[]> {
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
   if (error) {
-    console.warn("fetchModelTiers error:", error.message);
     return cachedTiers ?? [];
   }
   cachedTiers = (data ?? []) as ModelTier[];
@@ -248,7 +259,7 @@ export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
 /** Verify Xiaomi Mimo API key by calling /models endpoint */
 export async function verifyMimoApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
   try {
-    const res = await fetch(MIMO_MODELS_URL, {
+    const res = await fetch(`${getMimoEndpoint()}/models`, {
       headers: { "Authorization": `Bearer ${key}` },
     });
     if (res.ok) return { valid: true };
@@ -264,7 +275,7 @@ export async function fetchMimoModels(): Promise<OpenRouterModel[]> {
   const key = getMimoApiKey();
   if (!key) return [];
   try {
-    const res = await fetch(MIMO_MODELS_URL, {
+    const res = await fetch(`${getMimoEndpoint()}/models`, {
       headers: { "Authorization": `Bearer ${key}` },
     });
     if (!res.ok) return [];
@@ -287,6 +298,64 @@ export interface StreamCallbacks {
   onError: (error: string) => void;
 }
 
+/** Parse an SSE stream from a ReadableStream, calling callbacks for each delta. */
+async function parseSSEStream(body: ReadableStream<Uint8Array>, callbacks: StreamCallbacks) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      let line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line.startsWith(":") || line.trim() === "") continue;
+      if (!line.startsWith("data: ")) continue;
+
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") {
+        callbacks.onDone();
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+        if (content) callbacks.onDelta(content);
+      } catch {
+        buffer = line + "\n" + buffer;
+        break;
+      }
+    }
+  }
+
+  // Flush remaining buffer
+  if (buffer.trim()) {
+    for (let raw of buffer.split("\n")) {
+      if (!raw) continue;
+      if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+      if (raw.startsWith(":") || raw.trim() === "") continue;
+      if (!raw.startsWith("data: ")) continue;
+      const jsonStr = raw.slice(6).trim();
+      if (jsonStr === "[DONE]") continue;
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+        if (content) callbacks.onDelta(content);
+      } catch { /* ignore */ }
+    }
+  }
+
+  callbacks.onDone();
+}
+
 /**
  * Stream chat completions via SSE (supports OpenRouter and Xiaomi Mimo)
  */
@@ -305,7 +374,7 @@ export async function streamChat(
     return;
   }
 
-  const apiUrl = activeProvider === "mimo" ? MIMO_API_URL : OPENROUTER_API_URL;
+  const apiUrl = activeProvider === "mimo" ? `${getMimoEndpoint()}/chat/completions` : OPENROUTER_API_URL;
   const model = getModel();
   const maxTokens = maxTokensOverride ?? parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
 
@@ -369,60 +438,7 @@ export async function streamChat(
       return;
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-        let line = buffer.slice(0, newlineIndex);
-        buffer = buffer.slice(newlineIndex + 1);
-
-        if (line.endsWith("\r")) line = line.slice(0, -1);
-        if (line.startsWith(":") || line.trim() === "") continue;
-        if (!line.startsWith("data: ")) continue;
-
-        const jsonStr = line.slice(6).trim();
-        if (jsonStr === "[DONE]") {
-          callbacks.onDone();
-          return;
-        }
-
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-          if (content) callbacks.onDelta(content);
-        } catch {
-          buffer = line + "\n" + buffer;
-          break;
-        }
-      }
-    }
-
-    // Flush remaining buffer
-    if (buffer.trim()) {
-      for (let raw of buffer.split("\n")) {
-        if (!raw) continue;
-        if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-        if (raw.startsWith(":") || raw.trim() === "") continue;
-        if (!raw.startsWith("data: ")) continue;
-        const jsonStr = raw.slice(6).trim();
-        if (jsonStr === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-          if (content) callbacks.onDelta(content);
-        } catch { /* ignore */ }
-      }
-    }
-
-    callbacks.onDone();
+    await parseSSEStream(response.body, callbacks);
   } catch (err: any) {
     if (err.name === "AbortError") return;
     console.error("Stream error:", err);
@@ -450,10 +466,9 @@ export async function fetchChatQuota(): Promise<ChatQuota> {
     p_user_id: session.user.id,
   } as any);
   if (error || !data) {
-    console.warn("fetchChatQuota error:", error?.message);
     return { used: 0, limit: 20, remaining: 20, plan_name: "Free", tier: "free" };
   }
-  return data as ChatQuota;
+  return data as unknown as ChatQuota;
 }
 
 /**
@@ -524,61 +539,7 @@ export async function streamChatViaProxy(
       return;
     }
 
-    // SSE parsing (same logic as streamChat)
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-        let line = buffer.slice(0, newlineIndex);
-        buffer = buffer.slice(newlineIndex + 1);
-
-        if (line.endsWith("\r")) line = line.slice(0, -1);
-        if (line.startsWith(":") || line.trim() === "") continue;
-        if (!line.startsWith("data: ")) continue;
-
-        const jsonStr = line.slice(6).trim();
-        if (jsonStr === "[DONE]") {
-          callbacks.onDone();
-          return;
-        }
-
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-          if (content) callbacks.onDelta(content);
-        } catch {
-          buffer = line + "\n" + buffer;
-          break;
-        }
-      }
-    }
-
-    // Flush remaining buffer
-    if (buffer.trim()) {
-      for (let raw of buffer.split("\n")) {
-        if (!raw) continue;
-        if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-        if (raw.startsWith(":") || raw.trim() === "") continue;
-        if (!raw.startsWith("data: ")) continue;
-        const jsonStr = raw.slice(6).trim();
-        if (jsonStr === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-          if (content) callbacks.onDelta(content);
-        } catch { /* ignore */ }
-      }
-    }
-
-    callbacks.onDone();
+    await parseSSEStream(response.body, callbacks);
   } catch (err: any) {
     if (err.name === "AbortError") return;
     console.error("Proxy stream error:", err);

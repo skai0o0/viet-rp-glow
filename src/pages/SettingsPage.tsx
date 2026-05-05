@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Settings, Check, Loader2, Info, Crown, Zap, MessageSquare } from "lucide-react";
+import { Settings, Check, Loader2, Info, Crown, Zap, MessageSquare, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getSelectedTier, setSelectedTier } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import TierSelector from "@/components/TierSelector";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useUserCredits } from "@/hooks/useUserCredits";
 import { deriveChatAccess } from "@/utils/chatAccess";
 
 const SettingsPage = () => {
@@ -15,6 +16,7 @@ const SettingsPage = () => {
   const [tier, setTier] = useState("free");
   const { quota, loading: quotaLoading } = useChatQuota();
   const { role } = useUserRole();
+  const { balance: creditBalance, loading: creditLoading } = useUserCredits();
   const { isSubscriptionUser, effectiveQuota } = useMemo(
     () => deriveChatAccess(role, quota),
     [role, quota],
@@ -95,6 +97,17 @@ const SettingsPage = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Credit balance */}
+              {!creditLoading && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-oled-elevated border border-gray-border">
+                  <div className="flex items-center gap-2">
+                    <Coins size={16} className="text-neon-purple" />
+                    <span className="text-xs text-muted-foreground">Credit</span>
+                  </div>
+                  <span className="text-sm font-bold font-mono text-neon-purple">{creditBalance.toLocaleString()}</span>
+                </div>
+              )}
 
               {/* Quota progress */}
               <div className="space-y-2">

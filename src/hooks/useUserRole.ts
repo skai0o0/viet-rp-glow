@@ -40,7 +40,6 @@ export function useUserRole(): UserRoleResult {
 
     const fetchRole = async () => {
       try {
-        // Try get_user_role RPC first (returns highest role)
         const { data, error } = await supabase.rpc("get_user_role", {
           p_user_id: user.id,
         } as any);
@@ -48,28 +47,7 @@ export function useUserRole(): UserRoleResult {
         if (!error && data) {
           setRole(data as UserRole);
         } else {
-          // Fallback: check has_role for admin, then op, then moderator
-          const { data: isAdm } = await supabase.rpc("has_role", {
-            _user_id: user.id,
-            _role: "admin",
-          } as any);
-          if (isAdm) {
-            setRole("admin");
-          } else {
-            const { data: isOp } = await supabase.rpc("has_role", {
-              _user_id: user.id,
-              _role: "op",
-            } as any);
-            if (isOp) {
-              setRole("op");
-            } else {
-              const { data: isMod } = await supabase.rpc("has_role", {
-                _user_id: user.id,
-                _role: "moderator",
-              } as any);
-              setRole(isMod ? "moderator" : "user");
-            }
-          }
+          setRole("user");
         }
       } catch {
         setRole("user");
