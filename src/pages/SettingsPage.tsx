@@ -1,26 +1,51 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Settings, Check, Loader2, Info, Crown, Zap, MessageSquare, Coins } from "lucide-react";
+import { Settings, Check, Loader2, Info, Crown, Zap, MessageSquare, Coins, ShieldAlert, ShieldCheck, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { getSelectedTier, setSelectedTier } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
+import { useNsfwMode, dispatchNsfwModeChange } from "@/hooks/useNsfwMode";
 import TierSelector from "@/components/TierSelector";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useUserCredits } from "@/hooks/useUserCredits";
+import { useAuth } from "@/contexts/AuthContext";
 import { deriveChatAccess } from "@/utils/chatAccess";
+import { upsertProfile } from "@/services/profileDb";
 
 const SettingsPage = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [tier, setTier] = useState("free");
   const { quota, loading: quotaLoading } = useChatQuota();
-  const { role } = useUserRole();
+  const { role, isAdmin, isOp, isModerator, canViewAdminHub } = useUserRole();
   const { balance: creditBalance, loading: creditLoading } = useUserCredits();
   const { isSubscriptionUser, effectiveQuota } = useMemo(
     () => deriveChatAccess(role, quota),
     [role, quota],
   );
+  const nsfwMode = useNsfwMode();
+
+  const handleNsfwToggle = async (checked: boolean) => {
+    localStorage.setItem("vietrp_nsfw_mode", String(checked));
+    dispatchNsfwModeChange();
+    if (user) {
+      try {
+        await upsertProfile(user.id, { nsfw_mode: checked });
+        toast.success(checked ? "Đã bật NSFW" : "Đã tắt NSFW");
+      } catch {
+        toast.error("Không thể lưu cài đặt.");
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    toast.success("Đã đăng xuất");
+    navigate("/");
+  };
 
   useEffect(() => {
     setTier(getSelectedTier());
@@ -39,7 +64,7 @@ const SettingsPage = () => {
     : 0;
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin bg-oled-base p-6">
+    <div className="flex-1 overflow-y-auto scrollbar-thin bg-oled-base p-4 sm:p-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -197,6 +222,62 @@ const SettingsPage = () => {
           >
             <Check size={16} className="mr-2" />
             Lưu cài đặt
+          </Button>
+        </div>
+
+        {/* Preferences */}
+        <div className="bg-oled-surface border border-gray-border rounded-2xl p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-neon-rose shadow-neon-rose" />
+            <h2 className="text-sm font-semibold text-foreground">Tùy chọn</h2>
+          </div>
+
+          {/* NSFW Toggle */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-oled-elevated border border-gray-border">
+            <div className="flex items-center gap-2.5">
+              <ShieldAlert size={16} className="text-neon-rose" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Chế độ NSFW</p>
+                <p className="text-[10px] text-muted-foreground">Hiện nội dung người lớn</p>
+              </div>
+            </div>
+            <Switch checked={nsfwMode} onCheckedChange={handleNsfwToggle} />
+          </div>
+
+          {/* Admin Hub - for admin/op/mod */}
+          {canViewAdminHub && (
+            <Button
+              asChild
+              variant="outline"
+              className="w-full justify-start border-gray-border text-foreground hover:border-neon-purple hover:text-neon-purple"
+            >
+              <Link to="/admin">
+                <ShieldCheck size={16} className={`mr-2 ${isOp ? "text-neon-blue" : isModerator ? "text-yellow-400" : "text-neon-rose"}`} />
+                {isOp ? "Op Hub" : isModerator ? "Mod Hub" : "Admin Hub"}
+              </Link>
+            </Button>
+          )}
+
+          {/* Profile link */}
+          <Button
+            asChild
+            variant="outline"
+            className="w-full justify-start border-gray-border text-foreground hover:border-neon-blue hover:text-neon-blue"
+          >
+            <Link to="/profile">
+              <User size={16} className="mr-2" />
+              Hồ sơ Roleplay
+            </Link>
+          </Button>
+
+          {/* Logout */}
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="w-full justify-start border-gray-border text-destructive hover:border-destructive hover:bg-destructive/10"
+          >
+            <LogOut size={16} className="mr-2" />
+            Đăng xuất
           </Button>
         </div>
       </motion.div>
