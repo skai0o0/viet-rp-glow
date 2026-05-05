@@ -1059,6 +1059,28 @@ const AdminCharGenPage = () => {
                     }
                   </p>
                 </div>
+                {/* Instruction box */}
+                <div className={`max-w-lg w-full rounded-xl border px-4 py-3 text-xs leading-relaxed ${
+                  cloneMode
+                    ? "bg-neon-rose/5 border-neon-rose/20 text-muted-foreground"
+                    : "bg-neon-purple/5 border-neon-purple/20 text-muted-foreground"
+                }`}>
+                  {cloneMode ? (
+                    <p>
+                      <span className="font-medium text-foreground/80">Ví dụ:</span> Dán toàn bộ text từ bất kỳ nguồn nào — wiki, Fandom, Character.AI, Chub.ai, forum — AI sẽ tự động phân tích và chuyển thành Character Card đầy đủ. Không cần tóm tắt hay format lại, giữ nguyên chi tiết gốc.
+                    </p>
+                  ) : (
+                    <p>
+                      <span className="font-medium text-foreground/80">Ví dụ:</span>{" "}
+                      <span className="text-neon-purple/80">[Nhân vật]</span> Một nữ sát thủ 25 tuổi, mái tóc đen dài ngang eo, đôi mắt xám lạnh như thép, sẹo nhỏ chạy ngang khóe môi. Mặc áo khoác da đen ôm sát, giày combat.{" "}
+                      <span className="text-neon-purple/80">[Tính cách]</span> Lạnh lùng, ít nói, nhưng có soft spot cho trẻ con. Nói chuyện cộc lốc, hay dùng sarcasm.{" "}
+                      <span className="text-neon-purple/80">[Bối cảnh]</span> Thành phố cyberpunk năm 2087, {`{{user}}`} là mục tiêu mới nhưng cô ta bắt đầu do dự.{" "}
+                      <span className="text-neon-purple/80">[Tone]</span> Dark, NSFW, có yếu tố enemies-to-lovers, domination nhẹ.{" "}
+                      <span className="text-foreground/60">Bạn viết tự do hoặc bám theo format trên — AI sẽ tự bổ sung chi tiết còn thiếu.</span>
+                    </p>
+                  )}
+                </div>
+
                 {!cloneMode ? (
                   <div className="flex flex-wrap gap-2 justify-center mt-1 max-w-lg">
                     {[
