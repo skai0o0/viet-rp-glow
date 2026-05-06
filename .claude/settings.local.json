@@ -10,7 +10,8 @@
       "Bash(npx vitest *)",
       "WebSearch",
       "WebFetch(domain:docs.sillytavern.app)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

@@ -57,6 +57,9 @@ Deno.serve(async (req) => {
       return jsonError("Missing tier_key or messages", 400);
     }
 
+    // Check if client already deducted a credit for this request
+    const useCredit = req.headers.get("x-use-credit") === "true";
+
     // Call 2: Combined RPC — role + quota + tier + API key in ONE call
     const { data: ctx, error: ctxError } = await supabaseAdmin.rpc(
       "prepare_chat_context",
@@ -73,8 +76,8 @@ Deno.serve(async (req) => {
     const tierResult = ctx.tier;
     const apiKey = ctx.api_key as string | null;
 
-    // Check quota (skip for privileged roles)
-    if (!isPrivileged && quota.remaining <= 0) {
+    // Check quota (skip for privileged roles and credit-paid requests)
+    if (!isPrivileged && !useCredit && quota.remaining <= 0) {
       return new Response(
         JSON.stringify({
           error: "quota_exceeded",
@@ -179,7 +182,7 @@ Deno.serve(async (req) => {
       .insert({
         user_id: user.id,
         feature: "chat",
-        credits_used: 0,
+        credits_used: useCredit ? 1 : 0,
         metadata: {
           tier_key,
           model: resolvedModel,

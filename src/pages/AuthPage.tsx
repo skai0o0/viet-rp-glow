@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const AuthPage = () => {
+  const { track } = useAnalytics();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,9 +45,11 @@ const AuthPage = () => {
       toast.error(result.error);
     } else if (isLogin) {
       toast.success("Đăng nhập thành công!");
+      track("login", { method: "email" });
       navigate(from, { replace: true });
     } else {
       toast.success("Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản.");
+      track("register", { method: "email" });
     }
   };
 

@@ -26,6 +26,7 @@ import {
   createEmptyTavernCard,
   createEmptyBookEntry,
 } from "@/types/taverncard";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const fieldLabel = "text-sm font-medium text-foreground";
 const fieldHint = "text-xs text-muted-foreground mt-1";
@@ -39,6 +40,7 @@ const CreatePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAdmin, canViewAdminHub } = useUserRole();
+  const { track } = useAnalytics();
   const [card, setCard] = useState<TavernCardV2>(createEmptyTavernCard());
   const [tagInput, setTagInput] = useState("");
   const [greetingDraft, setGreetingDraft] = useState("");
@@ -204,6 +206,7 @@ const CreatePage = () => {
       if (isAdmin) {
         const saved = await createCharacter(card, userId, isPublic, undefined, avatarUrl);
         toast({ title: "Thành công!", description: "Tạo nhân vật thành công!" });
+        track("character_created", { characterId: saved.id, isPublic });
         navigate(`/chat/${saved.id}`);
       } else {
         const payload: ApprovalPayload = {
@@ -226,6 +229,7 @@ const CreatePage = () => {
           title: "Đã gửi yêu cầu!",
           description: "Nhân vật của bạn đang chờ Admin duyệt. Bạn sẽ được thông báo khi hoàn tất.",
         });
+        track("character_approval_submitted", { characterName: data.name });
         navigate("/");
       }
     } catch (err: any) {

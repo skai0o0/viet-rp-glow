@@ -520,6 +520,7 @@ export async function streamChatViaProxy(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
   maxTokensOverride?: number,
+  useCredit?: boolean,
 ) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
@@ -538,6 +539,7 @@ export async function streamChatViaProxy(
         "Authorization": `Bearer ${session.access_token}`,
         "apikey": SUPABASE_ANON_KEY,
         "Content-Type": "application/json",
+        ...(useCredit ? { "x-use-credit": "true" } : {}),
       },
       body: JSON.stringify({
         tier_key: tierKey,

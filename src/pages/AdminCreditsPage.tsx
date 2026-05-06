@@ -149,7 +149,7 @@ const AdminCreditsPage = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
           <Card className="bg-oled-surface border-gray-border">
             <CardContent className="p-4">
               <div className="text-xs text-muted-foreground">Tổng user</div>
@@ -198,6 +198,7 @@ const AdminCreditsPage = () => {
               </div>
             ) : (
               <ScrollArea className="max-h-[60vh]">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-gray-border hover:bg-transparent">
@@ -260,6 +261,7 @@ const AdminCreditsPage = () => {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </ScrollArea>
             )}
           </CardContent>

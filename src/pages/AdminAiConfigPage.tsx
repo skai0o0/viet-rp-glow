@@ -531,8 +531,8 @@ const AdminAiConfigPage = () => {
             <p className="text-xs text-muted-foreground">
               Nhập API Key OpenRouter, verify để kiểm tra, rồi lưu (mã hoá) lên Supabase.
             </p>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap gap-2">
+              <div className="relative flex-1 min-w-0">
                 <Input
                   type={showKey ? "text" : "password"}
                   value={testApiKey}
@@ -594,7 +594,7 @@ const AdminAiConfigPage = () => {
               BYOK cho Xiaomi Mimo. Endpoint có thể tùy chỉnh bên dưới.
             </p>
             {/* Mimo API Endpoint */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Input
                 value={mimoEndpoint}
                 onChange={(e) => { setMimoEndpointState(e.target.value); setSavedMimoEndpoint(false); }}
@@ -616,8 +616,8 @@ const AdminAiConfigPage = () => {
               </Button>
             </div>
             {/* Mimo API Key */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap gap-2">
+              <div className="relative flex-1 min-w-0">
                 <Input
                   type={showMimoKey ? "text" : "password"}
                   value={testMimoKey}
@@ -682,19 +682,19 @@ const AdminAiConfigPage = () => {
               <p className="text-xs text-muted-foreground">
                 Pool OpenRouter API keys — Edge Function xoay vòng giữa các key active khi user chat.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Input
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
                   placeholder="Tên (VD: Key #1)"
-                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 flex-[0.3]"
+                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 min-w-[100px] flex-1 sm:flex-[0.3]"
                 />
                 <Input
                   value={newKeyValue}
                   onChange={(e) => setNewKeyValue(e.target.value)}
                   placeholder="sk-or-v1-..."
                   type="password"
-                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 flex-[0.7] font-mono"
+                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 min-w-[140px] flex-1 sm:flex-[0.7] font-mono"
                 />
                 <Button
                   size="sm"
