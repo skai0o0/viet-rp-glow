@@ -16,6 +16,7 @@ import { getPublicCharactersPaginated, getTrendingCharacters, getWeeklyTrendingC
 import { useAuth } from "@/contexts/AuthContext";
 import { getActiveBanner, BannerData } from "@/services/bannerDb";
 import { getFavoritedIds } from "@/services/favoriteDb";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 function formatCount(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -24,6 +25,7 @@ function formatCount(n: number): string {
 }
 
 const HomePage = () => {
+  const { track } = useAnalytics();
   const [tagFilter, setTagFilter] = useState("");
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -604,7 +606,7 @@ const HomePage = () => {
                 >
                   <CharacterCard
                     character={char}
-                    onClick={() => setPreviewChar(char)}
+                    onClick={() => { track("character_clicked", { characterId: char.id }); setPreviewChar(char); }}
                     isFavorited={favIds.has(char.id)}
                     onFavoriteToggle={user ? handleFavToggle : undefined}
                   />

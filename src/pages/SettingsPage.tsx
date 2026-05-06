@@ -125,13 +125,15 @@ const SettingsPage = () => {
 
               {/* Credit balance */}
               {!creditLoading && (
-                <div className="flex items-center justify-between p-3 rounded-xl bg-oled-elevated border border-gray-border">
-                  <div className="flex items-center gap-2">
-                    <Coins size={16} className="text-neon-purple" />
-                    <span className="text-xs text-muted-foreground">Credit</span>
+                <Link to="/credits">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-oled-elevated border border-gray-border hover:border-neon-purple/50 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Coins size={16} className="text-neon-purple" />
+                      <span className="text-xs text-muted-foreground">Credit</span>
+                    </div>
+                    <span className="text-sm font-bold font-mono text-neon-purple">{creditBalance.toLocaleString()}</span>
                   </div>
-                  <span className="text-sm font-bold font-mono text-neon-purple">{creditBalance.toLocaleString()}</span>
-                </div>
+                </Link>
               )}
 
               {/* Quota progress */}

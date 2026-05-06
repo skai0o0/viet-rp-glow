@@ -1,8 +1,11 @@
 import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
+  name?: string;
 }
 
 interface State {
@@ -22,6 +25,22 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("ErrorBoundary caught:", error, errorInfo);
+
+    // Log to Supabase for monitoring
+    supabase
+      .rpc("log_site_event", {
+        p_event_name: "error_boundary_caught",
+        p_event_data: {
+          error: error.message,
+          stack: error.stack?.slice(0, 500),
+          componentStack: errorInfo.componentStack?.slice(0, 500),
+          route: window.location.pathname,
+          boundary: this.props.name || "root",
+        },
+      })
+      .then(({ error: logErr }) => {
+        if (logErr) console.debug("[ErrorBoundary] Failed to log:", logErr.message);
+      });
   }
 
   handleReset = () => {
@@ -30,6 +49,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback;
+
       return (
         <div className="flex-1 flex items-center justify-center bg-oled-base p-6">
           <div className="max-w-md text-center space-y-4">

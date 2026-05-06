@@ -236,7 +236,7 @@ const NavigationRail = () => {
                 <Key size={14} className="mr-2" /> Thẻ API của tôi
               </DropdownMenuItem>
               {!isAdminOrOp && (
-                <DropdownMenuItem className="text-foreground focus:bg-oled-surface cursor-default">
+                <DropdownMenuItem onClick={() => navigate("/credits")} className="text-foreground focus:bg-oled-surface cursor-pointer">
                   <Coins size={14} className="mr-2 text-neon-purple" />
                   <span className="flex-1">Credit</span>
                   <span className="font-mono font-semibold text-neon-purple text-xs">{creditBalance.toLocaleString()}</span>

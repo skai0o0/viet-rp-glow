@@ -65,6 +65,42 @@ export async function fetchCreditHistory(
   return data as CreditTransaction[];
 }
 
+/** Use (deduct) credits for a feature. Returns true if successful, false if insufficient balance. */
+export async function useCredits(feature: string, credits: number): Promise<boolean> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return false;
+
+  const { data, error } = await supabase.rpc("use_credits", {
+    p_user_id: session.user.id,
+    p_feature: feature,
+    p_credits: credits,
+  } as any);
+
+  if (error) return false;
+  return data as boolean;
+}
+
+export interface CreditPackage {
+  id: string;
+  name: string;
+  description: string;
+  credits: number;
+  price: number;
+  discount_percent: number;
+}
+
+/** Fetch active credit packages for purchase */
+export async function fetchCreditPackages(): Promise<CreditPackage[]> {
+  const { data, error } = await supabase
+    .from("credit_packages")
+    .select("id, name, description, credits, price, discount_percent")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error || !data) return [];
+  return data as CreditPackage[];
+}
+
 /** Grant credits to a target user (admin/op only) */
 export async function grantCredits(
   targetUserId: string,

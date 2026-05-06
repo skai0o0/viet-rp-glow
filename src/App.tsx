@@ -30,6 +30,7 @@ const AdminCharGenPage = lazyWithRetry(() => import("@/pages/AdminCharGenPage"))
 const AdminAiConfigPage = lazyWithRetry(() => import("@/pages/AdminAiConfigPage"));
 const AdminApprovalsPage = lazyWithRetry(() => import("@/pages/AdminApprovalsPage"));
 const AdminCreditsPage = lazyWithRetry(() => import("@/pages/AdminCreditsPage"));
+const CreditsPage = lazyWithRetry(() => import("@/pages/CreditsPage"));
 const CharacterPage = lazyWithRetry(() => import("@/pages/CharacterPage"));
 const NotFound = lazyWithRetry(() => import("@/pages/NotFound"));
 const TermsPage = lazyWithRetry(() => import("@/pages/TermsPage"));
@@ -67,23 +68,24 @@ const App = () => (
             <Routes>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<HomePage />} />
-                <Route path="/chat" element={<ChatPage />} />
-                <Route path="/chat/:characterId" element={<ChatPage />} />
+                <Route path="/chat" element={<ErrorBoundary name="chat"><ChatPage /></ErrorBoundary>} />
+                <Route path="/chat/:characterId" element={<ErrorBoundary name="chat"><ChatPage /></ErrorBoundary>} />
                 <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
                 <Route path="/edit/:characterId" element={<ProtectedRoute><EditCharacterPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                 <Route path="/character/:id" element={<CharacterPage />} />
                 <Route path="/auth" element={<AuthPage />} />
-                <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-                <Route path="/admin/roadmap" element={<ProtectedRoute><AdminRoadmapPage /></ProtectedRoute>} />
-                <Route path="/admin/knowledge" element={<ProtectedRoute><AdminKnowledgePage /></ProtectedRoute>} />
-                <Route path="/admin/sql" element={<ProtectedRoute><AdminSqlEditorPage /></ProtectedRoute>} />
-                <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboardPage /></ProtectedRoute>} />
-                <Route path="/admin/chargen" element={<ProtectedRoute><AdminCharGenPage /></ProtectedRoute>} />
-                <Route path="/admin/api-settings" element={<ProtectedRoute><AdminAiConfigPage /></ProtectedRoute>} />
-                <Route path="/admin/approvals" element={<ProtectedRoute><AdminApprovalsPage /></ProtectedRoute>} />
-                <Route path="/admin/credits" element={<ProtectedRoute><AdminCreditsPage /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/roadmap" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminRoadmapPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/knowledge" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminKnowledgePage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/sql" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminSqlEditorPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/dashboard" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminDashboardPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/chargen" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminCharGenPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/api-settings" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminAiConfigPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/approvals" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminApprovalsPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/credits" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminCreditsPage /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/terms" element={<TermsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />

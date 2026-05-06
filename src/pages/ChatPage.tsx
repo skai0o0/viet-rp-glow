@@ -36,6 +36,9 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useChatMemory } from "@/hooks/useChatMemory";
+import { useAnalytics } from "@/hooks/useAnalytics";
+import { useUserCredits } from "@/hooks/useUserCredits";
+import { useCredits } from "@/services/creditDb";
 import { deriveChatAccess } from "@/utils/chatAccess";
 
 const ChatPage = () => {
@@ -45,9 +48,12 @@ const ChatPage = () => {
   const isMobile = useIsMobile();
 
   const { quota, refresh: refreshQuota } = useChatQuota();
+  const { balance: creditBalance, refresh: refreshCredits } = useUserCredits();
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [creditExceeded, setCreditExceeded] = useState(false);
   const { role } = useUserRole();
   const { summary, facts, loadMemory, clearMemory, triggerSummarize } = useChatMemory();
+  const { track } = useAnalytics();
   const { isSubscriptionUser, effectiveQuota } = useMemo(
     () => deriveChatAccess(role, quota),
     [role, quota]
@@ -69,6 +75,7 @@ const ChatPage = () => {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const usedCreditRef = useRef(false);
   const customFirstMesRef = useRef("");
   const messagesRef = useRef<ChatMessage[]>([]);
   const lastStreamRef = useRef<{ apiMessages: any[]; assistantId: string } | null>(null);
@@ -391,9 +398,17 @@ const ChatPage = () => {
         return;
       }
 
+      usedCreditRef.current = false;
       if (isSubscriptionUser && effectiveQuota.remaining <= 0) {
-        setQuotaExceeded(true);
-        return;
+        // Hết daily quota → thử dùng credit
+        const creditOk = await useCredits("chat_message", 1);
+        if (!creditOk) {
+          setCreditExceeded(true);
+          setQuotaExceeded(true);
+          return;
+        }
+        usedCreditRef.current = true;
+        refreshCredits();
       }
 
       if (!activeCharacter) return;
@@ -445,7 +460,10 @@ const ChatPage = () => {
       setStreamError(null);
       lastStreamRef.current = { apiMessages, assistantId };
 
-      const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+      const streamFn = isSubscriptionUser
+        ? (msgs: Parameters<typeof streamChatViaProxy>[0], cbs: Parameters<typeof streamChatViaProxy>[1], sig?: AbortSignal) =>
+            streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
+        : streamChat;
 
       streamFn(
         apiMessages,
@@ -472,11 +490,17 @@ const ChatPage = () => {
                 )
               );
               triggerSummarize(sessionId, messagesRef.current);
+              track("chat_message_sent", { characterId: activeCharId, isSubscriptionUser });
             } else {
               setMessages((prev) => prev.filter((m) => m.id !== assistantId));
             }
             if (isSubscriptionUser) {
               refreshQuota();
+              if (usedCreditRef.current) {
+                refreshCredits();
+                setQuotaExceeded(false);
+                setCreditExceeded(false);
+              }
             }
           },
           onError: (error) => {
@@ -506,6 +530,7 @@ const ChatPage = () => {
       scenarioOverride,
       effectiveQuota.remaining,
       refreshQuota,
+      refreshCredits,
       isSubscriptionUser,
       summary,
       facts,
@@ -516,6 +541,20 @@ const ChatPage = () => {
     if (!activeSessionId || !activeCharacter || isStreaming) return;
     await deleteLastAssistantMessage(activeSessionId);
     const withoutLast = messages.slice(0, -1);
+
+    // Credit pre-check for subscription users with exhausted quota
+    usedCreditRef.current = false;
+    if (isSubscriptionUser && effectiveQuota.remaining <= 0) {
+      const creditOk = await useCredits("chat_message", 1);
+      if (!creditOk) {
+        setCreditExceeded(true);
+        setQuotaExceeded(true);
+        return;
+      }
+      usedCreditRef.current = true;
+      refreshCredits();
+    }
+
     setMessages(withoutLast);
     setIsStreaming(true);
 
@@ -542,7 +581,10 @@ const ChatPage = () => {
     setStreamError(null);
     lastStreamRef.current = { apiMessages, assistantId };
 
-    const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+    const streamFn = isSubscriptionUser
+      ? (msgs: Parameters<typeof streamChatViaProxy>[0], cbs: Parameters<typeof streamChatViaProxy>[1], sig?: AbortSignal) =>
+          streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
+      : streamChat;
 
     streamFn(
       apiMessages,
@@ -572,6 +614,11 @@ const ChatPage = () => {
           }
           if (isSubscriptionUser) {
             refreshQuota();
+            if (usedCreditRef.current) {
+              refreshCredits();
+              setQuotaExceeded(false);
+              setCreditExceeded(false);
+            }
           }
         },
         onError: (error) => {
@@ -582,6 +629,7 @@ const ChatPage = () => {
           }
           if (error === "__QUOTA_EXCEEDED__" && isSubscriptionUser) {
             setQuotaExceeded(true);
+            setCreditExceeded(true);
             refreshQuota();
           } else {
             setStreamError(error);
@@ -591,7 +639,7 @@ const ChatPage = () => {
       },
       controller.signal
     );
-  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser, summary, facts]);
+  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, refreshCredits, isSubscriptionUser, summary, facts]);
 
   const lastAssistantIdx = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -642,6 +690,19 @@ const ChatPage = () => {
 
       setMessages(updatedMessages);
 
+      // Credit pre-check for subscription users with exhausted quota
+      usedCreditRef.current = false;
+      if (isSubscriptionUser && effectiveQuota.remaining <= 0) {
+        const creditOk = await useCredits("chat_message", 1);
+        if (!creditOk) {
+          setCreditExceeded(true);
+          setQuotaExceeded(true);
+          return;
+        }
+        usedCreditRef.current = true;
+        refreshCredits();
+      }
+
       // Now regenerate
       setIsStreaming(true);
       const assistantId = "streaming-" + Date.now();
@@ -667,7 +728,10 @@ const ChatPage = () => {
       setStreamError(null);
       lastStreamRef.current = { apiMessages, assistantId };
 
-      const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+      const streamFn = isSubscriptionUser
+        ? (msgs: Parameters<typeof streamChatViaProxy>[0], cbs: Parameters<typeof streamChatViaProxy>[1], sig?: AbortSignal) =>
+            streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
+        : streamChat;
 
       streamFn(
         apiMessages,
@@ -697,6 +761,11 @@ const ChatPage = () => {
             }
             if (isSubscriptionUser) {
               refreshQuota();
+              if (usedCreditRef.current) {
+                refreshCredits();
+                setQuotaExceeded(false);
+                setCreditExceeded(false);
+              }
             }
           },
           onError: (error) => {
@@ -707,6 +776,7 @@ const ChatPage = () => {
             }
             if (error === "__QUOTA_EXCEEDED__" && isSubscriptionUser) {
               setQuotaExceeded(true);
+              setCreditExceeded(true);
               refreshQuota();
             } else {
               setStreamError(error);
@@ -717,12 +787,25 @@ const ChatPage = () => {
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, isSubscriptionUser, summary, facts]
+    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, refreshCredits, isSubscriptionUser, summary, facts]
   );
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback(async () => {
     if (!lastStreamRef.current || isStreaming) return;
     const { apiMessages } = lastStreamRef.current;
+
+    // Credit pre-check for subscription users with exhausted quota
+    usedCreditRef.current = false;
+    if (isSubscriptionUser && effectiveQuota.remaining <= 0) {
+      const creditOk = await useCredits("chat_message", 1);
+      if (!creditOk) {
+        setCreditExceeded(true);
+        setQuotaExceeded(true);
+        return;
+      }
+      usedCreditRef.current = true;
+      refreshCredits();
+    }
 
     setIsStreaming(true);
     setStreamError(null);
@@ -739,7 +822,10 @@ const ChatPage = () => {
     abortRef.current = controller;
     lastStreamRef.current = { apiMessages, assistantId };
 
-    const streamFn = isSubscriptionUser ? streamChatViaProxy : streamChat;
+    const streamFn = isSubscriptionUser
+      ? (msgs: Parameters<typeof streamChatViaProxy>[0], cbs: Parameters<typeof streamChatViaProxy>[1], sig?: AbortSignal) =>
+          streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
+      : streamChat;
 
     streamFn(
       apiMessages,
@@ -766,7 +852,14 @@ const ChatPage = () => {
               )
             );
           }
-          if (isSubscriptionUser) refreshQuota();
+          if (isSubscriptionUser) {
+            refreshQuota();
+            if (usedCreditRef.current) {
+              refreshCredits();
+              setQuotaExceeded(false);
+              setCreditExceeded(false);
+            }
+          }
         },
         onError: (error) => {
           setIsStreaming(false);
@@ -776,6 +869,7 @@ const ChatPage = () => {
           }
           if (error === "__QUOTA_EXCEEDED__" && isSubscriptionUser) {
             setQuotaExceeded(true);
+            setCreditExceeded(true);
             refreshQuota();
           } else {
             setStreamError(error);
@@ -785,7 +879,7 @@ const ChatPage = () => {
       },
       controller.signal
     );
-  }, [isStreaming, activeSessionId, isSubscriptionUser, refreshQuota]);
+  }, [isStreaming, activeSessionId, isSubscriptionUser, refreshQuota, refreshCredits]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
@@ -1179,17 +1273,22 @@ const ChatPage = () => {
                     <AlertTriangle size={20} className="text-neon-purple" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">Hết lượt chat hôm nay!</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {creditExceeded ? "Hết lượt chat & credit!" : "Hết lượt chat hôm nay!"}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Bạn đã dùng hết {effectiveQuota.limit} tin nhắn trong gói {effectiveQuota.plan_name}. Nâng cấp Pro để tăng giới hạn tin nhắn mỗi ngày.
+                      {creditExceeded
+                        ? `Bạn đã dùng hết ${effectiveQuota.limit} tin nhắn và không còn credit. Liên hệ admin để mua thêm credit hoặc chờ reset lúc 00:00.`
+                        : `Bạn đã dùng hết ${effectiveQuota.limit} tin nhắn trong gói ${effectiveQuota.plan_name}. Nâng cấp Pro để tăng giới hạn tin nhắn mỗi ngày.`
+                      }
                     </p>
                   </div>
                   <Button
                     size="sm"
                     className="bg-neon-purple text-primary-foreground hover:shadow-neon-purple shrink-0"
-                    onClick={() => navigate("/settings")}
+                    onClick={() => navigate(creditExceeded ? "/credits" : "/settings")}
                   >
-                    Nâng cấp
+                    {creditExceeded ? "Mua credit" : "Nâng cấp"}
                   </Button>
                 </div>
               </motion.div>

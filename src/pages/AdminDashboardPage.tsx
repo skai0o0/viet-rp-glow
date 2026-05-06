@@ -445,17 +445,17 @@ const AdminDashboardPage = () => {
           <>
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="bg-oled-surface border border-oled-border">
-                <TabsTrigger value="overview" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+              <TabsList className="bg-oled-surface border border-oled-border overflow-x-auto justify-start w-full">
+                <TabsTrigger value="overview" className="shrink-0 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
                   Tổng quan
                 </TabsTrigger>
-                <TabsTrigger value="analytics" className="data-[state=active]:bg-neon-blue/20 data-[state=active]:text-neon-blue">
+                <TabsTrigger value="analytics" className="shrink-0 data-[state=active]:bg-neon-blue/20 data-[state=active]:text-neon-blue">
                   Analytics
                 </TabsTrigger>
-                <TabsTrigger value="models" className="data-[state=active]:bg-neon-rose/20 data-[state=active]:text-neon-rose">
+                <TabsTrigger value="models" className="shrink-0 data-[state=active]:bg-neon-rose/20 data-[state=active]:text-neon-rose">
                   Models & API
                 </TabsTrigger>
-                <TabsTrigger value="debug" className="data-[state=active]:bg-cyan-400/20 data-[state=active]:text-cyan-400">
+                <TabsTrigger value="debug" className="shrink-0 data-[state=active]:bg-cyan-400/20 data-[state=active]:text-cyan-400">
                   Debug
                 </TabsTrigger>
               </TabsList>
