@@ -31,26 +31,36 @@ export function setMimoEndpoint(endpoint: string, userId?: string) {
   // Persist to Supabase if userId provided
   if (userId) {
     saveUserApiKeys(userId, { mimo_endpoint: trimmed }).catch((e) =>
-      console.warn("Failed to sync Mimo endpoint to Supabase:", e)
+      console.error("[BYOK] Failed to sync Mimo endpoint to Supabase:", e)
     );
   }
 }
 
 export type Provider = "openrouter" | "mimo";
 
-// ─── Secure storage helpers (sessionStorage + obfuscation) ───
-// Migrate old localStorage keys to sessionStorage on first load
-(function migrateSensitiveKeys() {
+// ─── Secure storage helpers (localStorage + obfuscation) ───
+// Migrate old sessionStorage keys back to localStorage (revert ephemeral storage)
+(function migrateFromSessionStorage() {
   try {
-    const oldKey = localStorage.getItem(STORAGE_KEY_API);
-    if (oldKey) {
-      sessionStorage.setItem(STORAGE_KEY_API, oldKey);
-      localStorage.removeItem(STORAGE_KEY_API);
+    const sessionKey = sessionStorage.getItem(STORAGE_KEY_API);
+    if (sessionKey && !localStorage.getItem(STORAGE_KEY_API)) {
+      localStorage.setItem(STORAGE_KEY_API, sessionKey);
+      sessionStorage.removeItem(STORAGE_KEY_API);
     }
-    const oldVerified = localStorage.getItem(STORAGE_KEY_VERIFIED);
-    if (oldVerified) {
-      sessionStorage.setItem(STORAGE_KEY_VERIFIED, oldVerified);
-      localStorage.removeItem(STORAGE_KEY_VERIFIED);
+    const sessionVerified = sessionStorage.getItem(STORAGE_KEY_VERIFIED);
+    if (sessionVerified && !localStorage.getItem(STORAGE_KEY_VERIFIED)) {
+      localStorage.setItem(STORAGE_KEY_VERIFIED, sessionVerified);
+      sessionStorage.removeItem(STORAGE_KEY_VERIFIED);
+    }
+    const sessionMimo = sessionStorage.getItem(MIMO_STORAGE_KEY_API);
+    if (sessionMimo && !localStorage.getItem(MIMO_STORAGE_KEY_API)) {
+      localStorage.setItem(MIMO_STORAGE_KEY_API, sessionMimo);
+      sessionStorage.removeItem(MIMO_STORAGE_KEY_API);
+    }
+    const sessionMimoVerified = sessionStorage.getItem(MIMO_STORAGE_KEY_VERIFIED);
+    if (sessionMimoVerified && !localStorage.getItem(MIMO_STORAGE_KEY_VERIFIED)) {
+      localStorage.setItem(MIMO_STORAGE_KEY_VERIFIED, sessionMimoVerified);
+      sessionStorage.removeItem(MIMO_STORAGE_KEY_VERIFIED);
     }
   } catch { /* ignore */ }
 })();
@@ -66,7 +76,7 @@ export function setActiveProvider(provider: Provider) {
   localStorage.setItem(STORAGE_KEY_PROVIDER, provider);
 }
 
-/** Simple XOR-based obfuscation for sessionStorage (not crypto-secure, but prevents casual DevTools reading) */
+/** Simple XOR-based obfuscation for localStorage (not crypto-secure, but prevents casual DevTools reading) */
 function obfuscate(value: string): string {
   const mask = "vietrp";
   let result = "";
@@ -112,7 +122,7 @@ export interface OpenRouterModel {
 }
 
 export function getApiKey(): string {
-  const stored = sessionStorage.getItem(STORAGE_KEY_API);
+  const stored = localStorage.getItem(STORAGE_KEY_API);
   if (!stored) return "";
   return deobfuscate(stored);
 }
@@ -120,30 +130,30 @@ export function getApiKey(): string {
 export function setApiKey(key: string, userId?: string) {
   const old = getApiKey();
   if (key) {
-    sessionStorage.setItem(STORAGE_KEY_API, obfuscate(key));
+    localStorage.setItem(STORAGE_KEY_API, obfuscate(key));
   } else {
-    sessionStorage.removeItem(STORAGE_KEY_API);
+    localStorage.removeItem(STORAGE_KEY_API);
   }
-  if (key !== old) sessionStorage.removeItem(STORAGE_KEY_VERIFIED);
+  if (key !== old) localStorage.removeItem(STORAGE_KEY_VERIFIED);
   // Persist to Supabase if userId provided
   if (userId) {
     saveUserApiKeys(userId, { openrouter_key: key }).catch((e) =>
-      console.warn("Failed to sync OpenRouter key to Supabase:", e)
+      console.error("[BYOK] Failed to save OpenRouter key to Supabase:", e)
     );
   }
 }
 
 export function isKeyVerified(): boolean {
-  return sessionStorage.getItem(STORAGE_KEY_VERIFIED) === "true";
+  return localStorage.getItem(STORAGE_KEY_VERIFIED) === "true";
 }
 
 export function markKeyVerified() {
-  sessionStorage.setItem(STORAGE_KEY_VERIFIED, "true");
+  localStorage.setItem(STORAGE_KEY_VERIFIED, "true");
 }
 
 // ─── Xiaomi Mimo key management ───
 export function getMimoApiKey(): string {
-  const stored = sessionStorage.getItem(MIMO_STORAGE_KEY_API);
+  const stored = localStorage.getItem(MIMO_STORAGE_KEY_API);
   if (!stored) return "";
   return deobfuscate(stored);
 }
@@ -151,45 +161,46 @@ export function getMimoApiKey(): string {
 export function setMimoApiKey(key: string, userId?: string) {
   const old = getMimoApiKey();
   if (key) {
-    sessionStorage.setItem(MIMO_STORAGE_KEY_API, obfuscate(key));
+    localStorage.setItem(MIMO_STORAGE_KEY_API, obfuscate(key));
   } else {
-    sessionStorage.removeItem(MIMO_STORAGE_KEY_API);
+    localStorage.removeItem(MIMO_STORAGE_KEY_API);
   }
-  if (key !== old) sessionStorage.removeItem(MIMO_STORAGE_KEY_VERIFIED);
+  if (key !== old) localStorage.removeItem(MIMO_STORAGE_KEY_VERIFIED);
   // Persist to Supabase if userId provided
   if (userId) {
     saveUserApiKeys(userId, { mimo_key: key }).catch((e) =>
-      console.warn("Failed to sync Mimo key to Supabase:", e)
+      console.error("[BYOK] Failed to save Mimo key to Supabase:", e)
     );
   }
 }
 
 export function isMimoKeyVerified(): boolean {
-  return sessionStorage.getItem(MIMO_STORAGE_KEY_VERIFIED) === "true";
+  return localStorage.getItem(MIMO_STORAGE_KEY_VERIFIED) === "true";
 }
 
 export function markMimoKeyVerified() {
-  sessionStorage.setItem(MIMO_STORAGE_KEY_VERIFIED, "true");
+  localStorage.setItem(MIMO_STORAGE_KEY_VERIFIED, "true");
 }
 
 /**
- * Sync BYOK keys from Supabase into sessionStorage.
+ * Sync BYOK keys from Supabase into localStorage.
  * Called on app init / login so user doesn't have to re-enter keys.
  */
 export async function syncKeysFromSupabase(userId: string): Promise<void> {
   try {
     const keys = await loadUserApiKeys(userId);
     if (keys.openrouter_key && !getApiKey()) {
-      sessionStorage.setItem(STORAGE_KEY_API, obfuscate(keys.openrouter_key));
+      localStorage.setItem(STORAGE_KEY_API, obfuscate(keys.openrouter_key));
     }
     if (keys.mimo_key && !getMimoApiKey()) {
-      sessionStorage.setItem(MIMO_STORAGE_KEY_API, obfuscate(keys.mimo_key));
+      localStorage.setItem(MIMO_STORAGE_KEY_API, obfuscate(keys.mimo_key));
     }
     if (keys.mimo_endpoint) {
       localStorage.setItem(MIMO_STORAGE_KEY_ENDPOINT, keys.mimo_endpoint);
     }
   } catch (e) {
-    console.warn("Failed to sync keys from Supabase:", e);
+    console.error("[BYOK] Failed to sync keys from Supabase:", e);
+    throw e;
   }
 }
 

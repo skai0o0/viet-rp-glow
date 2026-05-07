@@ -274,16 +274,14 @@ const CreatePage = () => {
       </div>
 
       <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/30">
-        <Tabs value={location.pathname === "/admin/chargen" ? "ai" : "manual"} className="w-full max-w-md">
+        <Tabs value={location.pathname === "/create-ai" ? "ai" : "manual"} className="w-full max-w-md">
           <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
             <TabsTrigger value="manual" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
               <Link to="/create">Tạo Card</Link>
             </TabsTrigger>
-            {canViewAdminHub && (
-              <TabsTrigger value="ai" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-                <Link to="/admin/chargen">AI Charagen</Link>
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="ai" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+              <Link to="/create-ai">AI Charagen</Link>
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

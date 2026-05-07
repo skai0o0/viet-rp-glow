@@ -25,9 +25,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (u) {
         getMyProfile().then((p) => {
           if (p) setCachedUserPersona(p.display_name, p.user_description, p.gender as any, p.sexuality as any);
-        }).catch(() => {});
-        // Sync BYOK keys from Supabase → sessionStorage
-        syncKeysFromSupabase(u.id).catch(() => {});
+        }).catch((e) => console.warn("[Auth] Failed to load profile:", e));
+        // Sync BYOK keys from Supabase → localStorage
+        syncKeysFromSupabase(u.id).catch((e) => {
+          console.error("[Auth] Failed to sync BYOK keys:", e);
+        });
       }
     };
 

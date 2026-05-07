@@ -29,7 +29,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 const topItems = [
   { icon: Home, label: "Khám phá", path: "/" },
   { icon: MessageSquare, label: "Cuộc trò chuyện", path: "/chat" },
-  { icon: PlusCircle, label: "Tạo Card", path: "/create", aliases: ["/admin/chargen"] },
+  { icon: PlusCircle, label: "Tạo Card", path: "/create", aliases: ["/admin/chargen", "/create-ai"] },
 ];
 
 const NavItem = ({
@@ -113,7 +113,14 @@ const NavigationRail = () => {
 
   const handleCopyMarkdown = async () => {
     try {
-      const mod = await import("turndown");
+      let mod;
+      try {
+        mod = await import("turndown");
+      } catch (importErr) {
+        console.error("[Nav] Failed to load turndown module:", importErr);
+        toast.error("Tính năng Copy Markdown tạm thời không khả dụng");
+        return;
+      }
       const TurndownService = mod.default ?? mod;
       const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
       const main = document.querySelector("main") || document.body;
