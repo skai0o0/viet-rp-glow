@@ -27,6 +27,7 @@ const AdminKnowledgePage = lazyWithRetry(() => import("@/pages/AdminKnowledgePag
 const AdminSqlEditorPage = lazyWithRetry(() => import("@/pages/AdminSqlEditorPage"));
 const AdminDashboardPage = lazyWithRetry(() => import("@/pages/AdminDashboardPage"));
 const AdminCharGenPage = lazyWithRetry(() => import("@/pages/AdminCharGenPage"));
+const UserCharGenPage = lazyWithRetry(() => import("@/pages/UserCharGenPage"));
 const AdminAiConfigPage = lazyWithRetry(() => import("@/pages/AdminAiConfigPage"));
 const AdminApprovalsPage = lazyWithRetry(() => import("@/pages/AdminApprovalsPage"));
 const AdminCreditsPage = lazyWithRetry(() => import("@/pages/AdminCreditsPage"));
@@ -71,6 +72,7 @@ const App = () => (
                 <Route path="/chat" element={<ErrorBoundary name="chat"><ChatPage /></ErrorBoundary>} />
                 <Route path="/chat/:characterId" element={<ErrorBoundary name="chat"><ChatPage /></ErrorBoundary>} />
                 <Route path="/create" element={<ProtectedRoute><CreatePage /></ProtectedRoute>} />
+                <Route path="/create-ai" element={<ProtectedRoute><UserCharGenPage /></ProtectedRoute>} />
                 <Route path="/edit/:characterId" element={<ProtectedRoute><EditCharacterPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                 <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />

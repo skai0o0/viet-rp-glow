@@ -176,7 +176,7 @@ const AdminAiConfigPage = () => {
       });
     fetchGlobalSystemPrompt().then(setPrompt);
     fetchSamplingParameters().then(setSamplingParams);
-    // Sync BYOK keys from Supabase → populate sessionStorage + inputs
+    // Sync BYOK keys from Supabase → populate localStorage + inputs
     if (user) {
       syncKeysFromSupabase(user.id).then(() => {
         setTestApiKey(getApiKey());
