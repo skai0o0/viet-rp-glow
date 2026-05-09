@@ -54,8 +54,75 @@ function extractBraceBlocks(text: string): string[] {
 }
 
 /**
+ * Try to auto-complete truncated JSON by closing open braces/brackets/strings.
+ * Returns the completed string, or null if the input doesn't look like JSON.
+ */
+function autoCompleteJson(s: string): string | null {
+  const trimmed = s.trim();
+  if (!trimmed.startsWith("{")) return null;
+
+  // Track open braces/brackets
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (const ch of trimmed) {
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{" || ch === "[") depth++;
+    if (ch === "}" || ch === "]") depth--;
+  }
+
+  let suffix = "";
+  // Close any open string
+  if (inString) suffix += '"';
+  // Close open arrays/braces (in reverse order we'd need to close)
+  const stack: string[] = [];
+  let inStr2 = false;
+  let esc2 = false;
+  for (const ch of trimmed) {
+    if (esc2) { esc2 = false; continue; }
+    if (ch === "\\") { esc2 = true; continue; }
+    if (ch === '"') { inStr2 = !inStr2; continue; }
+    if (inStr2) continue;
+    if (ch === "[") stack.push("]");
+    if (ch === "{") stack.push("}");
+    if (ch === "]" || ch === "}") stack.pop();
+  }
+  suffix += stack.reverse().join("");
+
+  // Remove trailing incomplete string value (e.g., "key": "incomplete...)
+  // Find the last complete key-value pair and truncate
+  let result = trimmed + suffix;
+
+  // Try parse as-is first
+  try { JSON5.parse(result); return result; } catch { /* continue */ }
+
+  // Try truncating at the last complete value
+  // Find last occurrence of a value-ending character (", }, ])
+  const lastValid = Math.max(
+    result.lastIndexOf('",'),
+    result.lastIndexOf("'}," ),
+    result.lastIndexOf('",'),
+    result.lastIndexOf("}"),
+    result.lastIndexOf("]"),
+  );
+  if (lastValid > 0) {
+    const truncated = result.slice(0, lastValid + 1);
+    // Re-close braces after truncation
+    const retried = autoCompleteJson(truncated);
+    if (retried) {
+      try { JSON5.parse(retried); return retried; } catch { /* continue */ }
+    }
+  }
+
+  return result; // return best effort
+}
+
+/**
  * Extract a TavernCardV2 from LLM response text.
- * Handles: raw JSON, markdown fenced blocks, JSON embedded in prose.
+ * Handles: raw JSON, markdown fenced blocks, JSON embedded in prose, truncated responses.
  */
 export function extractCardJson(raw: string): TavernCardV2 | null {
   // 1) Direct parse — entire response is raw JSON
@@ -80,6 +147,27 @@ export function extractCardJson(raw: string): TavernCardV2 | null {
   for (const block of braceResults) {
     const result = tryParse(block);
     if (result) return result;
+  }
+
+  // 4) Truncated response: find ```json block without closing fence
+  const truncatedFenceMatch = raw.match(/```(?:json5?|JSON5?)?\s*\n?([\s\S]*?)$/);
+  if (truncatedFenceMatch?.[1]) {
+    const completed = autoCompleteJson(truncatedFenceMatch[1].trim());
+    if (completed) {
+      const result = tryParse(completed);
+      if (result) return result;
+    }
+  }
+
+  // 5) Truncated raw JSON: find first { and try to auto-complete
+  const firstBrace = raw.indexOf("{");
+  if (firstBrace >= 0) {
+    const candidate = raw.slice(firstBrace);
+    const completed = autoCompleteJson(candidate);
+    if (completed) {
+      const result = tryParse(completed);
+      if (result) return result;
+    }
   }
 
   return null;
