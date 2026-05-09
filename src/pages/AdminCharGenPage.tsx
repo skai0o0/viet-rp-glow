@@ -57,6 +57,7 @@ import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKey, getModel, setModel, streamChat, getActiveProvider, setActiveProvider, getApiKeyForProvider, type StreamCallbacks, type Provider } from "@/services/openRouter";
 import JSON5 from "json5";
 import { readJsonFile, parseTavernCardJson } from "@/utils/importCharacterJson";
+import { extractCardJson } from "@/utils/extractCardJson";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
 import { createApproval } from "@/services/approvalService";
 
@@ -152,61 +153,6 @@ You are an expert Card Cloning Engine. Convert unstructured text (wiki, forum, f
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 /* ------------------------------------------------------------------ */
-/*  Helper: extract JSON from LLM response                            */
-/* ------------------------------------------------------------------ */
-function extractCardJson(raw: string): TavernCardV2 | null {
-  function normalize(obj: any): TavernCardV2 | null {
-    if (obj?.spec === "chara_card_v2" && obj?.data?.name) {
-      const d = obj.data;
-      return {
-        spec: "chara_card_v2",
-        spec_version: "2.0",
-        data: {
-          name: d.name || "",
-          description: d.description || "",
-          personality: d.personality || "",
-          scenario: d.scenario || "",
-          first_mes: d.first_mes || "",
-          mes_example: d.mes_example || "",
-          creator_notes: d.creator_notes || "Tạo bởi VietRP AI Generator.",
-          system_prompt: d.system_prompt || "",
-          post_history_instructions: d.post_history_instructions || "",
-          alternate_greetings: Array.isArray(d.alternate_greetings) ? d.alternate_greetings : [],
-          character_book: d.character_book || undefined,
-          tags: Array.isArray(d.tags) ? d.tags : [],
-          creator: d.creator || "VietRP Charagen AI",
-          character_version: d.character_version || "1.0",
-          extensions: d.extensions || {},
-        },
-      };
-    }
-    return null;
-  }
-
-  // Try direct parse first (JSON5 tolerates trailing commas, single quotes, etc.)
-  try {
-    return normalize(JSON5.parse(raw));
-  } catch { /* continue */ }
-
-  // Try to find JSON block in markdown fences or raw text
-  const patterns = [
-    /```json\s*\n?([\s\S]*?)```/,
-    /```\s*\n?([\s\S]*?)```/,
-    /(\{[\s\S]*"spec"\s*:\s*"chara_card_v2"[\s\S]*\})/,
-  ];
-
-  for (const pat of patterns) {
-    const m = raw.match(pat);
-    if (m?.[1]) {
-      try {
-        return normalize(JSON5.parse(m[1].trim()));
-      } catch { /* continue */ }
-    }
-  }
-  return null;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 const AdminCharGenPage = () => {
@@ -253,7 +199,6 @@ const AdminCharGenPage = () => {
       const { data, error } = await supabase
         .from("characters")
         .select("*")
-        .eq("creator", "VietRP Charagen AI")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -299,6 +244,7 @@ const AdminCharGenPage = () => {
       }
       const saved = await createCharacter(card, user!.id, true);
       toast.success(`Đã import nhân vật công khai: ${saved.name}`);
+      fetchHistory();
     } catch (err: any) {
       toast.error(err.message || "Import thất bại.");
     } finally {
@@ -324,6 +270,7 @@ const AdminCharGenPage = () => {
       const saved = await createCharacter(card, user!.id, true);
       toast.success(`Đã import nhân vật công khai: ${saved.name}`);
       setRawJson("");
+      fetchHistory();
     } catch (err: any) {
       toast.error(err.message || "JSON không hợp lệ.");
     } finally {
