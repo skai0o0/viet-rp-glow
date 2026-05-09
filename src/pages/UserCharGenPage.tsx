@@ -47,7 +47,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKeyForProvider, getModel, streamChat, getActiveProvider, type StreamCallbacks, type Provider } from "@/services/openRouter";
-import JSON5 from "json5";
+import { extractCardJson } from "@/utils/extractCardJson";
 import { TavernCardV2, TavernCardV2Data } from "@/types/taverncard";
 import { createApproval } from "@/services/approvalService";
 import CharGenAssistant from "@/components/CharGenAssistant";
@@ -139,59 +139,6 @@ You are an expert Card Cloning Engine. Convert unstructured text (wiki, forum, f
 `;
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
-
-/* ------------------------------------------------------------------ */
-/*  Helper: extract JSON from LLM response                            */
-/* ------------------------------------------------------------------ */
-function extractCardJson(raw: string): TavernCardV2 | null {
-  function normalize(obj: any): TavernCardV2 | null {
-    if (obj?.spec === "chara_card_v2" && obj?.data?.name) {
-      const d = obj.data;
-      return {
-        spec: "chara_card_v2",
-        spec_version: "2.0",
-        data: {
-          name: d.name || "",
-          description: d.description || "",
-          personality: d.personality || "",
-          scenario: d.scenario || "",
-          first_mes: d.first_mes || "",
-          mes_example: d.mes_example || "",
-          creator_notes: d.creator_notes || "Tạo bởi VietRP AI Generator.",
-          system_prompt: d.system_prompt || "",
-          post_history_instructions: d.post_history_instructions || "",
-          alternate_greetings: Array.isArray(d.alternate_greetings) ? d.alternate_greetings : [],
-          character_book: d.character_book || undefined,
-          tags: Array.isArray(d.tags) ? d.tags : [],
-          creator: d.creator || "VietRP Charagen AI",
-          character_version: d.character_version || "1.0",
-          extensions: d.extensions || {},
-        },
-      };
-    }
-    return null;
-  }
-
-  try {
-    return normalize(JSON5.parse(raw));
-  } catch { /* continue */ }
-
-  const patterns = [
-    /```json\s*\n?([\s\S]*?)```/,
-    /```\s*\n?([\s\S]*?)```/,
-    /(\{[\s\S]*"spec"\s*:\s*"chara_card_v2"[\s\S]*\})/,
-  ];
-
-  for (const pat of patterns) {
-    const m = raw.match(pat);
-    if (m?.[1]) {
-      try {
-        return normalize(JSON5.parse(m[1].trim()));
-      } catch { /* continue */ }
-    }
-  }
-  return null;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
