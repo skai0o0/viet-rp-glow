@@ -368,13 +368,17 @@ export interface SamplingParameters {
   top_p: number;
   top_k: number;
   repetition_penalty: number;
+  max_tokens: number;
 }
+
+export const DEFAULT_MAX_TOKENS = 1500;
 
 const DEFAULT_SAMPLING_PARAMS: SamplingParameters = {
   temperature: 0.7,
   top_p: 0.9,
   top_k: 40,
   repetition_penalty: 1.0,
+  max_tokens: DEFAULT_MAX_TOKENS,
 };
 
 let cachedSamplingParams: SamplingParameters | null = null;
@@ -386,6 +390,8 @@ export async function fetchSamplingParameters(): Promise<SamplingParameters> {
     .eq("key", "sampling_parameters")
     .single();
   const value = data?.value ? JSON.parse(data.value) : DEFAULT_SAMPLING_PARAMS;
+  // Backward compat: add max_tokens if missing from stored config
+  if (value.max_tokens === undefined) value.max_tokens = DEFAULT_MAX_TOKENS;
   cachedSamplingParams = value;
   return value;
 }

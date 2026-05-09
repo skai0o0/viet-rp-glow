@@ -1,5 +1,5 @@
 import { OpenRouterMessage } from "@/utils/promptBuilder";
-import { getCachedSamplingParameters } from "@/services/globalSettingsDb";
+import { getCachedSamplingParameters, DEFAULT_MAX_TOKENS } from "@/services/globalSettingsDb";
 import { supabase } from "@/integrations/supabase/client";
 import { loadUserApiKeys, saveUserApiKeys } from "@/services/userApiKeys";
 
@@ -427,7 +427,7 @@ export async function streamChat(
 
   const apiUrl = activeProvider === "mimo" ? `${getMimoEndpoint()}/chat/completions` : OPENROUTER_API_URL;
   const model = getModel();
-  const maxTokens = maxTokensOverride ?? parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
+  const maxTokens = maxTokensOverride ?? (parseInt(localStorage.getItem("vietrp_max_tokens") || "") || getCachedSamplingParameters().max_tokens || DEFAULT_MAX_TOKENS);
 
   try {
     // Get sampling parameters from global settings
@@ -540,7 +540,7 @@ export async function streamChatViaProxy(
   }
 
   const tierKey = getSelectedTier();
-  const maxTokens = maxTokensOverride ?? parseInt(localStorage.getItem("vietrp_max_tokens") || "800", 10);
+  const maxTokens = maxTokensOverride ?? (parseInt(localStorage.getItem("vietrp_max_tokens") || "") || getCachedSamplingParameters().max_tokens || DEFAULT_MAX_TOKENS);
   const samplingParams = getCachedSamplingParameters();
 
   try {

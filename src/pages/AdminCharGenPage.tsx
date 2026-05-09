@@ -449,7 +449,7 @@ const AdminCharGenPage = () => {
       },
     };
 
-    await streamChat(apiMessages, callbacks, controller.signal, 4096, activeProvider);
+    await streamChat(apiMessages, callbacks, controller.signal, 16384, activeProvider);
   }, [input, streaming, messages, cloneMode, fetchHistory, user, activeProvider]);
 
   const handleStop = () => {

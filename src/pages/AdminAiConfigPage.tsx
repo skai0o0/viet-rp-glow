@@ -155,6 +155,7 @@ const AdminAiConfigPage = () => {
     top_p: 0.9,
     top_k: 40,
     repetition_penalty: 1.0,
+    max_tokens: 1500,
   });
   const [savingSamplingParams, setSavingSamplingParams] = useState(false);
 
@@ -1122,11 +1123,29 @@ const AdminAiConfigPage = () => {
                 />
                 <p className="text-[10px] text-muted-foreground">1.0 = Không phạt / 1.2+ = Tránh lặp lại từ (tốt cho roleplay)</p>
               </div>
+
+              {/* Max Output Tokens */}
+              <div className="space-y-2 pt-2 border-t border-oled-border">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground">Max Output Tokens (độ dài phản hồi)</Label>
+                  <span className="text-xs text-neon-purple font-mono">{Math.round(samplingParams.max_tokens)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="100"
+                  max="4096"
+                  step="50"
+                  value={samplingParams.max_tokens}
+                  onChange={(e) => setSamplingParams({ ...samplingParams, max_tokens: parseInt(e.target.value) })}
+                  className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                />
+                <p className="text-[10px] text-muted-foreground">Giới hạn số token tối đa AI được phép sinh ra. 1500 = phù hợp roleplay / 4096 = phản hồi rất dài</p>
+              </div>
             </div>
 
             <div className="bg-oled-base/50 border border-oled-border rounded-lg p-3 mt-4">
               <p className="text-[10px] text-muted-foreground">
-                <strong>Gợi ý:</strong> Temperature 0.8-1.0 + Top-P 0.85-0.95 + Repetition Penalty 1.1-1.2 = Roleplay tốt với sáng tạo phù hợp
+                <strong>Gợi ý:</strong> Temperature 0.8-1.0 + Top-P 0.85-0.95 + Repetition Penalty 1.1-1.2 + Max Tokens 1500-2000 = Roleplay tốt với phản hồi đủ dài
               </p>
             </div>
 
