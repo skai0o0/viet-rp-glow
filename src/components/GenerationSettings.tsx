@@ -16,6 +16,7 @@ import {
   getSelectedTier, setSelectedTier, getModel, setModel,
   getActiveProvider, setActiveProvider, type Provider,
 } from "@/services/openRouter";
+import { getCachedSamplingParameters, DEFAULT_MAX_TOKENS } from "@/services/globalSettingsDb";
 
 const STORAGE_KEY_MAX_TOKENS = "vietrp_max_tokens";
 const STORAGE_KEY_RESPONSE_STYLE = "vietrp_response_style";
@@ -46,7 +47,8 @@ export const RESPONSE_STYLES: { value: string; label: string; prompt: string }[]
 
 export function getMaxTokens(): number {
   const stored = localStorage.getItem(STORAGE_KEY_MAX_TOKENS);
-  return stored ? parseInt(stored, 10) : 800;
+  if (stored) return parseInt(stored, 10);
+  return getCachedSamplingParameters().max_tokens ?? DEFAULT_MAX_TOKENS;
 }
 
 export function setMaxTokens(val: number) {

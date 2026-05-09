@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const {
       tier_key,
       messages,
-      max_tokens = 800,
+      max_tokens = 1500,
       temperature = 0.7,
       top_p = 0.9,
       top_k = 40,
