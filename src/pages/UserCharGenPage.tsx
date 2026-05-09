@@ -298,6 +298,8 @@ const UserCharGenPage = () => {
       if (card) {
         setGeneratedCard(card);
         setRenameFrom(card.data.name);
+        setReviewOpen(true);
+        toast.success(`Đã tạo card: ${card.data.name}`, { description: "Đang mở panel duyệt card." });
       }
     }
     setStreamBuffer("");
