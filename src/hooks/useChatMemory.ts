@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import type { ChatMessage } from "@/types/character";
-import { getMemoryContext, summarizeIfNeeded } from "@/services/chatSummarizer";
+import { getMemoryContext, triggerRollingSummary } from "@/services/memoryManager";
 
 interface ChatMemoryState {
   summary: string | undefined;
@@ -25,13 +25,14 @@ export function useChatMemory() {
     lastSessionIdRef.current = sessionId;
     try {
       const ctx = await getMemoryContext(sessionId);
+      console.log("[useChatMemory] Loaded memory for session:", sessionId, ctx);
       setMemory((prev) => ({
         ...prev,
         summary: ctx.summary,
         facts: ctx.facts,
       }));
-    } catch {
-      // Memory load failure should not block chat
+    } catch (err) {
+      console.error("[useChatMemory] Failed to load memory:", err);
     }
   }, []);
 
@@ -53,17 +54,11 @@ export function useChatMemory() {
 
       setMemory((prev) => ({ ...prev, isSummarizing: true }));
       try {
-        const result = await summarizeIfNeeded(sessionId, messages);
-        if (result && lastSessionIdRef.current === sessionId) {
-          setMemory((prev) => ({
-            ...prev,
-            summary: result.summary,
-            facts: result.facts,
-            isSummarizing: false,
-          }));
-        } else {
-          setMemory((prev) => ({ ...prev, isSummarizing: false }));
-        }
+        await triggerRollingSummary(sessionId, messages);
+        // The archivist runs in the background; when it finishes the summary
+        // will be loaded on the next loadMemory() call (e.g. session switch).
+        // We clear isSummarizing immediately since the actual work is fire-and-forget.
+        setMemory((prev) => ({ ...prev, isSummarizing: false }));
       } catch {
         setMemory((prev) => ({ ...prev, isSummarizing: false }));
       }

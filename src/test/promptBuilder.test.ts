@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { buildMessages, buildSystemPrompt } from "@/utils/promptBuilder";
+import { buildMessages, buildSystemPrompt, detectCardType } from "@/utils/promptBuilder";
 import type { CharacterCard } from "@/types/character";
 
 // Mock dependencies
@@ -15,6 +15,10 @@ vi.mock("@/services/profileDb", () => ({
 
 vi.mock("@/services/globalSettingsDb", () => ({
   getGlobalSystemPrompt: () => "Global prompt",
+  getGlobalPromptTypeA: () => "Type A system prompt",
+  getGlobalPromptTypeB: () => "Type B system prompt",
+  getGlobalPostHistoryTypeA: () => "Type A post-history",
+  getGlobalPostHistoryTypeB: () => "Type B post-history",
 }));
 
 vi.mock("@/components/GenerationSettings", () => ({
@@ -39,14 +43,96 @@ const baseChar: CharacterCard = {
   tags: ["test"],
 };
 
+describe("detectCardType", () => {
+  it("returns 'type_a' for a simple single-character card", () => {
+    expect(detectCardType(baseChar)).toBe("type_a");
+  });
+
+  it("returns 'type_b' when description contains --- [Name] --- pattern", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      description: "--- [Thy Ngân] ---\nA mysterious merchant.\n--- [Linh] ---\nA traveling warrior.",
+    };
+    expect(detectCardType(char)).toBe("type_b");
+  });
+
+  it("returns 'type_b' when character_book has entries", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: {
+        entries: [
+          {
+            keys: ["kingdom"],
+            content: "The kingdom has 5 provinces.",
+            enabled: true,
+            insertion_order: 0,
+            constant: true,
+          },
+        ],
+      },
+    };
+    expect(detectCardType(char)).toBe("type_b");
+  });
+
+  it("returns 'type_a' when character_book has zero entries", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: { entries: [] },
+    };
+    expect(detectCardType(char)).toBe("type_a");
+  });
+});
+
 describe("buildSystemPrompt", () => {
   beforeEach(() => {
     localStorageMock["vietrp_nsfw_mode"] = "false";
   });
 
-  it("includes global prompt, character info, and user info sections", () => {
+  it("uses Type A prompt for a Type A character", () => {
     const result = buildSystemPrompt(baseChar, "Alice");
-    expect(result).toContain("Global prompt");
+    expect(result).toContain("Type A system prompt");
+  });
+
+  it("uses Type B prompt for a character with --- [Name] --- in description", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      description: "--- [NPC1] ---\nFirst NPC.\n--- [NPC2] ---\nSecond NPC.",
+    };
+    const result = buildSystemPrompt(char, "Alice");
+    expect(result).toContain("Type B system prompt");
+  });
+
+  it("uses Type B prompt for a character with lorebook entries", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: {
+        entries: [
+          {
+            keys: ["magic"],
+            content: "Magic is powered by crystals.",
+            enabled: true,
+            insertion_order: 0,
+            constant: true,
+            position: "before_char",
+          },
+        ],
+      },
+    };
+    const result = buildSystemPrompt(char, "Alice");
+    expect(result).toContain("Type B system prompt");
+  });
+
+  it("does NOT inject character.system_prompt", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      system_prompt: "This should NOT appear in the prompt.",
+    };
+    const result = buildSystemPrompt(char, "Alice");
+    expect(result).not.toContain("This should NOT appear in the prompt.");
+  });
+
+  it("includes character info sections", () => {
+    const result = buildSystemPrompt(baseChar, "Alice");
     expect(result).toContain("A test character");
     expect(result).toContain("Friendly");
     expect(result).toContain("A test scenario");
@@ -153,6 +239,22 @@ describe("buildMessages", () => {
     expect(messages[0].role).toBe("system");
     expect(messages.some((m) => m.content === "Hi")).toBe(true);
     expect(messages.some((m) => m.content === "Hello!")).toBe(true);
+  });
+
+  it("includes Type A post-history instructions for Type A character", () => {
+    const messages = buildMessages(baseChar, []);
+    const postSystem = [...messages].reverse().find((m) => m.role === "system");
+    expect(postSystem?.content).toContain("Type A post-history");
+  });
+
+  it("includes Type B post-history instructions for Type B character", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      description: "--- [NPC1] ---\nFirst.\n--- [NPC2] ---\nSecond.",
+    };
+    const messages = buildMessages(char, []);
+    const postSystem = [...messages].reverse().find((m) => m.role === "system");
+    expect(postSystem?.content).toContain("Type B post-history");
   });
 
   it("adds NSFW gate when nsfw mode is off", () => {

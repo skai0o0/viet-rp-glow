@@ -40,10 +40,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Invalid token" }, 401, headers);
     }
 
-    const { prompt } = await req.json();
+    const { prompt, systemPrompt } = await req.json();
     if (!prompt || typeof prompt !== "string") {
       return jsonResponse({ error: "Missing prompt" }, 400, headers);
     }
+
+    // Allow client to pass a custom system prompt (e.g. the Archivist Prompt).
+    // Fall back to the generic Vietnamese summariser if not provided.
+    const effectiveSystemPrompt =
+      typeof systemPrompt === "string" && systemPrompt.trim()
+        ? systemPrompt
+        : "Bạn là trợ lý tóm tắt. Luôn trả lời bằng tiếng Việt. Chỉ tóm tắt, không thêm bình luận.";
 
     // Call OpenRouter with platform key (free for user)
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -57,14 +64,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: SUMMARIZE_MODEL,
         messages: [
-          {
-            role: "system",
-            content: "Bạn là trợ lý tóm tắt. Luôn trả lời bằng tiếng Việt. Chỉ tóm tắt, không thêm bình luận.",
-          },
+          { role: "system", content: effectiveSystemPrompt },
           { role: "user", content: prompt },
         ],
         stream: false,
-        max_tokens: 500,
+        max_tokens: 800,
         temperature: 0.3,
       }),
     });

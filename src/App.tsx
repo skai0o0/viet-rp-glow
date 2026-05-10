@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AppLayout from "@/layouts/AppLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { fetchGlobalSystemPrompt, fetchSamplingParameters } from "@/services/globalSettingsDb";
+import { fetchAllPrompts, fetchSamplingParameters } from "@/services/globalSettingsDb";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -39,7 +39,7 @@ const TermsPage = lazyWithRetry(() => import("@/pages/TermsPage"));
 const queryClient = new QueryClient();
 
 // Pre-warm global system prompt & sampling parameters cache
-fetchGlobalSystemPrompt();
+fetchAllPrompts();
 fetchSamplingParameters();
 
 const PageLoader = () => (

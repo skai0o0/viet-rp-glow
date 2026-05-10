@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use `@/services/memoryManager` instead — it provides the same
+ * API with the Archivist Prompt and user-message-based triggering.
+ * This file is kept for reference only.
+ */
+
 import type { ChatMessage } from "@/types/character";
 import { estimateTokens } from "@/utils/promptBuilder";
 import { getLatestSummary, saveSummary, getFacts, saveFacts, clearFacts } from "./chatMemoryDb";

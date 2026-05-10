@@ -36,6 +36,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useChatMemory } from "@/hooks/useChatMemory";
+import { forceGenerateSummary } from "@/services/memoryManager";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useUserCredits } from "@/hooks/useUserCredits";
 import { useCredits } from "@/services/creditDb";
@@ -72,6 +73,7 @@ const ChatPage = () => {
   const [scenarioOverride, setScenarioOverride] = useState("");
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
   const [customFirstMes, setCustomFirstMes] = useState("");
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -79,6 +81,7 @@ const ChatPage = () => {
   const customFirstMesRef = useRef("");
   const messagesRef = useRef<ChatMessage[]>([]);
   const lastStreamRef = useRef<{ apiMessages: any[]; assistantId: string } | null>(null);
+  const prefillRef = useRef<string | undefined>(undefined);
   const [streamError, setStreamError] = useState<string | null>(null);
 
   // Message search state
@@ -392,7 +395,7 @@ const ChatPage = () => {
   }, [messages, isStreaming]);
 
   const handleSend = useCallback(
-    async (content: string) => {
+    async (content: string, prefillText?: string) => {
       if (!user) {
         toast.error("Vui lòng đăng nhập để chat.");
         return;
@@ -449,6 +452,12 @@ const ChatPage = () => {
       );
       const apiMessages = truncateMessages(rawMessages);
 
+      // Append assistant prefill at the end if provided
+      prefillRef.current = prefillText;
+      if (prefillText) {
+        apiMessages.push({ role: "assistant", content: prefillText });
+      }
+
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -459,6 +468,11 @@ const ChatPage = () => {
 
       setStreamError(null);
       lastStreamRef.current = { apiMessages, assistantId };
+
+      // Debug log for admin/op/mod to verify rolling_summary + truncation
+      if (role === "admin" || role === "op" || role === "moderator") {
+        console.log("🚀 [DEBUG] Final Payload sent to LLM:", JSON.stringify(apiMessages, null, 2));
+      }
 
       const streamFn = isSubscriptionUser
         ? (msgs: Parameters<typeof streamChatViaProxy>[0], cbs: Parameters<typeof streamChatViaProxy>[1], sig?: AbortSignal) =>
@@ -640,6 +654,32 @@ const ChatPage = () => {
       controller.signal
     );
   }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, refreshCredits, isSubscriptionUser, summary, facts]);
+
+  // ── Force Summarize (admin/op/mod BYOK manual trigger) ──
+  const canForceSummarize = (role === "admin" || role === "op" || role === "moderator") && !isSubscriptionUser;
+
+  const handleForceSummarize = useCallback(async () => {
+    if (!activeSessionId || isSummarizing) return;
+    setIsSummarizing(true);
+    try {
+      const newSummary = await toast.promise(
+        forceGenerateSummary(activeSessionId, messagesRef.current, summary ?? null),
+        {
+          loading: "Đang tóm tắt ngữ cảnh bằng model của bạn...",
+          success: "Đã tóm tắt ngữ cảnh thành công!",
+          error: (err) => `Tóm tắt thất bại: ${err?.message || "Unknown error"}`,
+        },
+      );
+      if (newSummary) {
+        console.log("[handleForceSummarize] Summary generated, reloading memory...");
+        await loadMemory(activeSessionId);
+      }
+    } catch (err) {
+      console.error("[handleForceSummarize] Error:", err);
+    } finally {
+      setIsSummarizing(false);
+    }
+  }, [activeSessionId, summary, isSummarizing, loadMemory]);
 
   const lastAssistantIdx = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -908,6 +948,7 @@ const ChatPage = () => {
   );
 
   // Settings sidebar content
+  const canViewMemory = canForceSummarize && !!activeSessionId;
   const settingsContent = activeCharacter ? (
     <GenerationSettings
       scenario={scenarioOverride}
@@ -920,6 +961,11 @@ const ChatPage = () => {
       defaultFirstMes={activeCharacter.first_mes}
       userTier={effectiveQuota.tier}
       isByok={!isSubscriptionUser}
+      summary={canViewMemory ? summary : undefined}
+      facts={canViewMemory ? facts : undefined}
+      canViewMemory={canViewMemory}
+      onForceSummarize={canForceSummarize ? handleForceSummarize : undefined}
+      isSummarizing={isSummarizing}
     />
   ) : null;
 
@@ -943,7 +989,6 @@ const ChatPage = () => {
           open={sidebarOpen} onClose={() => setSidebarOpen(false)}
           sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
           onSelectSession={handleSelectSession} onNewChat={() => {}} onDeleteSession={handleDeleteSession}
-          summary={summary} facts={facts} canViewMemory={role === "admin" || role === "op"}
         />
         <div className="flex-1 flex flex-col min-w-0">
           <div className="h-14 flex items-center px-4 md:px-6 border-b border-gray-border flex-shrink-0">
@@ -1085,7 +1130,6 @@ const ChatPage = () => {
         onSelectSession={(id) => { handleSelectSession(id); setSidebarOpen(false); }}
         onNewChat={handleNewChat} onDeleteSession={handleDeleteSession}
         characterName={activeCharacter.name}
-        summary={summary} facts={facts} canViewMemory={role === "admin" || role === "op"}
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

@@ -1,8 +1,15 @@
 import { CharacterCard } from "@/types/character";
 import { CharacterBook } from "@/types/taverncard";
 import { getCachedUserPersona, buildIdentityString } from "@/services/profileDb";
-import { getGlobalSystemPrompt } from "@/services/globalSettingsDb";
+import {
+  getGlobalSystemPrompt,
+  getGlobalPromptTypeA,
+  getGlobalPromptTypeB,
+  getGlobalPostHistoryTypeA,
+  getGlobalPostHistoryTypeB,
+} from "@/services/globalSettingsDb";
 import { getResponseStylePrompt } from "@/components/GenerationSettings";
+import { countTokens } from "@/utils/tokenizer";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -15,24 +22,29 @@ export interface PromptSection {
   order: number;
 }
 
+/** @deprecated Use `countTokens` from `@/utils/tokenizer` instead. */
+export const estimateTokens = countTokens;
+
+// ─── Card Type Detection ──────────────────────────────────────
+
+export type CardType = "type_a" | "type_b";
+
 /**
- * Estimate token count for a string.
- * ~4 chars/token for Latin, ~2 chars/token for CJK/Vietnamese diacritics.
- * Good enough for budget enforcement without a real tokenizer.
+ * Auto-detect whether a character card is Type A (single character) or
+ * Type B (multi-character / RPG simulation).
+ *
+ * Type B criteria (either is sufficient):
+ *   1. description contains the "--- [Name] ---" separator pattern
+ *   2. character_book has at least one entry
  */
-export function estimateTokens(text: string): number {
-  if (!text) return 0;
-  let count = 0;
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    // CJK + Vietnamese diacritics range → ~2 chars/token
-    if (code > 0x02ff) {
-      count += 0.5;
-    } else {
-      count += 0.25;
-    }
+export function detectCardType(character: CharacterCard): CardType {
+  if (character.description && /---\s*\[.+?\]\s*---/.test(character.description)) {
+    return "type_b";
   }
-  return Math.ceil(count);
+  if (character.character_book?.entries?.length > 0) {
+    return "type_b";
+  }
+  return "type_a";
 }
 
 /** Default max context tokens (conservative for most models) */
@@ -125,25 +137,22 @@ function resolveLorebookEntries(
 
   // Scan recent messages for triggered entries
   const recentMessages = chatHistory.slice(-scanDepth);
-  const recentText = recentMessages
+  const recentTextLower = recentMessages
     .map((m) => m.content)
     .join(" ")
     .toLowerCase();
+  const recentTextRaw = recentMessages.map((m) => m.content).join(" ");
 
   const matchedTriggered = triggeredEntries.filter((entry) => {
     if (!entry.keys?.length) return false;
     const caseSensitive = entry.case_sensitive === true;
-    const searchText = caseSensitive ? recentText : recentText;
+    const searchText = caseSensitive ? recentTextRaw : recentTextLower;
     const searchKeys = caseSensitive
       ? entry.keys
       : entry.keys.map((k) => k.toLowerCase());
 
     // Primary keys: any match triggers
-    const primaryMatch = searchKeys.some((key) =>
-      caseSensitive
-        ? recentMessages.some((m) => m.content.includes(key))
-        : searchText.includes(key),
-    );
+    const primaryMatch = searchKeys.some((key) => searchText.includes(key));
 
     if (!primaryMatch) return false;
 
@@ -152,11 +161,7 @@ function resolveLorebookEntries(
       const secondaryKeys = caseSensitive
         ? entry.secondary_keys
         : entry.secondary_keys.map((k) => k.toLowerCase());
-      return secondaryKeys.some((key) =>
-        caseSensitive
-          ? recentMessages.some((m) => m.content.includes(key))
-          : searchText.includes(key),
-      );
+      return secondaryKeys.some((key) => searchText.includes(key));
     }
 
     return true;
@@ -203,8 +208,12 @@ export function buildLayeredPrompt(
   const sections: PromptSection[] = [];
   let order = 0;
 
-  // 1. Main Prompt (global system prompt from admin config)
-  const globalPrompt = getGlobalSystemPrompt();
+  // 1. Main Prompt (type-specific global system prompt from admin config)
+  const cardType = detectCardType(character);
+  const typeSpecificPrompt = cardType === "type_b"
+    ? getGlobalPromptTypeB()
+    : getGlobalPromptTypeA();
+  const globalPrompt = typeSpecificPrompt || getGlobalSystemPrompt();
   if (globalPrompt) {
     sections.push({ id: "main_prompt", content: globalPrompt, order: order++ });
   }
@@ -261,16 +270,7 @@ export function buildLayeredPrompt(
     });
   }
 
-  // 7. Character System Prompt (custom instructions)
-  if (character.system_prompt) {
-    sections.push({
-      id: "char_system_prompt",
-      content: character.system_prompt,
-      order: order++,
-    });
-  }
-
-  // 8. World Info (after_char)
+  // 7. World Info (after_char)
   if (lorebook.afterChar.length > 0) {
     sections.push({
       id: "world_info_after",
@@ -404,8 +404,17 @@ export function buildMessages(
     });
   }
 
-  // 4. Post-history instructions (response style + NSFW gate)
+  // 4. Post-history instructions (type-specific + response style + NSFW gate)
+  const postCardType = detectCardType(effectiveCharacter);
+  const postHistoryInstructions = postCardType === "type_b"
+    ? getGlobalPostHistoryTypeB()
+    : getGlobalPostHistoryTypeA();
+
   const postParts: string[] = [];
+
+  if (postHistoryInstructions) {
+    postParts.push(postHistoryInstructions);
+  }
 
   const stylePrompt = getResponseStylePrompt();
   if (stylePrompt) {

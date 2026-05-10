@@ -149,6 +149,15 @@ export async function updateSessionTitle(sessionId: string, title: string): Prom
   if (error) throw error;
 }
 
+/** Update the denormalised rolling summary on chat_sessions */
+export async function updateSessionRollingSummary(sessionId: string, summary: string): Promise<void> {
+  const { error } = await supabase
+    .from("chat_sessions")
+    .update({ rolling_summary: summary })
+    .eq("id", sessionId);
+  if (error) throw error;
+}
+
 /**
  * Branch a chat session at a specific message index (JSONB Snapshot approach).
  * Slices messages 0..messageIndex (inclusive) and creates a new session with them.

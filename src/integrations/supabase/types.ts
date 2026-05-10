@@ -270,6 +270,7 @@ export type Database = {
           character_id: string
           created_at: string
           id: string
+          rolling_summary: string | null
           title: string
           updated_at: string
           user_id: string
@@ -278,6 +279,7 @@ export type Database = {
           character_id: string
           created_at?: string
           id?: string
+          rolling_summary?: string | null
           title?: string
           updated_at?: string
           user_id: string
@@ -286,6 +288,7 @@ export type Database = {
           character_id?: string
           created_at?: string
           id?: string
+          rolling_summary?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -296,6 +299,76 @@ export type Database = {
             columns: ["character_id"]
             isOneToOne: false
             referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_summaries: {
+        Row: {
+          id: string
+          session_id: string
+          summary: string
+          messages_up_to: number
+          token_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          summary: string
+          messages_up_to?: number
+          token_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          summary?: string
+          messages_up_to?: number
+          token_count?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_summaries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_facts: {
+        Row: {
+          id: string
+          session_id: string
+          fact: string
+          category: string
+          message_index: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          fact: string
+          category?: string
+          message_index: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          fact?: string
+          category?: string
+          message_index?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_facts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
             referencedColumns: ["id"]
           },
         ]
