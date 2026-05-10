@@ -224,6 +224,117 @@ describe("buildSystemPrompt", () => {
     ]);
     expect(result).not.toContain("Dragons are extinct.");
   });
+
+  it("injects triggered entries when keywords match (case-insensitive)", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: {
+        entries: [
+          {
+            keys: ["Dragon"],
+            content: "Dragons are extinct.",
+            enabled: true,
+            insertion_order: 0,
+            constant: false,
+          },
+        ],
+      },
+    };
+    const result = buildSystemPrompt(char, "Alice", [
+      { role: "user", content: "I see a dragon in the distance." },
+    ]);
+    expect(result).toContain("Dragons are extinct.");
+  });
+
+  it("injects case_sensitive entries when exact case matches", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: {
+        entries: [
+          {
+            keys: ["Dragon"],
+            content: "Dragons are extinct.",
+            enabled: true,
+            insertion_order: 0,
+            constant: false,
+            case_sensitive: true,
+          },
+        ],
+      },
+    };
+    const result = buildSystemPrompt(char, "Alice", [
+      { role: "user", content: "I see a Dragon in the distance." },
+    ]);
+    expect(result).toContain("Dragons are extinct.");
+  });
+
+  it("does NOT inject case_sensitive entries when case does not match", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: {
+        entries: [
+          {
+            keys: ["Dragon"],
+            content: "Dragons are extinct.",
+            enabled: true,
+            insertion_order: 0,
+            constant: false,
+            case_sensitive: true,
+          },
+        ],
+      },
+    };
+    const result = buildSystemPrompt(char, "Alice", [
+      { role: "user", content: "I see a dragon in the distance." },
+    ]);
+    expect(result).not.toContain("Dragons are extinct.");
+  });
+
+  it("injects selective entries when both primary and secondary keys match", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: {
+        entries: [
+          {
+            keys: ["magic"],
+            content: "Magic requires a catalyst.",
+            enabled: true,
+            insertion_order: 0,
+            constant: false,
+            selective: true,
+            secondary_keys: ["catalyst"],
+          },
+        ],
+      },
+    };
+    const result = buildSystemPrompt(char, "Alice", [
+      { role: "user", content: "I use magic with a catalyst." },
+    ]);
+    expect(result).toContain("Magic requires a catalyst.");
+  });
+
+  it("does NOT inject selective entries when only primary key matches", () => {
+    const char: CharacterCard = {
+      ...baseChar,
+      character_book: {
+        entries: [
+          {
+            keys: ["magic"],
+            content: "Magic requires a catalyst.",
+            enabled: true,
+            insertion_order: 0,
+            constant: false,
+            selective: true,
+            secondary_keys: ["catalyst"],
+          },
+        ],
+      },
+    };
+    const result = buildSystemPrompt(char, "Alice", [
+      { role: "user", content: "I use magic." },
+    ]);
+    expect(result).not.toContain("Magic requires a catalyst.");
+  });
 });
 
 describe("buildMessages", () => {
@@ -270,5 +381,15 @@ describe("buildMessages", () => {
     const systemMsgs = messages.filter((m) => m.role === "system");
     const hasNsfw = systemMsgs.some((m) => m.content.includes("NSFW"));
     expect(hasNsfw).toBe(false);
+  });
+
+  it("prelude can be appended as last assistant message", () => {
+    const messages = buildMessages(baseChar, [
+      { role: "user", content: "Hello" },
+    ]);
+    const prefill = "*nhìn bạn* \"Xin chào...";
+    const withPrefill = [...messages, { role: "assistant" as const, content: prefill }];
+    expect(withPrefill[withPrefill.length - 1].role).toBe("assistant");
+    expect(withPrefill[withPrefill.length - 1].content).toBe(prefill);
   });
 });

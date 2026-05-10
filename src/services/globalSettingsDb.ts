@@ -62,7 +62,7 @@ async function fetchGlobalSetting(key: string): Promise<string> {
     .from("global_settings")
     .select("value")
     .eq("key", key)
-    .single();
+    .maybeSingle();
   return data?.value ?? "";
 }
 

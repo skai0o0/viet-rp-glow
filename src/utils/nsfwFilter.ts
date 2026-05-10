@@ -3,9 +3,8 @@
  *
  * Two layers:
  *  1. Tag-based  – exact match against a known NSFW tag set.
- *  2. Content-based – keyword scan on name / description / summary,
- *     using word-boundary regex for short ambiguous words and simple
- *     substring matching for longer, unambiguous terms.
+ *  2. Content-based – keyword scan using Aho-Corasick (WASM, O(n)) when
+ *     available, falls back to O(n*m) String.includes() loop.
  *
  * filterByNsfw() now checks BOTH tags AND content so that cards
  * missing proper tags but containing explicit text are still caught.
@@ -120,6 +119,30 @@ const SUBSTRING_KEYWORDS = [
   "địt", "chịch",
 ];
 
+// ── WASM bridge (lazy-loaded) ───────────────────────────────────
+
+let nsfwWasmReady = false;
+let nsfwWasm: {
+  is_nsfw: (text: string) => boolean;
+  get_nsfw_tags: (text: string) => string[];
+} | null = null;
+
+/**
+ * Initialize the WASM NSFW filter. Call once at app startup.
+ * Falls back to JS implementation if WASM is not available.
+ */
+export async function initNsfwWasm(): Promise<void> {
+  try {
+    const mod = await import("@/wasm-pkg/wasm_lib");
+    await mod.default(); // idempotent — safe to call even if initWasm already called it
+    nsfwWasm = mod;
+    nsfwWasmReady = true;
+    console.log("[nsfwFilter] WASM loaded — using Aho-Corasick (O(n))");
+  } catch {
+    console.warn("[nsfwFilter] WASM not available — using JS fallback");
+  }
+}
+
 // ── Public API ───────────────────────────────────────────────────
 
 /** Check if any of the provided text strings contain NSFW keywords */
@@ -128,9 +151,18 @@ export function hasNsfwContent(
 ): boolean {
   const raw = texts.filter(Boolean).join(" ");
   if (!raw) return false;
-  const lower = raw.toLowerCase();
 
-  // Single pass: check substring keywords first (cheaper), then boundary patterns
+  // Use WASM Aho-Corasick if available (O(n) single pass)
+  if (nsfwWasmReady && nsfwWasm) {
+    try {
+      return nsfwWasm.is_nsfw(raw);
+    } catch {
+      // Fall through to JS fallback
+    }
+  }
+
+  // JS fallback: O(n*m) substring scan
+  const lower = raw.toLowerCase();
   for (let i = 0; i < SUBSTRING_KEYWORDS.length; i++) {
     if (lower.includes(SUBSTRING_KEYWORDS[i])) return true;
   }

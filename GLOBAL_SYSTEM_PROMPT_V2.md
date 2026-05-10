@@ -80,7 +80,7 @@ Context: {{user}} is backed into a dim corner of a tavern by {{char}} — a poss
 
 ---
 
-## Những thay đổi chính so với prompt cũ
+## Những thay đổi chính so với prompt cũGom
 
 | Trước | Sau | Lý do |
 |-------|-----|-------|
@@ -94,7 +94,7 @@ Context: {{user}} is backed into a dim corner of a tavern by {{char}} — a poss
 
 ## Lưu ý quan trọng
 
-1. **max_tokens**: Đã tích hợp vào **Admin Hub > AI Config > Sampling Parameters**. Admin có thể chỉnh "Max Output Tokens" (default 1500). User vẫn có thể override trong GenerationSettings (localStorage).
+1. **max_tokens**: Default hiện tại là 800. Nên nâng lên **1500-2000** trong GenerationSettings để response không bị cắt cụt.
 2. **NSFW Mode**: Phải bật NSFW mode trong Settings (toggle) để post-history gate không block content.
 3. **Response Style**: Chọn "Mặc định" hoặc "Trả lời sâu, mô tả kĩ càng" — đừng chọn "Ngắn gọn" vì sẽ mâu thuẫn với prompt.
 4. **Temperature**: 0.7-0.85 là sweet spot cho RP sáng tạo mà không bị loạn.

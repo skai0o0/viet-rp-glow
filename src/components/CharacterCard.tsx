@@ -56,8 +56,9 @@ const CharacterCard = ({ character, onClick, isFavorited, onFavoriteToggle }: Ch
   return (
     <motion.div
       whileTap={{ scale: 0.98 }}
+      whileHover={{ y: -4 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="bg-oled-surface rounded-xl sm:rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple hover:border-secondary hover:scale-[1.02] transition-all duration-200 h-[260px] sm:h-[280px] flex flex-col"
+      className="bg-oled-surface rounded-xl sm:rounded-2xl border border-gray-border overflow-hidden cursor-pointer hover:shadow-neon-purple hover:border-secondary transition-all duration-200 h-[260px] sm:h-[280px] flex flex-col"
       onClick={onClick}
     >
       {/* Image Section */}

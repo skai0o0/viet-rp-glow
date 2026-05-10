@@ -1,0 +1,7 @@
+C:\Users\hoang\Desktop\claude-plan\viet-rp-glow\wasm-lib\target\wasm32-unknown-unknown\release\deps\cfg_if-266c59daaf23efb0.d: C:\Users\hoang\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cfg-if-1.0.4\src\lib.rs
+
+C:\Users\hoang\Desktop\claude-plan\viet-rp-glow\wasm-lib\target\wasm32-unknown-unknown\release\deps\libcfg_if-266c59daaf23efb0.rlib: C:\Users\hoang\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cfg-if-1.0.4\src\lib.rs
+
+C:\Users\hoang\Desktop\claude-plan\viet-rp-glow\wasm-lib\target\wasm32-unknown-unknown\release\deps\libcfg_if-266c59daaf23efb0.rmeta: C:\Users\hoang\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cfg-if-1.0.4\src\lib.rs
+
+C:\Users\hoang\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\cfg-if-1.0.4\src\lib.rs:

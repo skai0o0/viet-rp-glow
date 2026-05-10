@@ -15,7 +15,22 @@
       "Bash(npx vite *)",
       "Bash(node *)",
       "Bash(curl *)",
-      "Bash(npx supabase *)"
+      "Bash(npx supabase *)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(wasm-pack --version)",
+      "PowerShell(rustc *)",
+      "Bash(sh -s -- -y)",
+      "PowerShell(rustup target *)",
+      "PowerShell(cargo install *)",
+      "Bash(sh)",
+      "PowerShell($url = \"https://github.com/nicolo-ribaudo/wasm-pack/releases/download/v0.14.0/wasm-pack-x86_64-pc-windows-msvc.zip\"; Invoke-WebRequest -Uri $url -OutFile \"$env:TEMP\\\\wasm-pack.zip\" 2>&1)",
+      "PowerShell(Expand-Archive *)",
+      "PowerShell(winget install *)",
+      "Bash(tar -xzf /tmp/wasm-pack.tar.gz -C /tmp/)",
+      "Read(//c/tmp/**)",
+      "Bash(export PATH=\"$HOME/.cargo/bin:$PATH\")",
+      "Bash(wasm-pack build *)"
     ]
   }
 }

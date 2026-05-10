@@ -141,18 +141,22 @@ const MessageBubble = ({
                 rows={2}
               />
               <div className="flex items-center gap-2 justify-end">
-                <button
+                <motion.button
                   onClick={handleCancelEdit}
+                  whileTap={{ scale: 0.85 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
                   className="px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded"
                 >
                   Hủy
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   onClick={handleResend}
+                  whileTap={{ scale: 0.85 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
                   className="px-3 py-1 text-xs bg-neon-blue text-white rounded hover:bg-neon-blue/80 transition-colors font-medium"
                 >
                   Gửi lại
-                </button>
+                </motion.button>
               </div>
             </div>
           ) : (
@@ -177,24 +181,28 @@ const MessageBubble = ({
 
             {!isStreaming && message.content && (
               <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ml-1">
-                <button
+                <motion.button
                   onClick={handleCopy}
+                  whileTap={{ scale: 0.85 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
                   className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                   title="Sao chép"
                 >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
-                </button>
+                </motion.button>
 
                 {/* Edit - only for last user message */}
                 {isUser && isLastUser && onEdit && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
+                      <motion.button
                         onClick={handleStartEdit}
+                        whileTap={{ scale: 0.85 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
                         className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue hover:drop-shadow-[0_0_4px_rgba(0,170,255,0.5)] transition-all min-w-[32px] min-h-[32px] flex items-center justify-center"
                       >
                         <Edit2 size={14} />
-                      </button>
+                      </motion.button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground">
                       Chỉnh sửa & gửi lại
@@ -206,12 +214,14 @@ const MessageBubble = ({
                 {onDelete && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
+                      <motion.button
                         onClick={onDelete}
+                        whileTap={{ scale: 0.85 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
                         className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-rose active:text-neon-rose hover:drop-shadow-[0_0_4px_rgba(255,38,100,0.5)] transition-all min-w-[32px] min-h-[32px] flex items-center justify-center"
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </motion.button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground">
                       Xóa tin nhắn
@@ -220,24 +230,28 @@ const MessageBubble = ({
                 )}
 
                 {!isUser && isLastAssistant && onRegenerate && (
-                  <button
+                  <motion.button
                     onClick={onRegenerate}
+                    whileTap={{ scale: 0.85 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
                     className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-purple active:text-neon-purple transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                     title="Tạo lại"
                   >
                     <RotateCcw size={14} />
-                  </button>
+                  </motion.button>
                 )}
 
                 {onBranch && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
+                      <motion.button
                         onClick={onBranch}
+                        whileTap={{ scale: 0.85 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
                         className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                       >
                         <GitBranch size={14} />
-                      </button>
+                      </motion.button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-oled-surface border-gray-border text-foreground">
                       Tạo nhánh trò chuyện từ đây

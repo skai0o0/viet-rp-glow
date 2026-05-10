@@ -12,6 +12,8 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  // WASM support: allow importing .wasm files as static assets
+  assetsInclude: ["**/*.wasm"],
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
