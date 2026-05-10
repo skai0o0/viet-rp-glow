@@ -12,6 +12,8 @@ import { usePageTracking } from "@/hooks/usePageTracking";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/utils/lazyWithRetry";
+import { initWasm } from "@/utils/tokenizer";
+import { initNsfwWasm } from "@/utils/nsfwFilter";
 
 // Lazy-loaded pages with retry for stale chunk errors
 const HomePage = lazyWithRetry(() => import("@/pages/HomePage"));
@@ -42,6 +44,10 @@ const queryClient = new QueryClient();
 fetchAllPrompts();
 fetchSamplingParameters();
 
+// Initialize WASM modules (tokenizer + NSFW filter) — fire-and-forget
+initWasm();
+initNsfwWasm();
+
 const PageLoader = () => (
   <div className="flex-1 flex items-center justify-center bg-oled-base min-h-[60vh]">
     <div className="flex flex-col items-center gap-3">
@@ -62,7 +68,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <PageTracker>
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>

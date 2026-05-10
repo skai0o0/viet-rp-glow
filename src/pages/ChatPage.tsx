@@ -479,11 +479,18 @@ const ChatPage = () => {
             streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
         : streamChat;
 
+      let prefillSent = false;
+
       streamFn(
         apiMessages,
         {
           onDelta: (text) => {
-            assistantContent += text;
+            if (prefillRef.current && !prefillSent) {
+              assistantContent = prefillRef.current + text;
+              prefillSent = true;
+            } else {
+              assistantContent += text;
+            }
             setMessages((prev) => {
               const last = prev[prev.length - 1];
               if (last?.id === assistantId) {
@@ -496,6 +503,7 @@ const ChatPage = () => {
             setIsStreaming(false);
             abortRef.current = null;
             lastStreamRef.current = null;
+            prefillRef.current = undefined;
             if (assistantContent) {
               const saved = await addMessage(sessionId, "assistant", assistantContent);
               setMessages((prev) =>
@@ -584,6 +592,11 @@ const ChatPage = () => {
       facts,
     ));
 
+    // Reuse prefill from previous send if any
+    if (prefillRef.current) {
+      apiMessages.push({ role: "assistant", content: prefillRef.current });
+    }
+
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -600,10 +613,18 @@ const ChatPage = () => {
           streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
       : streamChat;
 
+    let prefillSent = false;
+
     streamFn(
       apiMessages,
       {
         onDelta: (text) => {
+          if (prefillRef.current && !prefillSent) {
+            assistantContent = prefillRef.current + text;
+            prefillSent = true;
+          } else {
+            assistantContent += text;
+          }
           assistantContent += text;
           setMessages((prev) => {
             const last = prev[prev.length - 1];
@@ -757,6 +778,11 @@ const ChatPage = () => {
         facts,
       ));
 
+      // Reuse prefill from previous send if any
+      if (prefillRef.current) {
+        apiMessages.push({ role: "assistant", content: prefillRef.current });
+      }
+
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -773,11 +799,18 @@ const ChatPage = () => {
             streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
         : streamChat;
 
+      let prefillSent = false;
+
       streamFn(
         apiMessages,
         {
           onDelta: (text) => {
-            assistantContent += text;
+            if (prefillRef.current && !prefillSent) {
+              assistantContent = prefillRef.current + text;
+              prefillSent = true;
+            } else {
+              assistantContent += text;
+            }
             setMessages((prev) => {
               const last = prev[prev.length - 1];
               if (last?.id === assistantId) {
@@ -867,11 +900,18 @@ const ChatPage = () => {
           streamChatViaProxy(msgs, cbs, sig, undefined, usedCreditRef.current)
       : streamChat;
 
+    let prefillSent = false;
+
     streamFn(
       apiMessages,
       {
         onDelta: (text) => {
-          assistantContent += text;
+          if (prefillRef.current && !prefillSent) {
+            assistantContent = prefillRef.current + text;
+            prefillSent = true;
+          } else {
+            assistantContent += text;
+          }
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last?.id === assistantId) {

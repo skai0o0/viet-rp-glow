@@ -564,7 +564,7 @@ const HomePage = () => {
         <div
           ref={gridRef}
           className="grid gap-3 sm:gap-4"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}
         >
           {loading
             ? Array.from({ length: perPage }).map((_, i) => (

@@ -148,19 +148,19 @@ const EditCharacterPage = () => {
 
   const addBookEntry = () => {
     if (!data.character_book) return;
-    updateBook({ entries: [...data.character_book.entries, createEmptyBookEntry(data.character_book.entries.length)] });
+    updateBook({ entries: [...(Array.isArray(data.character_book.entries) ? data.character_book.entries : []), createEmptyBookEntry((Array.isArray(data.character_book.entries) ? data.character_book.entries : []).length)] });
   };
 
   const updateBookEntry = (idx: number, patch: Partial<CharacterBookEntry>) => {
     if (!data.character_book) return;
-    const entries = [...data.character_book.entries];
+    const entries = [...(Array.isArray(data.character_book.entries) ? data.character_book.entries : [])];
     entries[idx] = { ...entries[idx], ...patch };
     updateBook({ entries });
   };
 
   const removeBookEntry = (idx: number) => {
     if (!data.character_book) return;
-    updateBook({ entries: data.character_book.entries.filter((_, i) => i !== idx) });
+    updateBook({ entries: (Array.isArray(data.character_book.entries) ? data.character_book.entries : []).filter((_, i) => i !== idx) });
   };
 
   const handleSave = async () => {
@@ -485,17 +485,17 @@ const EditCharacterPage = () => {
 
                   <div className={sectionCard}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-foreground">Mục lore ({data.character_book.entries.length})</span>
+                      <span className="text-sm font-semibold text-foreground">Mục lore ({(Array.isArray(data.character_book.entries) ? data.character_book.entries : []).length})</span>
                       <Button variant="outline" size="sm" onClick={addBookEntry} className="border-gray-border hover:border-neon-blue text-muted-foreground hover:text-foreground">
                         <Plus size={12} className="mr-1" /> Thêm mục
                       </Button>
                     </div>
                     <AnimatePresence>
-                      {data.character_book.entries.map((entry, idx) => (
+                      {(Array.isArray(data.character_book.entries) ? data.character_book.entries : []).map((entry, idx) => (
                         <LoreEntryCard key={idx} entry={entry} idx={idx} onUpdate={(p) => updateBookEntry(idx, p)} onRemove={() => removeBookEntry(idx)} />
                       ))}
                     </AnimatePresence>
-                    {data.character_book.entries.length === 0 && (
+                    {(Array.isArray(data.character_book.entries) ? data.character_book.entries : []).length === 0 && (
                       <p className="text-xs text-muted-foreground text-center py-6">Chưa có mục lore nào.</p>
                     )}
                   </div>

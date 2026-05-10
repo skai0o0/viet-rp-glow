@@ -1,132 +1,231 @@
-import { useState, useRef } from "react";
-import { createPortal } from "react-dom";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { PlusCircle, Sparkles, X, Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Save, Eye, Loader2, Upload, ImagePlus } from "lucide-react";
-import { readJsonFile } from "@/utils/importCharacterJson";
-import { compressAvatar } from "@/utils/imageOptimization";
+import { createPortal } from "react-dom";
+import {
+  Loader2,
+  Save,
+  Plus,
+  X,
+  Sparkles,
+  BookOpen,
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  Upload,
+  ImagePlus,
+  PlusCircle,
+  ArrowLeft,
+  ArrowRight,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { createCharacter } from "@/services/characterDb";
-import { createApproval, type ApprovalPayload } from "@/services/approvalService";
-import { useUserRole } from "@/hooks/useUserRole";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  TavernCardV2,
-  TavernCardV2Data,
-  CharacterBook,
-  CharacterBookEntry,
-  createEmptyTavernCard,
-  createEmptyBookEntry,
-} from "@/types/taverncard";
-import { useAnalytics } from "@/hooks/useAnalytics";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { CharacterBookEntry } from "@/types/tavern";
+import { createCharacter } from "@/services/characterDb";
+import { createApproval } from "@/services/approvalService";
 
-const fieldLabel = "text-sm font-medium text-foreground";
-const fieldHint = "text-xs text-muted-foreground mt-1";
+// --- Import gate: only admins see the JSON import button ---
+const SHOW_IMPORT_FOR_ALL = false;
+
+// ─── Shared field styles ────────────────────────────────────────
+const fieldLabel = "text-xs text-muted-foreground font-medium mb-1 block";
+const fieldHint = "text-[11px] text-muted-foreground/60 mt-0.5";
 const inputStyle =
-  "bg-oled-surface border-gray-border text-foreground placeholder:text-muted-foreground focus:border-neon-purple focus:ring-neon-purple/30";
-const textareaStyle = `${inputStyle} min-h-[120px] font-mono text-xs leading-relaxed`;
+  "bg-oled-surface border-gray-border text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-neon-purple/40";
+const textareaStyle = `${inputStyle} min-h-[100px] resize-y font-mono text-sm`;
 const sectionCard =
-  "rounded-xl border border-gray-border bg-oled-surface/50 p-4 space-y-4";
+  "rounded-xl border border-gray-border bg-oled-surface/50 p-4 space-y-3";
+
+// ─── Step definitions ───────────────────────────────────────────
+const STEPS = [
+  { key: "basic", label: "Cơ bản" },
+  { key: "shaping", label: "Định hình" },
+  { key: "scenario", label: "Kịch bản" },
+  { key: "world", label: "Thế giới" },
+] as const;
+
+// ─── Stepper indicator ──────────────────────────────────────────
+const StepIndicator = ({
+  current,
+  labels,
+}: {
+  current: number;
+  labels: readonly string[];
+}) => (
+  <div className="flex items-center justify-center gap-0 w-full max-w-xs mx-auto py-3">
+    {labels.map((label, i) => (
+      <div key={i} className="flex items-center flex-1 last:flex-none">
+        {/* Dot + label */}
+        <div className="flex flex-col items-center gap-1">
+          <motion.div
+            className={`rounded-full border-2 transition-colors duration-300 ${
+              i === current
+                ? "w-3 h-3 bg-neon-purple border-neon-purple shadow-[0_0_8px_var(--tw-shadow-color)] shadow-neon-purple"
+                : i < current
+                  ? "w-2.5 h-2.5 bg-neon-purple/60 border-neon-purple/60"
+                  : "w-2.5 h-2.5 bg-transparent border-gray-border"
+            }`}
+            layout
+          />
+          <span
+            className={`text-[10px] whitespace-nowrap transition-colors duration-300 ${
+              i === current
+                ? "text-neon-purple font-semibold"
+                : i < current
+                  ? "text-neon-purple/50"
+                  : "text-muted-foreground/50"
+            }`}
+          >
+            {label}
+          </span>
+        </div>
+        {/* Connecting line */}
+        {i < labels.length - 1 && (
+          <div className="flex-1 h-0.5 mx-1.5 mt-[-14px]">
+            <div
+              className={`h-full rounded-full transition-colors duration-300 ${
+                i < current ? "bg-neon-purple/60" : "bg-gray-border"
+              }`}
+            />
+          </div>
+        )}
+      </div>
+    ))}
+  </div>
+);
+
+// ─── Slide animation variants ───────────────────────────────────
+const slideVariants = {
+  enter: (dir: number) => ({ x: dir > 0 ? 40 : -40, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir > 0 ? -40 : 40, opacity: 0 }),
+};
 
 const CreatePage = () => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin, canViewAdminHub } = useUserRole();
-  const { track } = useAnalytics();
-  const [card, setCard] = useState<TavernCardV2>(createEmptyTavernCard());
+  const { isAdmin } = useUserRole();
+  const { user } = useAuth();
+
+  // ─── Step state ─────────────────────────────────────────────
+  const [currentStep, setCurrentStep] = useState(0);
+  const [direction, setDirection] = useState(0); // +1 forward, -1 backward
+
+  // ─── Card form state ────────────────────────────────────────
+  const [card, setCard] = useState(() => makeDefaultCard());
   const [tagInput, setTagInput] = useState("");
   const [greetingDraft, setGreetingDraft] = useState("");
-  const [bookOpen, setBookOpen] = useState(false);
+  const [bookOpen, setBookOpen] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // Feature flag: set to true to show import button for all users
-  const SHOW_IMPORT_FOR_ALL = false;
+  const data = card.data;
 
+  // ─── Keep creator in sync with logged-in user ───────────────
+  useEffect(() => {
+    if (user?.user_metadata?.display_name) {
+      setCard((prev) => ({
+        ...prev,
+        data: { ...prev.data, creator: user.user_metadata.display_name },
+      }));
+    }
+  }, [user]);
+
+  // ─── Central data flow ──────────────────────────────────────
+  const updateData = (patch: Partial<typeof data>) =>
+    setCard((prev) => ({ ...prev, data: { ...prev.data, ...patch } }));
+
+  // ─── JSON import ────────────────────────────────────────────
   const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const imported = await readJsonFile(file);
-      setCard(imported);
-      toast({ title: "Import thành công! 🎉", description: `Đã tải dữ liệu nhân vật "${imported.data.name}".` });
-    } catch (err: any) {
-      toast({ title: "Lỗi Import", description: err.message, variant: "destructive" });
-    } finally {
-      if (jsonInputRef.current) jsonInputRef.current.value = "";
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const d = json.data ?? json;
+      setCard((prev) => ({
+        ...prev,
+        ...json,
+        data: {
+          ...prev.data,
+          ...d,
+          tags: Array.isArray(d.tags) ? d.tags : prev.data.tags,
+          alternate_greetings: Array.isArray(d.alternate_greetings)
+            ? d.alternate_greetings
+            : prev.data.alternate_greetings,
+          character_book: d.character_book ?? prev.data.character_book,
+        },
+      }));
+      toast.success("Đã nạp dữ liệu từ JSON.");
+    } catch {
+      toast.error("File JSON không hợp lệ.");
     }
+    if (jsonInputRef.current) jsonInputRef.current.value = "";
   };
 
-  const data = card.data;
-
-  const updateData = (patch: Partial<TavernCardV2Data>) => {
-    setCard((prev) => ({ ...prev, data: { ...prev.data, ...patch } }));
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ─── Avatar upload ──────────────────────────────────────────
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Lỗi", description: "Ảnh quá lớn (tối đa 5MB).", variant: "destructive" });
+      toast.error("Kích thước ảnh tối đa 5MB.");
       return;
     }
-    try {
-      const compressed = await compressAvatar(file);
-      setAvatarFile(compressed);
-      const url = URL.createObjectURL(compressed);
-      setAvatarPreview(url);
-    } catch {
-      setAvatarFile(file);
-      const url = URL.createObjectURL(file);
-      setAvatarPreview(url);
-    }
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setAvatarPreview(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
-  // Tags
+  // ─── Tags ───────────────────────────────────────────────────
   const addTag = () => {
-    const t = tagInput.trim();
-    if (t && !data.tags.includes(t)) {
-      updateData({ tags: [...data.tags, t] });
-    }
+    const t = tagInput.trim().toLowerCase();
+    if (t && !data.tags.includes(t)) updateData({ tags: [...data.tags, t] });
     setTagInput("");
   };
-
-  const removeTag = (tag: string) => {
+  const removeTag = (tag: string) =>
     updateData({ tags: data.tags.filter((t) => t !== tag) });
-  };
 
-  // Alternate greetings
+  // ─── Greetings ──────────────────────────────────────────────
   const addGreeting = () => {
     const g = greetingDraft.trim();
-    if (g) {
-      updateData({ alternate_greetings: [...data.alternate_greetings, g] });
-      setGreetingDraft("");
-    }
+    if (!g) return;
+    updateData({ alternate_greetings: [...data.alternate_greetings, g] });
+    setGreetingDraft("");
   };
-
-  const removeGreeting = (idx: number) => {
+  const removeGreeting = (i: number) =>
     updateData({
-      alternate_greetings: data.alternate_greetings.filter((_, i) => i !== idx),
+      alternate_greetings: data.alternate_greetings.filter((_, idx) => idx !== i),
     });
-  };
 
-  // Character book
-  const initBook = () => {
-    if (!data.character_book) {
-      updateData({
+  // ─── Character Book helpers ─────────────────────────────────
+  const initBook = () =>
+    setCard((prev) => ({
+      ...prev,
+      data: {
+        ...prev.data,
         character_book: {
           name: "",
           description: "",
@@ -136,113 +235,176 @@ const CreatePage = () => {
           extensions: {},
           entries: [],
         },
-      });
-    }
-    setBookOpen(true);
-  };
+      },
+    }));
 
-  const updateBook = (patch: Partial<CharacterBook>) => {
-    if (!data.character_book) return;
-    updateData({ character_book: { ...data.character_book, ...patch } });
-  };
+  const updateBook = (patch: Record<string, unknown>) =>
+    setCard((prev) => ({
+      ...prev,
+      data: {
+        ...prev.data,
+        character_book: { ...prev.data.character_book!, ...patch },
+      },
+    }));
 
   const addBookEntry = () => {
-    if (!data.character_book) return;
-    const newId = data.character_book.entries.length;
-    updateBook({ entries: [...data.character_book.entries, createEmptyBookEntry(newId)] });
+    const book = data.character_book;
+    if (!book) return;
+    const newEntry: CharacterBookEntry = {
+      keys: [],
+      secondary_keys: [],
+      content: "",
+      extensions: {},
+      enabled: true,
+      insertion_order: (Array.isArray(book.entries) ? book.entries : []).length,
+      case_sensitive: false,
+      name: "",
+      priority: 10,
+      id: Date.now(),
+      selective: false,
+      selective_logic: 0,
+      position: "before_char",
+      constant: false,
+    };
+    updateBook({ entries: [...(Array.isArray(book.entries) ? book.entries : []), newEntry] });
   };
 
   const updateBookEntry = (idx: number, patch: Partial<CharacterBookEntry>) => {
-    if (!data.character_book) return;
-    const entries = [...data.character_book.entries];
+    const book = data.character_book;
+    if (!book) return;
+    const entries = [...(Array.isArray(book.entries) ? book.entries : [])];
     entries[idx] = { ...entries[idx], ...patch };
     updateBook({ entries });
   };
 
   const removeBookEntry = (idx: number) => {
-    if (!data.character_book) return;
-    updateBook({ entries: data.character_book.entries.filter((_, i) => i !== idx) });
+    const book = data.character_book;
+    if (!book) return;
+    updateBook({ entries: (Array.isArray(book.entries) ? book.entries : []).filter((_, i) => i !== idx) });
   };
 
+  // ─── Save handler ───────────────────────────────────────────
   const handleSave = async () => {
     if (!data.name.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng nhập tên nhân vật trước khi lưu.", variant: "destructive" });
-      return;
-    }
-    if (!data.description.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng nhập mô tả nhân vật.", variant: "destructive" });
+      toast.error("Tên nhân vật là bắt buộc.");
       return;
     }
     if (!data.first_mes.trim()) {
-      toast({ title: "Lỗi", description: "Vui lòng nhập lời chào đầu tiên.", variant: "destructive" });
+      toast.error("Lời chào đầu tiên là bắt buộc.");
       return;
     }
-
     setIsSaving(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) {
-        toast({ title: "Lỗi", description: "Bạn cần đăng nhập để lưu nhân vật.", variant: "destructive" });
-        setIsSaving(false);
-        return;
-      }
-
-      const userId = session.session.user.id;
-
-      let avatarUrl: string | null = null;
+      let avatarUrl = data.avatar ?? "";
       if (avatarFile) {
-        const ext = "webp";
-        const filePath = `${userId}/${Date.now()}.${ext}`;
+        const filePath = `${user!.id}/${Date.now()}.webp`;
         const { error: uploadErr } = await supabase.storage
           .from("character-avatars")
           .upload(filePath, avatarFile, { upsert: true });
         if (uploadErr) throw uploadErr;
-        const { data: urlData } = supabase.storage
-          .from("character-avatars")
-          .getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage.from("character-avatars").getPublicUrl(filePath);
         avatarUrl = urlData.publicUrl;
       }
 
+      const cardData = {
+        name: data.name.trim(),
+        description: data.description,
+        personality: data.personality,
+        scenario: data.scenario,
+        first_mes: data.first_mes,
+        mes_example: data.mes_example,
+        system_prompt: data.system_prompt,
+        post_history_instructions: data.post_history_instructions,
+        creator_notes: data.creator_notes,
+        tags: data.tags,
+        avatar: avatarUrl,
+        character_version: data.character_version,
+        alternate_greetings: data.alternate_greetings,
+        creator: data.creator || user?.user_metadata?.display_name || "Ẩn danh",
+        character_book: data.character_book
+          ? {
+              name: data.character_book.name ?? "",
+              description: data.character_book.description ?? "",
+              scan_depth: data.character_book.scan_depth ?? 50,
+              token_budget: data.character_book.token_budget ?? 500,
+              recursive_scanning: data.character_book.recursive_scanning ?? false,
+              extensions: data.character_book.extensions ?? {},
+              entries: (Array.isArray(data.character_book.entries) ? data.character_book.entries : []).map((e, i) => ({
+                ...e,
+                insertion_order: i,
+                extensions: e.extensions ?? {},
+                keys: e.keys ?? [],
+                secondary_keys: e.secondary_keys ?? [],
+              })),
+            }
+          : null,
+      };
+
       if (isAdmin) {
-        const saved = await createCharacter(card, userId, isPublic, undefined, avatarUrl);
-        toast({ title: "Thành công!", description: "Tạo nhân vật thành công!" });
-        track("character_created", { characterId: saved.id, isPublic });
-        navigate(`/chat/${saved.id}`);
+        await createCharacter(cardData, user!.id, isPublic);
+        toast.success("Nhân vật đã được tạo!");
       } else {
-        const payload: ApprovalPayload = {
-          action: "card_create",
-          target_table: "characters",
-          data: {
-            card: card as unknown as Record<string, unknown>,
-            owner_id: userId,
-            is_public: isPublic,
-            avatar_url: avatarUrl,
-          },
-        };
-        await createApproval(
-          userId,
-          `Tạo nhân vật: ${data.name}`,
-          payload,
-          "card_create",
-        );
-        toast({
-          title: "Đã gửi yêu cầu!",
-          description: "Nhân vật của bạn đang chờ Admin duyệt. Bạn sẽ được thông báo khi hoàn tất.",
+        await createApproval({
+          userId: user!.id,
+          type: "card_create",
+          payload: { cardData, isPublic },
         });
-        track("character_approval_submitted", { characterName: data.name });
-        navigate("/");
+        toast.success("Nhân vật sẽ được công khai sau khi được duyệt.");
       }
-    } catch (err: any) {
-      toast({ title: "Lỗi", description: err.message || "Không thể lưu nhân vật.", variant: "destructive" });
+      setCard(makeDefaultCard());
+      setAvatarFile(null);
+      setAvatarPreview(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handlePreview = () => {
-    setShowPreview((prev) => !prev);
+  const handlePreview = () => setShowPreview((prev) => !prev);
+
+  // ─── Step navigation ────────────────────────────────────────
+  const canNext = () => {
+    if (currentStep === 0) return data.name.trim().length > 0;
+    return true;
   };
 
+  const goNext = () => {
+    if (!canNext()) {
+      toast.error("Tên nhân vật là bắt buộc.");
+      return;
+    }
+    if (currentStep < STEPS.length - 1) {
+      setDirection(1);
+      setCurrentStep((s) => s + 1);
+    }
+  };
+
+  const goBack = () => {
+    if (currentStep > 0) {
+      setDirection(-1);
+      setCurrentStep((s) => s - 1);
+    }
+  };
+
+  // ─── Step content renderer ──────────────────────────────────
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0:
+        return <StepBasic {...{ data, updateData, tagInput, setTagInput, addTag, removeTag, isPublic, setIsPublic, avatarPreview, setAvatarFile, setAvatarPreview, avatarInputRef, handleAvatarChange }} />;
+      case 1:
+        return <StepShaping {...{ data, updateData }} />;
+      case 2:
+        return <StepScenario {...{ data, updateData, greetingDraft, setGreetingDraft, addGreeting, removeGreeting }} />;
+      case 3:
+        return <StepWorld {...{ data, bookOpen, setBookOpen, initBook, updateBook, addBookEntry, updateBookEntry, removeBookEntry }} />;
+      default:
+        return null;
+    }
+  };
+
+  // ─── JSX ────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
       {/* Header */}
@@ -273,6 +435,7 @@ const CreatePage = () => {
         </div>
       </div>
 
+      {/* Manual / AI Tab Switcher */}
       <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/30">
         <Tabs value={location.pathname === "/create-ai" ? "ai" : "manual"} className="w-full max-w-md">
           <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
@@ -286,479 +449,588 @@ const CreatePage = () => {
         </Tabs>
       </div>
 
-      {/* Form Body */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-24 md:pb-6">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="max-w-2xl mx-auto space-y-6"
-        >
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="w-full bg-oled-surface border border-gray-border h-auto flex-wrap">
-              <TabsTrigger value="basic" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1">
-                Cơ bản
-              </TabsTrigger>
-              <TabsTrigger value="advanced" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1">
-                Nâng cao
-              </TabsTrigger>
-              <TabsTrigger value="lorebook" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs flex-1">
-                Lorebook
-              </TabsTrigger>
-            </TabsList>
-
-            {/* ===== BASIC TAB ===== */}
-            <TabsContent value="basic" className="space-y-4 mt-4">
-              {/* Avatar Upload */}
-              <div className={sectionCard}>
-                <div className="flex items-center gap-2 mb-2">
-                  <ImagePlus size={14} className="text-neon-purple" />
-                  <span className="text-sm font-semibold text-foreground">Ảnh đại diện</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div
-                    onClick={() => avatarInputRef.current?.click()}
-                    className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-border hover:border-neon-purple/50 bg-oled-elevated flex items-center justify-center cursor-pointer transition-colors overflow-hidden group"
-                  >
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-neon-purple transition-colors">
-                        <ImagePlus size={24} />
-                        <span className="text-[10px]">Tải ảnh</span>
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    ref={avatarInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                  />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">JPG, PNG, WebP — Tối đa 5MB</p>
-                    {avatarPreview && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setAvatarFile(null); setAvatarPreview(null); }}
-                        className="text-xs text-muted-foreground hover:text-destructive mt-1 h-7 px-2"
-                      >
-                        <X size={12} className="mr-1" /> Xóa ảnh
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className={sectionCard}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={14} className="text-neon-purple" />
-                  <span className="text-sm font-semibold text-foreground">Thông tin chính</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className={fieldLabel}>Tên nhân vật *</Label>
-                    <Input
-                      value={data.name}
-                      onChange={(e) => updateData({ name: e.target.value })}
-                      placeholder="VD: Nguyễn Thị Bé"
-                      className={inputStyle}
-                    />
-                  </div>
-                  <div>
-                    <Label className={fieldLabel}>Phiên bản</Label>
-                    <Input
-                      value={data.character_version}
-                      onChange={(e) => updateData({ character_version: e.target.value })}
-                      placeholder="1.0"
-                      className={inputStyle}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>Mô tả (Description)</Label>
-                  <p className={fieldHint}>Mô tả chi tiết về nhân vật: ngoại hình, lịch sử, đặc điểm nổi bật.</p>
-                  <Textarea
-                    value={data.description}
-                    onChange={(e) => updateData({ description: e.target.value })}
-                    placeholder="VD: {{char}} là một cô gái sống tại Sài Gòn, tính tình vui vẻ..."
-                    className={textareaStyle}
-                  />
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>Tính cách (Personality)</Label>
-                  <p className={fieldHint}>Tóm tắt tính cách: đặc điểm, thói quen, cách nói chuyện.</p>
-                  <Textarea
-                    value={data.personality}
-                    onChange={(e) => updateData({ personality: e.target.value })}
-                    placeholder="Vui vẻ, nhiệt tình, thẳng thắn..."
-                    className={textareaStyle}
-                  />
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>Kịch bản (Scenario)</Label>
-                  <p className={fieldHint}>Bối cảnh và tình huống ban đầu của cuộc trò chuyện.</p>
-                  <Textarea
-                    value={data.scenario}
-                    onChange={(e) => updateData({ scenario: e.target.value })}
-                    placeholder="VD: Bạn gặp {{char}} tại một quán cà phê..."
-                    className={textareaStyle}
-                  />
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>Lời chào đầu tiên (first_mes) *</Label>
-                  <p className={fieldHint}>Tin nhắn đầu tiên AI gửi khi bắt đầu cuộc trò chuyện mới.</p>
-                  <Textarea
-                    value={data.first_mes}
-                    onChange={(e) => updateData({ first_mes: e.target.value })}
-                    placeholder="VD: *{{char}} ngoảnh đầu lại và mỉm cười* Ê! Cuối cùng cũng gặp được cậu rồi~"
-                    className={`${textareaStyle} min-h-[140px]`}
-                  />
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div className={sectionCard}>
-                <Label className={fieldLabel}>Thẻ (Tags)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-                    placeholder="Nhập tag rồi Enter..."
-                    className={`${inputStyle} flex-1`}
-                  />
-                  <Button variant="outline" size="icon" onClick={addTag} className="border-gray-border hover:border-neon-purple shrink-0">
-                    <Plus size={14} />
-                  </Button>
-                </div>
-                {data.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {data.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="bg-neon-purple/15 text-neon-purple border-neon-purple/30 text-xs cursor-pointer hover:bg-neon-purple/25" onClick={() => removeTag(tag)}>
-                        {tag} <X size={10} className="ml-1" />
-                      </Badge>
-                    ))}
-                  </div>
-                 )}
-
-                {/* Public toggle */}
-                <div className="flex items-center justify-between rounded-lg border border-gray-border bg-oled-base p-3">
-                  <div>
-                    <Label className={fieldLabel}>Công khai nhân vật</Label>
-                    <p className={fieldHint}>Cho phép mọi người xem và trò chuyện với nhân vật này trên trang Khám Phá.</p>
-                  </div>
-                  <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className={fieldLabel}>Người tạo (Creator)</Label>
-                    <Input
-                      value={data.creator}
-                      onChange={(e) => updateData({ creator: e.target.value })}
-                      placeholder="Tên / nickname của bạn"
-                      className={inputStyle}
-                    />
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* ===== ADVANCED TAB ===== */}
-            <TabsContent value="advanced" className="space-y-4 mt-4">
-              <div className={sectionCard}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={14} className="text-neon-blue" />
-                  <span className="text-sm font-semibold text-foreground">Cấu hình Prompt</span>
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>System Prompt</Label>
-                  <p className={fieldHint}>Prompt hệ thống — hướng dẫn AI cách hành xử cho nhân vật này.</p>
-                  <Textarea
-                    value={data.system_prompt}
-                    onChange={(e) => updateData({ system_prompt: e.target.value })}
-                    placeholder="VD: Bạn là {{char}}, hãy luôn nhập vai và không bao giờ thoát ra..."
-                    className={textareaStyle}
-                  />
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>Post-History Instructions</Label>
-                  <p className={fieldHint}>Chèn vào cuối lịch sử hội thoại, trước lượt trả lời của AI.</p>
-                  <Textarea
-                    value={data.post_history_instructions}
-                    onChange={(e) => updateData({ post_history_instructions: e.target.value })}
-                    placeholder="VD: [Hãy viết tối thiểu 3 đoạn văn mỗi lượt...]"
-                    className={textareaStyle}
-                  />
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>Ví dụ Hội thoại (mes_example)</Label>
-                  <p className={fieldHint}>
-                    Định dạng: {"<START>"} để bắt đầu mỗi đoạn ví dụ. Dùng {`{{char}}`} và {`{{user}}`}.
-                  </p>
-                  <Textarea
-                    value={data.mes_example}
-                    onChange={(e) => updateData({ mes_example: e.target.value })}
-                    placeholder={"VD:\n<START>\n{{user}}: Chào buổi sáng!\n{{char}}: Ê ê! Chào cậu~ ✨"}
-                    className={`${textareaStyle} min-h-[160px]`}
-                  />
-                </div>
-
-                <div>
-                  <Label className={fieldLabel}>Ghi chú Tác giả (Creator Notes)</Label>
-                  <p className={fieldHint}>Ghi chú riêng dành cho người dùng thẻ, không ảnh hưởng đến AI.</p>
-                  <Textarea
-                    value={data.creator_notes}
-                    onChange={(e) => updateData({ creator_notes: e.target.value })}
-                    placeholder="VD: Nhân vật này hoạt động tốt nhất với mô hình Claude..."
-                    className={inputStyle}
-                  />
-                </div>
-
-                {/* Alternate Greetings */}
-                <div className="flex items-center justify-between mb-2 mt-2">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={14} className="text-neon-blue" />
-                    <span className="text-sm font-semibold text-foreground">Lời chào thay thế</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{data.alternate_greetings.length} lời chào</span>
-                </div>
-
-                <p className={fieldHint}>Các lời chào khác nhau — người dùng có thể chọn ngẫu nhiên hoặc theo sở thích.</p>
-
-                <AnimatePresence>
-                  {data.alternate_greetings.map((g, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="relative group"
-                    >
-                      <div className="rounded-lg border border-gray-border bg-oled-base p-3 pr-10">
-                        <p className="text-xs text-muted-foreground mb-1">Lời chào #{i + 1}</p>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{g}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeGreeting(i)}
-                        className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 size={12} />
-                      </Button>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-
-                <Textarea
-                  value={greetingDraft}
-                  onChange={(e) => setGreetingDraft(e.target.value)}
-                  placeholder="Viết một lời chào thay thế..."
-                  className={`${textareaStyle} min-h-[100px]`}
-                />
-                <Button variant="outline" onClick={addGreeting} disabled={!greetingDraft.trim()} className="border-gray-border hover:border-neon-purple text-muted-foreground hover:text-foreground w-full">
-                  <Plus size={14} className="mr-1" /> Thêm lời chào
-                </Button>
-              </div>
-            </TabsContent>
-
-            {/* ===== LOREBOOK TAB ===== */}
-            <TabsContent value="lorebook" className="space-y-4 mt-4">
-              {!data.character_book ? (
-                <div className={sectionCard}>
-                  <div className="text-center py-8 space-y-4">
-                    <div className="w-14 h-14 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center mx-auto">
-                      <BookOpen className="text-neon-blue" size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground mb-1">Character Book / Lorebook</h3>
-                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                        Thêm các mục kiến thức (lore entries) để AI tự động nhớ bối cảnh khi gặp từ khóa nhất định.
-                      </p>
-                    </div>
-                    <Button onClick={initBook} variant="outline" className="border-neon-blue/30 text-neon-blue hover:bg-neon-blue/10">
-                      <BookOpen size={14} className="mr-1" /> Khởi tạo Lorebook
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Book settings */}
-                  <div className={sectionCard}>
-                    <div className="flex items-center gap-2 mb-2 cursor-pointer" onClick={() => setBookOpen(!bookOpen)}>
-                      <BookOpen size={14} className="text-neon-blue" />
-                      <span className="text-sm font-semibold text-foreground flex-1">Cài đặt Lorebook</span>
-                      {bookOpen ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
-                    </div>
-
-                    <AnimatePresence>
-                      {bookOpen && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="space-y-3 overflow-hidden">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <Label className={fieldLabel}>Tên Lorebook</Label>
-                              <Input value={data.character_book.name || ""} onChange={(e) => updateBook({ name: e.target.value })} placeholder="VD: Thế giới của nhân vật" className={inputStyle} />
-                            </div>
-                            <div>
-                              <Label className={fieldLabel}>Scan Depth</Label>
-                              <Input type="number" value={data.character_book.scan_depth || 50} onChange={(e) => updateBook({ scan_depth: Number(e.target.value) })} className={inputStyle} />
-                            </div>
-                            <div>
-                              <Label className={fieldLabel}>Token Budget</Label>
-                              <Input type="number" value={data.character_book.token_budget || 500} onChange={(e) => updateBook({ token_budget: Number(e.target.value) })} className={inputStyle} />
-                            </div>
-                            <div className="flex items-center gap-3 pt-5">
-                              <Switch checked={data.character_book.recursive_scanning || false} onCheckedChange={(v) => updateBook({ recursive_scanning: v })} />
-                              <Label className="text-xs text-muted-foreground">Quét đệ quy</Label>
-                            </div>
-                          </div>
-                          <div>
-                            <Label className={fieldLabel}>Mô tả</Label>
-                            <Textarea value={data.character_book.description || ""} onChange={(e) => updateBook({ description: e.target.value })} placeholder="VD: Mô tả ngắn về Lorebook..." className={inputStyle} />
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Entries */}
-                  <div className={sectionCard}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-foreground">Mục lore ({data.character_book.entries.length})</span>
-                      <Button variant="outline" size="sm" onClick={addBookEntry} className="border-gray-border hover:border-neon-blue text-muted-foreground hover:text-foreground">
-                        <Plus size={12} className="mr-1" /> Thêm mục
-                      </Button>
-                    </div>
-
-                    <AnimatePresence>
-                      {data.character_book.entries.map((entry, idx) => (
-                        <LoreEntryCard key={idx} entry={entry} idx={idx} onUpdate={(p) => updateBookEntry(idx, p)} onRemove={() => removeBookEntry(idx)} />
-                      ))}
-                    </AnimatePresence>
-
-                    {data.character_book.entries.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-6">Chưa có mục lore nào. Nhấn "Thêm mục" để bắt đầu.</p>
-                    )}
-                  </div>
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
-
-          {/* Fullscreen Preview Dialog */}
-          {showPreview && createPortal(
-            <AnimatePresence>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4"
-                onClick={() => setShowPreview(false)}
-              >
-                <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* Close button */}
-                  <button
-                    onClick={() => setShowPreview(false)}
-                    className="sticky top-3 ml-auto mr-3 z-10 w-8 h-8 rounded-full bg-oled-base/80 border border-gray-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
-
-                  {/* Avatar Image */}
-                  <div className="relative w-full aspect-square overflow-hidden -mt-8">
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-oled-elevated to-oled-base flex items-center justify-center">
-                        <span className="text-7xl font-bold text-secondary">
-                          {data.name?.charAt(0)?.toUpperCase() || "?"}
-                        </span>
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-oled-surface to-transparent" />
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-5 -mt-10 relative space-y-4">
-                    <h2 className="text-2xl font-bold text-foreground">
-                      {data.name || "Tên nhân vật"}
-                    </h2>
-
-                    {data.description && (
-                      <div>
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Mô tả</h4>
-                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                          {data.description}
-                        </p>
-                      </div>
-                    )}
-
-                    {data.personality && (
-                      <div>
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tính cách</h4>
-                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                          {data.personality}
-                        </p>
-                      </div>
-                    )}
-
-                    {data.tags.length > 0 && (
-                      <div>
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tags</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {data.tags.map((tag) => (
-                            <span key={tag} className="text-xs bg-oled-elevated text-primary rounded-full px-3 py-1 border border-gray-border">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Save button */}
-                    <div className="flex justify-end pt-2">
-                      <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-neon-purple text-white font-medium text-sm hover:bg-neon-purple/80 hover:shadow-neon-purple transition-all duration-200 disabled:opacity-50"
-                      >
-                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        {isSaving ? "Đang xử lý..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-            </AnimatePresence>,
-            document.body
-          )}
-        </motion.div>
+      {/* Stepper Indicator */}
+      <div className="shrink-0 border-b border-gray-border bg-oled-surface/20">
+        <StepIndicator current={currentStep} labels={STEPS.map((s) => s.label)} />
       </div>
+
+      {/* Step Content */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-36 md:pb-24">
+        <div className="max-w-2xl mx-auto">
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={currentStep}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="space-y-6"
+            >
+              {renderStepContent()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Sticky Bottom Navigation */}
+      <div className="fixed bottom-16 md:bottom-0 inset-x-0 z-30 border-t border-gray-border bg-oled-surface/90 backdrop-blur-xl">
+        <div className="max-w-2xl mx-auto flex items-center justify-between p-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goBack}
+            disabled={currentStep === 0}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+          >
+            <ArrowLeft size={14} className="mr-1" /> Quay lại
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-muted-foreground">
+              Bước {currentStep + 1}/{STEPS.length}
+            </span>
+          </div>
+
+          {currentStep < STEPS.length - 1 ? (
+            <Button
+              size="sm"
+              onClick={goNext}
+              disabled={!canNext()}
+              className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple disabled:opacity-40"
+            >
+              Tiếp theo <ArrowRight size={14} className="ml-1" />
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple"
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
+              {isSaving ? "Đang lưu..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Fullscreen Preview Dialog */}
+      {showPreview && createPortal(
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4"
+            onClick={() => setShowPreview(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowPreview(false)}
+                className="sticky top-3 ml-auto mr-3 z-10 w-8 h-8 rounded-full bg-oled-base/80 border border-gray-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="relative w-full aspect-square overflow-hidden -mt-8">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-oled-elevated to-oled-base flex items-center justify-center">
+                    <span className="text-7xl font-bold text-secondary">
+                      {data.name?.charAt(0)?.toUpperCase() || "?"}
+                    </span>
+                  </div>
+                )}
+                <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-oled-surface to-transparent" />
+              </div>
+
+              <div className="p-5 -mt-10 relative space-y-4">
+                <h2 className="text-2xl font-bold text-foreground">
+                  {data.name || "Tên nhân vật"}
+                </h2>
+
+                {data.description && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Mô tả</h4>
+                    <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{data.description}</p>
+                  </div>
+                )}
+
+                {data.personality && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tính cách</h4>
+                    <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{data.personality}</p>
+                  </div>
+                )}
+
+                {data.tags.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tags</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {data.tags.map((tag) => (
+                        <span key={tag} className="text-xs bg-oled-elevated text-primary rounded-full px-3 py-1 border border-gray-border">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-neon-purple text-white font-medium text-sm hover:bg-neon-purple/80 hover:shadow-neon-purple transition-all duration-200 disabled:opacity-50"
+                  >
+                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    {isSaving ? "Đang xử lý..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
 
+export default CreatePage;
+
+// ═══════════════════════════════════════════════════════════════
+// Step 0 — Cơ bản: Avatar, Name, Version, Tags, Public, Creator
+// ═══════════════════════════════════════════════════════════════
+function StepBasic({
+  data, updateData, tagInput, setTagInput, addTag, removeTag,
+  isPublic, setIsPublic, avatarPreview, setAvatarFile, setAvatarPreview,
+  avatarInputRef, handleAvatarChange,
+}: {
+  data: any;
+  updateData: (p: any) => void;
+  tagInput: string;
+  setTagInput: (v: string) => void;
+  addTag: () => void;
+  removeTag: (t: string) => void;
+  isPublic: boolean;
+  setIsPublic: (v: boolean) => void;
+  avatarPreview: string | null;
+  setAvatarFile: (f: File | null) => void;
+  setAvatarPreview: (v: string | null) => void;
+  avatarInputRef: React.RefObject<HTMLInputElement>;
+  handleAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <>
+      {/* Avatar Upload */}
+      <div className={sectionCard}>
+        <div className="flex items-center gap-2 mb-2">
+          <ImagePlus size={14} className="text-neon-purple" />
+          <span className="text-sm font-semibold text-foreground">Ảnh đại diện</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div
+            onClick={() => avatarInputRef.current?.click()}
+            className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-border hover:border-neon-purple/50 bg-oled-elevated flex items-center justify-center cursor-pointer transition-colors overflow-hidden group"
+          >
+            {avatarPreview ? (
+              <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-neon-purple transition-colors">
+                <ImagePlus size={24} />
+                <span className="text-[10px]">Tải ảnh</span>
+              </div>
+            )}
+          </div>
+          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground">JPG, PNG, WebP — Tối đa 5MB</p>
+            {avatarPreview && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setAvatarFile(null); setAvatarPreview(null); }}
+                className="text-xs text-muted-foreground hover:text-destructive mt-1 h-7 px-2"
+              >
+                <X size={12} className="mr-1" /> Xóa ảnh
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Name + Version */}
+      <div className={sectionCard}>
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles size={14} className="text-neon-purple" />
+          <span className="text-sm font-semibold text-foreground">Thông tin chính</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label className={fieldLabel}>Tên nhân vật *</Label>
+            <Input
+              value={data.name}
+              onChange={(e) => updateData({ name: e.target.value })}
+              placeholder="VD: Nguyễn Thị Bé"
+              className={inputStyle}
+            />
+          </div>
+          <div>
+            <Label className={fieldLabel}>Phiên bản</Label>
+            <Input
+              value={data.character_version}
+              onChange={(e) => updateData({ character_version: e.target.value })}
+              placeholder="1.0"
+              className={inputStyle}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Tags */}
+      <div className={sectionCard}>
+        <Label className={fieldLabel}>Thẻ (Tags)</Label>
+        <div className="flex gap-2">
+          <Input
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+            placeholder="Nhập tag rồi Enter..."
+            className={`${inputStyle} flex-1`}
+          />
+          <Button variant="outline" size="icon" onClick={addTag} className="border-gray-border hover:border-neon-purple shrink-0">
+            <Plus size={14} />
+          </Button>
+        </div>
+        {data.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {data.tags.map((tag: string) => (
+              <Badge key={tag} variant="secondary" className="bg-neon-purple/15 text-neon-purple border-neon-purple/30 text-xs cursor-pointer hover:bg-neon-purple/25" onClick={() => removeTag(tag)}>
+                {tag} <X size={10} className="ml-1" />
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Public toggle + Creator */}
+      <div className={sectionCard}>
+        <div className="flex items-center justify-between rounded-lg border border-gray-border bg-oled-base p-3">
+          <div>
+            <Label className={fieldLabel}>Công khai nhân vật</Label>
+            <p className={fieldHint}>Cho phép mọi người xem và trò chuyện với nhân vật này trên trang Khám Phá.</p>
+          </div>
+          <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+        </div>
+        <div>
+          <Label className={fieldLabel}>Người tạo (Creator)</Label>
+          <Input
+            value={data.creator}
+            onChange={(e) => updateData({ creator: e.target.value })}
+            placeholder="Tên / nickname của bạn"
+            className={inputStyle}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 1 — Định hình: Description, Personality
+// ═══════════════════════════════════════════════════════════════
+function StepShaping({
+  data, updateData,
+}: {
+  data: any;
+  updateData: (p: any) => void;
+}) {
+  return (
+    <>
+      <div className={sectionCard}>
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles size={14} className="text-neon-purple" />
+          <span className="text-sm font-semibold text-foreground">Định hình nhân vật</span>
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>Mô tả (Description)</Label>
+          <p className={fieldHint}>Mô tả chi tiết về nhân vật: ngoại hình, lịch sử, đặc điểm nổi bật.</p>
+          <Textarea
+            value={data.description}
+            onChange={(e) => updateData({ description: e.target.value })}
+            placeholder="VD: {{char}} là một cô gái sống tại Sài Gòn, tính tình vui vẻ..."
+            className={textareaStyle}
+          />
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>Tính cách (Personality)</Label>
+          <p className={fieldHint}>Tóm tắt tính cách: đặc điểm, thói quen, cách nói chuyện.</p>
+          <Textarea
+            value={data.personality}
+            onChange={(e) => updateData({ personality: e.target.value })}
+            placeholder="Vui vẻ, nhiệt tình, thẳng thắn..."
+            className={textareaStyle}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 2 — Kịch bản: Scenario, First Mes, System Prompt, PHI, Mes Example, Creator Notes, Alt Greetings
+// ═══════════════════════════════════════════════════════════════
+function StepScenario({
+  data, updateData, greetingDraft, setGreetingDraft, addGreeting, removeGreeting,
+}: {
+  data: any;
+  updateData: (p: any) => void;
+  greetingDraft: string;
+  setGreetingDraft: (v: string) => void;
+  addGreeting: () => void;
+  removeGreeting: (i: number) => void;
+}) {
+  return (
+    <>
+      <div className={sectionCard}>
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles size={14} className="text-neon-blue" />
+          <span className="text-sm font-semibold text-foreground">Kịch bản & Prompt</span>
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>Kịch bản (Scenario)</Label>
+          <p className={fieldHint}>Bối cảnh và tình huống ban đầu của cuộc trò chuyện.</p>
+          <Textarea
+            value={data.scenario}
+            onChange={(e) => updateData({ scenario: e.target.value })}
+            placeholder="VD: Bạn gặp {{char}} tại một quán cà phê..."
+            className={textareaStyle}
+          />
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>Lời chào đầu tiên (first_mes) *</Label>
+          <p className={fieldHint}>Tin nhắn đầu tiên AI gửi khi bắt đầu cuộc trò chuyện mới.</p>
+          <Textarea
+            value={data.first_mes}
+            onChange={(e) => updateData({ first_mes: e.target.value })}
+            placeholder="VD: *{{char}} ngoảnh đầu lại và mỉm cười* Ê! Cuối cùng cũng gặp được cậu rồi~"
+            className={`${textareaStyle} min-h-[140px]`}
+          />
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>System Prompt</Label>
+          <p className={fieldHint}>Prompt hệ thống — hướng dẫn AI cách hành xử cho nhân vật này.</p>
+          <Textarea
+            value={data.system_prompt}
+            onChange={(e) => updateData({ system_prompt: e.target.value })}
+            placeholder="VD: Bạn là {{char}}, hãy luôn nhập vai và không bao giờ thoát ra..."
+            className={textareaStyle}
+          />
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>Post-History Instructions</Label>
+          <p className={fieldHint}>Chèn vào cuối lịch sử hội thoại, trước lượt trả lời của AI.</p>
+          <Textarea
+            value={data.post_history_instructions}
+            onChange={(e) => updateData({ post_history_instructions: e.target.value })}
+            placeholder="VD: [Hãy viết tối thiểu 3 đoạn văn mỗi lượt...]"
+            className={textareaStyle}
+          />
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>Ví dụ Hội thoại (mes_example)</Label>
+          <p className={fieldHint}>
+            Định dạng: {"<START>"} để bắt đầu mỗi đoạn ví dụ. Dùng {`{{char}}`} và {`{{user}}`}.
+          </p>
+          <Textarea
+            value={data.mes_example}
+            onChange={(e) => updateData({ mes_example: e.target.value })}
+            placeholder={"VD:\n<START>\n{{user}}: Chào buổi sáng!\n{{char}}: Ê ê! Chào cậu~ ✨"}
+            className={`${textareaStyle} min-h-[160px]`}
+          />
+        </div>
+
+        <div>
+          <Label className={fieldLabel}>Ghi chú Tác giả (Creator Notes)</Label>
+          <p className={fieldHint}>Ghi chú riêng dành cho người dùng thẻ, không ảnh hưởng đến AI.</p>
+          <Textarea
+            value={data.creator_notes}
+            onChange={(e) => updateData({ creator_notes: e.target.value })}
+            placeholder="VD: Nhân vật này hoạt động tốt nhất với mô hình Claude..."
+            className={inputStyle}
+          />
+        </div>
+      </div>
+
+      {/* Alternate Greetings */}
+      <div className={sectionCard}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} className="text-neon-blue" />
+            <span className="text-sm font-semibold text-foreground">Lời chào thay thế</span>
+          </div>
+          <span className="text-xs text-muted-foreground">{data.alternate_greetings.length} lời chào</span>
+        </div>
+        <p className={fieldHint}>Các lời chào khác nhau — người dùng có thể chọn ngẫu nhiên hoặc theo sở thích.</p>
+
+        <AnimatePresence>
+          {data.alternate_greetings.map((g: string, i: number) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="relative group"
+            >
+              <div className="rounded-lg border border-gray-border bg-oled-base p-3 pr-10">
+                <p className="text-xs text-muted-foreground mb-1">Lời chào #{i + 1}</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{g}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => removeGreeting(i)}
+                className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Trash2 size={12} />
+              </Button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        <Textarea
+          value={greetingDraft}
+          onChange={(e) => setGreetingDraft(e.target.value)}
+          placeholder="Viết một lời chào thay thế..."
+          className={`${textareaStyle} min-h-[100px]`}
+        />
+        <Button variant="outline" onClick={addGreeting} disabled={!greetingDraft.trim()} className="border-gray-border hover:border-neon-purple text-muted-foreground hover:text-foreground w-full">
+          <Plus size={14} className="mr-1" /> Thêm lời chào
+        </Button>
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 3 — Thế giới: Lorebook
+// ═══════════════════════════════════════════════════════════════
+function StepWorld({
+  data, bookOpen, setBookOpen, initBook, updateBook, addBookEntry, updateBookEntry, removeBookEntry,
+}: {
+  data: any;
+  bookOpen: boolean;
+  setBookOpen: (v: boolean) => void;
+  initBook: () => void;
+  updateBook: (p: Record<string, unknown>) => void;
+  addBookEntry: () => void;
+  updateBookEntry: (i: number, p: Partial<CharacterBookEntry>) => void;
+  removeBookEntry: (i: number) => void;
+}) {
+  if (!data.character_book) {
+    return (
+      <div className={sectionCard}>
+        <div className="text-center py-8 space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center mx-auto">
+            <BookOpen className="text-neon-blue" size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-1">Character Book / Lorebook</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Thêm các mục kiến thức (lore entries) để AI tự động nhớ bối cảnh khi gặp từ khóa nhất định.
+            </p>
+          </div>
+          <Button onClick={initBook} variant="outline" className="border-neon-blue/30 text-neon-blue hover:bg-neon-blue/10">
+            <BookOpen size={14} className="mr-1" /> Khởi tạo Lorebook
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Book settings */}
+      <div className={sectionCard}>
+        <div className="flex items-center gap-2 mb-2 cursor-pointer" onClick={() => setBookOpen(!bookOpen)}>
+          <BookOpen size={14} className="text-neon-blue" />
+          <span className="text-sm font-semibold text-foreground flex-1">Cài đặt Lorebook</span>
+          {bookOpen ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
+        </div>
+        <AnimatePresence>
+          {bookOpen && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="space-y-3 overflow-hidden">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className={fieldLabel}>Tên Lorebook</Label>
+                  <Input value={data.character_book.name || ""} onChange={(e) => updateBook({ name: e.target.value })} placeholder="VD: Thế giới của nhân vật" className={inputStyle} />
+                </div>
+                <div>
+                  <Label className={fieldLabel}>Scan Depth</Label>
+                  <Input type="number" value={data.character_book.scan_depth || 50} onChange={(e) => updateBook({ scan_depth: Number(e.target.value) })} className={inputStyle} />
+                </div>
+                <div>
+                  <Label className={fieldLabel}>Token Budget</Label>
+                  <Input type="number" value={data.character_book.token_budget || 500} onChange={(e) => updateBook({ token_budget: Number(e.target.value) })} className={inputStyle} />
+                </div>
+                <div className="flex items-center gap-3 pt-5">
+                  <Switch checked={data.character_book.recursive_scanning || false} onCheckedChange={(v: boolean) => updateBook({ recursive_scanning: v })} />
+                  <Label className="text-xs text-muted-foreground">Quét đệ quy</Label>
+                </div>
+              </div>
+              <div>
+                <Label className={fieldLabel}>Mô tả</Label>
+                <Textarea value={data.character_book.description || ""} onChange={(e) => updateBook({ description: e.target.value })} placeholder="VD: Mô tả ngắn về Lorebook..." className={inputStyle} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Entries */}
+      <div className={sectionCard}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-semibold text-foreground">Mục lore ({(Array.isArray(data.character_book.entries) ? data.character_book.entries : []).length})</span>
+          <Button variant="outline" size="sm" onClick={addBookEntry} className="border-gray-border hover:border-neon-blue text-muted-foreground hover:text-foreground">
+            <Plus size={12} className="mr-1" /> Thêm mục
+          </Button>
+        </div>
+
+        <AnimatePresence>
+          {(Array.isArray(data.character_book.entries) ? data.character_book.entries : []).map((entry: CharacterBookEntry, idx: number) => (
+            <LoreEntryCard key={idx} entry={entry} idx={idx} onUpdate={(p) => updateBookEntry(idx, p)} onRemove={() => removeBookEntry(idx)} />
+          ))}
+        </AnimatePresence>
+
+        {(Array.isArray(data.character_book.entries) ? data.character_book.entries : []).length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-6">Chưa có mục lore nào. Nhấn "Thêm mục" để bắt đầu.</p>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Sub-component for a single lore entry
+// ═══════════════════════════════════════════════════════════════
 const LoreEntryCard = ({
   entry,
   idx,
@@ -881,4 +1153,28 @@ const LoreEntryCard = ({
   );
 };
 
-export default CreatePage;
+// ─── Default card factory ───────────────────────────────────────
+function makeDefaultCard() {
+  return {
+    spec: "chara_card_v2" as const,
+    spec_version: "2.0",
+    data: {
+      name: "",
+      description: "",
+      personality: "",
+      scenario: "",
+      first_mes: "",
+      mes_example: "",
+      system_prompt: "",
+      post_history_instructions: "",
+      creator_notes: "",
+      tags: [] as string[],
+      avatar: "",
+      character_version: "1.0",
+      alternate_greetings: [] as string[],
+      creator: "",
+      extensions: {},
+      character_book: null as any,
+    },
+  };
+}
