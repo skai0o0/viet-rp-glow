@@ -1,3 +1,5 @@
+use std::fmt;
+
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
@@ -8,6 +10,17 @@ pub enum AppError {
     Forbidden(String),
     Internal(String),
     BadGateway(String),
+}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AppError::Unauthorized => write!(f, "Unauthorized"),
+            AppError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
+            AppError::Internal(msg) => write!(f, "Internal error: {}", msg),
+            AppError::BadGateway(msg) => write!(f, "Bad gateway: {}", msg),
+        }
+    }
 }
 
 impl IntoResponse for AppError {
