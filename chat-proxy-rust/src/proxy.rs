@@ -1,14 +1,12 @@
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use axum::Json;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use uuid::Uuid;
 
-use crate::auth::Claims;
 use crate::db;
 use crate::error::AppError;
 use crate::AppState;

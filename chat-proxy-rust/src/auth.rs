@@ -1,4 +1,4 @@
-use jsonwebtoken::{decode, Algorithm, Validation};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -29,7 +29,8 @@ pub fn validate_jwt(token: &str, jwt_secret: &[u8]) -> Result<Claims, AppError> 
     // Don't require specific issuer — Supabase uses the project URL
     validation.validate_exp = true;
 
-    let token_data = decode::<Claims>(token, jwt_secret, &validation)
+    let key = DecodingKey::from_secret(jwt_secret);
+    let token_data = decode::<Claims>(token, &key, &validation)
         .map_err(|e| {
             tracing::warn!("JWT validation failed: {}", e);
             AppError::Unauthorized
