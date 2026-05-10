@@ -13,7 +13,9 @@
       "Bash(npm run *)",
       "Bash(node -e ' *)",
       "Bash(npx vite *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(curl *)",
+      "Bash(npx supabase *)"
     ]
   }
 }

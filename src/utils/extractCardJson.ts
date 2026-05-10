@@ -2,31 +2,45 @@ import JSON5 from "json5";
 import { TavernCardV2 } from "@/types/taverncard";
 
 function normalize(obj: any): TavernCardV2 | null {
-  if (obj?.spec === "chara_card_v2" && obj?.data?.name) {
-    const d = obj.data;
-    return {
-      spec: "chara_card_v2",
-      spec_version: "2.0",
-      data: {
-        name: d.name || "",
-        description: d.description || "",
-        personality: d.personality || "",
-        scenario: d.scenario || "",
-        first_mes: d.first_mes || "",
-        mes_example: d.mes_example || "",
-        creator_notes: d.creator_notes || "Tạo bởi VietRP AI Generator.",
-        system_prompt: d.system_prompt || "",
-        post_history_instructions: d.post_history_instructions || "",
-        alternate_greetings: Array.isArray(d.alternate_greetings) ? d.alternate_greetings : [],
-        character_book: d.character_book || undefined,
-        tags: Array.isArray(d.tags) ? d.tags : [],
-        creator: d.creator || "VietRP Charagen AI",
-        character_version: d.character_version || "1.0",
-        extensions: d.extensions || {},
-      },
-    };
+  if (!obj || typeof obj !== "object") return null;
+
+  // Accept multiple formats:
+  // 1. Standard: { spec: "chara_card_v2", data: { name, ... } }
+  // 2. Flat data: { name, description, ... } (AI forgot spec wrapper)
+  // 3. Nested but no spec: { data: { name, ... } }
+  let d: any = null;
+
+  if (obj.data && typeof obj.data === "object" && obj.data.name) {
+    // Standard or nested format
+    d = obj.data;
+  } else if (obj.name && typeof obj.name === "string") {
+    // Flat format — AI output fields at top level
+    d = obj;
   }
-  return null;
+
+  if (!d || !d.name) return null;
+
+  return {
+    spec: "chara_card_v2",
+    spec_version: "2.0",
+    data: {
+      name: d.name || "",
+      description: d.description || "",
+      personality: d.personality || "",
+      scenario: d.scenario || "",
+      first_mes: d.first_mes || "",
+      mes_example: d.mes_example || "",
+      creator_notes: d.creator_notes || "Tạo bởi VietRP AI Generator.",
+      system_prompt: d.system_prompt || "",
+      post_history_instructions: d.post_history_instructions || "",
+      alternate_greetings: Array.isArray(d.alternate_greetings) ? d.alternate_greetings : [],
+      character_book: d.character_book || undefined,
+      tags: Array.isArray(d.tags) ? d.tags : [],
+      creator: d.creator || "VietRP Charagen AI",
+      character_version: d.character_version || "1.0",
+      extensions: d.extensions || {},
+    },
+  };
 }
 
 function tryParse(s: string): TavernCardV2 | null {
@@ -50,7 +64,12 @@ function extractBraceBlocks(text: string): string[] {
       }
     }
   }
-  return results.filter((b) => b.includes('"spec"') || b.includes('"name"'));
+  return results.filter((b) =>
+    b.includes('"spec"') ||
+    b.includes('"name"') ||
+    b.includes('"description"') ||
+    b.includes('"first_mes"')
+  );
 }
 
 /**

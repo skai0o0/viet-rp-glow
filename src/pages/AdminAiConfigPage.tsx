@@ -49,6 +49,14 @@ import {
   fetchSamplingParameters,
   saveSamplingParameters,
   type SamplingParameters,
+  fetchGlobalPromptTypeA,
+  saveGlobalPromptTypeA,
+  fetchGlobalPromptTypeB,
+  saveGlobalPromptTypeB,
+  fetchGlobalPostHistoryTypeA,
+  saveGlobalPostHistoryTypeA,
+  fetchGlobalPostHistoryTypeB,
+  saveGlobalPostHistoryTypeB,
 } from "@/services/globalSettingsDb";
 import { createApproval } from "@/services/approvalService";
 import {
@@ -149,6 +157,16 @@ const AdminAiConfigPage = () => {
   const [prompt, setPrompt] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
 
+  // Type-Specific Prompts
+  const [promptTypeA, setPromptTypeA] = useState("");
+  const [savingPromptTypeA, setSavingPromptTypeA] = useState(false);
+  const [promptTypeB, setPromptTypeB] = useState("");
+  const [savingPromptTypeB, setSavingPromptTypeB] = useState(false);
+  const [postHistoryTypeA, setPostHistoryTypeA] = useState("");
+  const [savingPostHistoryTypeA, setSavingPostHistoryTypeA] = useState(false);
+  const [postHistoryTypeB, setPostHistoryTypeB] = useState("");
+  const [savingPostHistoryTypeB, setSavingPostHistoryTypeB] = useState(false);
+
   // Sampling Parameters
   const [samplingParams, setSamplingParams] = useState<SamplingParameters>({
     temperature: 0.7,
@@ -177,6 +195,10 @@ const AdminAiConfigPage = () => {
       });
     fetchGlobalSystemPrompt().then(setPrompt);
     fetchSamplingParameters().then(setSamplingParams);
+    fetchGlobalPromptTypeA().then(setPromptTypeA);
+    fetchGlobalPromptTypeB().then(setPromptTypeB);
+    fetchGlobalPostHistoryTypeA().then(setPostHistoryTypeA);
+    fetchGlobalPostHistoryTypeB().then(setPostHistoryTypeB);
     // Sync BYOK keys from Supabase → populate localStorage + inputs
     if (user) {
       syncKeysFromSupabase(user.id).then(() => {
@@ -357,6 +379,55 @@ const AdminAiConfigPage = () => {
       toast.error("Lưu cấu hình thất bại!");
     } finally {
       setSavingPrompt(false);
+    }
+  };
+
+  // ── Type-Specific Prompt handlers ──
+  const handleSavePromptTypeA = async () => {
+    setSavingPromptTypeA(true);
+    try {
+      await saveGlobalPromptTypeA(promptTypeA);
+      toast.success("Đã lưu System Prompt Type A!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingPromptTypeA(false);
+    }
+  };
+
+  const handleSavePromptTypeB = async () => {
+    setSavingPromptTypeB(true);
+    try {
+      await saveGlobalPromptTypeB(promptTypeB);
+      toast.success("Đã lưu System Prompt Type B!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingPromptTypeB(false);
+    }
+  };
+
+  const handleSavePostHistoryTypeA = async () => {
+    setSavingPostHistoryTypeA(true);
+    try {
+      await saveGlobalPostHistoryTypeA(postHistoryTypeA);
+      toast.success("Đã lưu Post-History Type A!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingPostHistoryTypeA(false);
+    }
+  };
+
+  const handleSavePostHistoryTypeB = async () => {
+    setSavingPostHistoryTypeB(true);
+    try {
+      await saveGlobalPostHistoryTypeB(postHistoryTypeB);
+      toast.success("Đã lưu Post-History Type B!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingPostHistoryTypeB(false);
     }
   };
 
@@ -1013,31 +1084,153 @@ const AdminAiConfigPage = () => {
           </CardContent>
         </Card>
 
-        {/* ═══════ Global System Prompt ═══════ */}
+        {/* ═══════ Type-Specific AI Prompts ═══════ */}
         <Card className="bg-oled-surface border-oled-border">
-          <CardContent className="p-5 space-y-4">
+          <CardContent className="p-5 space-y-6">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-neon-blue shadow-[0_0_6px] shadow-neon-blue" />
-              <h2 className="text-sm font-semibold text-foreground">Global System Prompt</h2>
+              <h2 className="text-sm font-semibold text-foreground">AI Prompt Configuration</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              Prompt này sẽ được âm thầm thêm vào đầu mọi cuộc trò chuyện để định hướng hành vi cốt lõi của AI.
+              Cấu hình prompt cho 2 loại card: <strong>Type A</strong> (1 nhân vật) và <strong>Type B</strong> (đa nhân vật/RPG).
+              System sẽ tự động detect loại card và áp dụng prompt tương ứng.
             </p>
-            <Textarea
-              rows={10}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Nhập global system prompt tại đây..."
-              className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[160px]"
-            />
-            <Button
-              onClick={handleSavePrompt}
-              disabled={savingPrompt}
-              className="bg-neon-blue hover:bg-neon-blue/80 text-white font-semibold"
-            >
-              {savingPrompt ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
-              Lưu cấu hình
-            </Button>
+
+            {/* System Prompts */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Layers size={14} className="text-neon-blue" />
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">System Prompt</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Type A — Single Character
+                  </Label>
+                  <Textarea
+                    rows={8}
+                    value={promptTypeA}
+                    onChange={(e) => setPromptTypeA(e.target.value)}
+                    placeholder="System prompt cho card 1 nhân vật..."
+                    className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[120px]"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSavePromptTypeA}
+                    disabled={savingPromptTypeA}
+                    className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
+                    variant="outline"
+                  >
+                    {savingPromptTypeA ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                    Lưu Type A
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Type B — Multi-Character / RPG
+                  </Label>
+                  <Textarea
+                    rows={8}
+                    value={promptTypeB}
+                    onChange={(e) => setPromptTypeB(e.target.value)}
+                    placeholder="System prompt cho card đa nhân vật/RPG..."
+                    className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[120px]"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSavePromptTypeB}
+                    disabled={savingPromptTypeB}
+                    className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
+                    variant="outline"
+                  >
+                    {savingPromptTypeB ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                    Lưu Type B
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Post-History Instructions */}
+            <div className="space-y-4 pt-4 border-t border-oled-border">
+              <div className="flex items-center gap-2">
+                <Layers size={14} className="text-neon-purple" />
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Post-History Instructions</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Type A — Single Character
+                  </Label>
+                  <Textarea
+                    rows={6}
+                    value={postHistoryTypeA}
+                    onChange={(e) => setPostHistoryTypeA(e.target.value)}
+                    placeholder="Post-history instructions cho Type A..."
+                    className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[100px]"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSavePostHistoryTypeA}
+                    disabled={savingPostHistoryTypeA}
+                    className="bg-neon-purple/10 text-neon-purple border border-neon-purple/30 hover:bg-neon-purple/20"
+                    variant="outline"
+                  >
+                    {savingPostHistoryTypeA ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                    Lưu Type A
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Type B — Multi-Character / RPG
+                  </Label>
+                  <Textarea
+                    rows={6}
+                    value={postHistoryTypeB}
+                    onChange={(e) => setPostHistoryTypeB(e.target.value)}
+                    placeholder="Post-history instructions cho Type B..."
+                    className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[100px]"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSavePostHistoryTypeB}
+                    disabled={savingPostHistoryTypeB}
+                    className="bg-neon-purple/10 text-neon-purple border border-neon-purple/30 hover:bg-neon-purple/20"
+                    variant="outline"
+                  >
+                    {savingPostHistoryTypeB ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                    Lưu Type B
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Legacy Fallback */}
+            <div className="pt-4 border-t border-oled-border space-y-3">
+              <p className="text-[10px] text-muted-foreground">
+                <strong>Legacy Fallback:</strong> Nếu type-specific prompt trống, hệ thống sẽ dùng prompt bên dưới.
+              </p>
+              <Textarea
+                rows={6}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Legacy global system prompt (fallback)..."
+                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[100px]"
+              />
+              <Button
+                size="sm"
+                onClick={handleSavePrompt}
+                disabled={savingPrompt}
+                className="bg-muted-foreground/10 text-muted-foreground border border-muted-foreground/30 hover:bg-muted-foreground/20"
+                variant="outline"
+              >
+                {savingPrompt ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                Lưu Legacy Fallback
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

@@ -28,6 +28,103 @@ export async function saveGlobalSystemPrompt(value: string): Promise<void> {
   cachedPrompt = value;
 }
 
+// ─── Type-Specific System Prompts & Post-History ────────────
+
+let cachedPromptTypeA: string | null = null;
+let cachedPromptTypeB: string | null = null;
+let cachedPostHistoryTypeA: string | null = null;
+let cachedPostHistoryTypeB: string | null = null;
+
+/** Helper: upsert a global_settings row (try update, then insert) */
+async function upsertGlobalSetting(key: string, value: string): Promise<void> {
+  const { data } = await supabase
+    .from("global_settings")
+    .select("key")
+    .eq("key", key)
+    .single();
+  if (data) {
+    const { error } = await supabase
+      .from("global_settings")
+      .update({ value, updated_at: new Date().toISOString() })
+      .eq("key", key);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("global_settings")
+      .insert({ key, value });
+    if (error) throw error;
+  }
+}
+
+/** Helper: fetch a single global setting by key */
+async function fetchGlobalSetting(key: string): Promise<string> {
+  const { data } = await supabase
+    .from("global_settings")
+    .select("value")
+    .eq("key", key)
+    .single();
+  return data?.value ?? "";
+}
+
+// Type A System Prompt
+export async function fetchGlobalPromptTypeA(): Promise<string> {
+  if (cachedPromptTypeA !== null) return cachedPromptTypeA;
+  cachedPromptTypeA = await fetchGlobalSetting("global_system_prompt_type_a");
+  return cachedPromptTypeA;
+}
+export function getGlobalPromptTypeA(): string { return cachedPromptTypeA ?? ""; }
+export async function saveGlobalPromptTypeA(value: string): Promise<void> {
+  await upsertGlobalSetting("global_system_prompt_type_a", value);
+  cachedPromptTypeA = value;
+}
+
+// Type B System Prompt
+export async function fetchGlobalPromptTypeB(): Promise<string> {
+  if (cachedPromptTypeB !== null) return cachedPromptTypeB;
+  cachedPromptTypeB = await fetchGlobalSetting("global_system_prompt_type_b");
+  return cachedPromptTypeB;
+}
+export function getGlobalPromptTypeB(): string { return cachedPromptTypeB ?? ""; }
+export async function saveGlobalPromptTypeB(value: string): Promise<void> {
+  await upsertGlobalSetting("global_system_prompt_type_b", value);
+  cachedPromptTypeB = value;
+}
+
+// Type A Post-History Instructions
+export async function fetchGlobalPostHistoryTypeA(): Promise<string> {
+  if (cachedPostHistoryTypeA !== null) return cachedPostHistoryTypeA;
+  cachedPostHistoryTypeA = await fetchGlobalSetting("global_post_history_type_a");
+  return cachedPostHistoryTypeA;
+}
+export function getGlobalPostHistoryTypeA(): string { return cachedPostHistoryTypeA ?? ""; }
+export async function saveGlobalPostHistoryTypeA(value: string): Promise<void> {
+  await upsertGlobalSetting("global_post_history_type_a", value);
+  cachedPostHistoryTypeA = value;
+}
+
+// Type B Post-History Instructions
+export async function fetchGlobalPostHistoryTypeB(): Promise<string> {
+  if (cachedPostHistoryTypeB !== null) return cachedPostHistoryTypeB;
+  cachedPostHistoryTypeB = await fetchGlobalSetting("global_post_history_type_b");
+  return cachedPostHistoryTypeB;
+}
+export function getGlobalPostHistoryTypeB(): string { return cachedPostHistoryTypeB ?? ""; }
+export async function saveGlobalPostHistoryTypeB(value: string): Promise<void> {
+  await upsertGlobalSetting("global_post_history_type_b", value);
+  cachedPostHistoryTypeB = value;
+}
+
+/** Batch-fetch all prompt settings (call on app startup) */
+export async function fetchAllPrompts(): Promise<void> {
+  await Promise.all([
+    fetchGlobalSystemPrompt(),
+    fetchGlobalPromptTypeA(),
+    fetchGlobalPromptTypeB(),
+    fetchGlobalPostHistoryTypeA(),
+    fetchGlobalPostHistoryTypeB(),
+  ]);
+}
+
 // ─── Allowed Models ─────────────────────────────────────────
 
 export type AllowedModel = {

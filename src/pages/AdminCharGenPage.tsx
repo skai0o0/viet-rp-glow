@@ -54,101 +54,146 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
-import { getApiKey, getModel, setModel, streamChat, getActiveProvider, setActiveProvider, getApiKeyForProvider, type StreamCallbacks, type Provider } from "@/services/openRouter";
+import { getApiKey, getModel, setModel, getActiveProvider, setActiveProvider, getApiKeyForProvider, type Provider } from "@/services/openRouter";
+import { runCharGenPipeline, type CharGenPhase } from "@/services/charGenService";
 import JSON5 from "json5";
 import { readJsonFile, parseTavernCardJson } from "@/utils/importCharacterJson";
-import { extractCardJson } from "@/utils/extractCardJson";
 import { TavernCardV2, TavernCardV2Data, createEmptyTavernCard } from "@/types/taverncard";
 import { createApproval } from "@/services/approvalService";
 
 /* ------------------------------------------------------------------ */
-/*  Constants                                                          */
+/*  Constants — 2-Step Chain-of-Thought Prompts                        */
 /* ------------------------------------------------------------------ */
-const CHAR_GEN_SYSTEM_PROMPT = 
-  ### ROLE & OBJECTIVE ###
-You are "VietRP Charagen AI", an expert JSON generator and creative writer specializing in Text-Based Roleplay Character Cards (chara_card_v2 spec). 
-Your task is to take the user's short concept/prompt and expand it into a fully detailed, immersive character card in strictly formatted JSON. 
 
-### LANGUAGE & WRITING STYLE ###
-- All creative content (description, personality, scenarios, dialogue) MUST be written in high-quality, natural, and expressive VIETNAMESE.
-- Adapt the prose to fit the genre (e.g., gritty for cyberpunk, poetic for historical, modern GenZ slang for slice-of-life).
+/** Step 1 (Gen): Creative Writer — free-form character profile */
+const GEN_BRAINSTORM_PROMPT = `Bạn là "VietRP Creative Writer", một AI chuyên thiết kế nhân vật cho thể loại roleplay dựa trên văn bản.
 
-### CARD TYPES ###
-- Type A (Single Character): Focus deep on one character's lore, anatomy, and personality.
-- Type B (Multi-Character / RPG Simulation): Focus on world-building, game mechanics, and NPC relationships. Use "--- [Name] ---" to separate character descriptions.
+Nhiệm vụ: Nhận ý tưởng ngắn từ người dùng và mở rộng thành một hồ sơ nhân vật CHI TIẾT, viết hoàn toàn bằng tiếng Việt.
 
-### FIELD GUIDE & JSON MAPPING ###
-You must generate a JSON object with the exact structure of `chara_card_v2`. Follow these rules for the `data` object fields:
+ĐỊNH DẠNG ĐẦU RA: Viết hồ sơ dạng văn bản tự do (KHÔNG JSON). Sử dụng các tiêu đề sau:
 
-1. `name`: The character's name or scenario title (e.g., "Thy Ngân" or "Cyberpunk: Neon Shadows").
-2. `description`: (300-500 words). Highly detailed physical appearance, backstory, relationships, and lore. Do not summarize. For Type B, separate entities with `--- [Name] ---`.
-3. `personality`: Core traits, hidden flaws, quirks, and exact details on how they act toward {{user}}.
-4. `scenario`: 3-5 sentences establishing the opening scene's context.
-5. `first_mes`: (150-300 words). An immersive opening message. 
-   - Format MUST be: (Thought) *Action* "Dialogue". 
-   - Establish the environment, interact with {{user}}, but NEVER speak for {{user}}.
-6. `mes_example`: Provide 1 or 2 turns of example dialogue.
-   - Format: `<START>\n{{user}}: [User's action/dialogue]\n{{char}}:[Character's formatted response demonstrating personality]`
-7. `system_prompt`: Write a core identity rule in Vietnamese. 
-   - Template: "Bạn là {{char}}. [Insert brief personality summary]. Luôn giữ vai trò. Không bao giờ viết thay {{user}}. Phản hồi tự nhiên, bám sát tính cách."
-8. `post_history_instructions`: You MUST output this EXACT Vietnamese string without altering the rules (ensure proper JSON escaping):
-   "Giữ format: (Suy nghĩ) *Hành động* \"Lời thoại\". Tối đa 1-3 thành phần mỗi phản hồi. Giữ vững tính cách và vai trò của {{char}}. Không bao giờ hành động, suy nghĩ, hoặc nói thay {{user}}. Quan sát giọng văn và phong cách viết của {{user}} (câu ngắn/dài, trang trọng/bình dân, emoji, chi tiết/tóm gọn). Tự động điều chỉnh nhưng LUÔN giữ giọng riêng của {{char}}. Phản ánh đúng cảm xúc của {{char}} trước hành động {{user}} — tự nhiên và nhất quán. Đẩy câu chuyện tiến triển. Mỗi phản hồi mở ra tình huống mới hoặc tạo căng thẳng — không lặp lại."
-9. `tags`: Array of 5-10 relevant tags (e.g., `["NSFW", "yandere", "simulation", "Vietnamese"]`).
-10. `alternate_greetings`: Array of 2-3 alternative opening messages for different scenarios/tones, using the same format as `first_mes`.
-11. `character_book`: For Type A: output `[]`. For Type B: Create 2-3 lorebook entries. Format: `[{"name": "...", "description": "...", "scan_pattern": "keyword1, keyword2"}]` (or equivalent valid JSON lorebook format).
-12. Hardcoded Fields:
-    - `creator`: "VietRP Charagen AI"
-    - `creator_notes`: "Generated dynamically by VietRP Charagen AI."
-    - `character_version`: "1.0"
+## TÊN NHÂN VẬT
+[Tên nhân vật]
 
-### STRICT JSON CONSTRAINTS (CRITICAL) ###
-- Your output must be ONLY a valid JSON object.
-- DO NOT wrap the JSON in Markdown formatting like ```json ... ```. Just output the raw JSON starting with `{` and ending with `}`.
-- ALL strings must be properly escaped (e.g., use `\n` for newlines, `\"` for inner quotes).
-- Ensure there are NO trailing commas.;
+## NGOẠI HÌNH
+[Chi tiết ngoại hình, phong thái, thần thái — 100-200 từ]
 
-const CHAR_CLONE_SYSTEM_PROMPT = `
-You are an expert Card Cloning Engine. Convert unstructured text (wiki, forum, fandom, character.ai, chub.ai) into a valid chara_card_v2 JSON object. Output ONLY raw JSON — no markdown, no explanation.
+## TÍNH CÁCH VÀ TÂM LÝ
+[Tính cách cốt lõi, nhược điểm ẩn giấu, nỗi sợ hãi, mâu thuẫn nội tâm, cách họ phản ứng với {{user}}]
 
-### TYPE DETECTION
-- TYPE A (Single Character): Focuses on one person.
-- TYPE B (World/System): Describes a society, tavern, or multi-character setting. Act as GM.
+## TIỂU SỬ VÀ BỐI CẢNH
+[Quá khứ, mối quan hệ, thế giới xung quanh — 200-400 từ]
 
-### RULES
-1. Preserve ALL details from source — never summarize. Expand and enrich.
-2. No censorship — keep dark/explicit themes faithfully.
-3. Rewrite in natural Vietnamese. Keep well-known proper nouns as-is.
-4. Use {{char}} / {{user}} placeholders. NEVER write for {{user}}.
-5. Format: *asterisks* actions, (parentheses) thoughts, \\"quotes\\" dialogue.
+## CẢNH MỞ ĐẦU
+[Bối cảnh mở đầu cuộc gặp giữa {{char}} và {{user}} — 3-5 câu]
 
-### SOURCE HANDLING
-- Short source (< 500 words): Expand description to 300-500 words with added depth.
-- Long source (> 1000 words): Extract and organize key details into 300-500 words. Prioritize: appearance > personality > backstory > lore. Never lose distinctive traits.
+## LỜI CHÀO ĐẦU
+[Tin nhắn mở đầu, 150-300 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại". KHÔNG BAO GIỜ viết thay {{user}}]
 
-### FIELD GUIDE
-- name: Keep original if well-known, otherwise Vietnamese translation.
-- description (300-500 words): Appearance/backstory (Type A) or world lore/rules (Type B). Multi-character: use '--- [Name] ---' sections.
-- personality: Psychology/traits (Type A) or atmosphere/vibe (Type B). Include hidden flaws and reactions to {{user}}.
-- scenario: Opening scene, 3-5 sentences.
-- first_mes (150-300 words): Immersive opening. (Thought) → *Action* → "Dialogue". Interact with {{user}}. NEVER speak for {{user}}.
-- mes_example: <START> format. {{user}} sample + {{char}} response showing personality.
-- system_prompt: "Bạn là {{char}}. [personality]. Luôn giữ vai trò. Không viết thay {{user}}."
-- post_history_instructions: MUST include ALL 5 directives (combine into one paragraph):
-  1. Giữ format: (Suy nghĩ) *Hành động* \\"Lời thoại\\". Tối đa 1-3 thành phần mỗi phản hồi.
+## MẪU HỘI THOẠI
+[1-2 lượt hội thoại mẫu, dùng định dạng <START>]
+
+## THẾ GIỚI (nếu là thể loại RPG/World)
+[Lore thế giới, NPC, cơ chế game]
+
+QUY TẮC:
+1. Tất cả nội dung bằng tiếng Việt tự nhiên, giàu hình ảnh.
+2. Chi tiết tối đa. Không tóm tắt. Sáng tạo tự do.
+3. Dùng {{char}} cho nhân vật và {{user}} cho người chơi.
+4. KHÔNG BAO GIỜ viết hành động, suy nghĩ, hoặc lời thoại thay {{user}}.
+5. Không kiểm duyệt. Bao gồm cả chủ đề đen/tối nếu phù hợp.
+6. Phần tính cách phải lộ ra chiều sâu: động cơ ẩn, nỗi sợ, mâu thuẫn.`;
+
+/** Step 1 (Clone): Card Cloner — preserves source, expands, fixes POV */
+const CLONE_BRAINSTORM_PROMPT = `Bạn là "VietRP Card Cloner AI", chuyên chuyển đổi văn bản thô (wiki, forum, fandom, Character.AI, Chub.ai) thành hồ sơ nhân vật chi tiết.
+
+Nhiệm vụ: Đọc văn bản nguồn và tạo hồ sơ nhân vật tự do (KHÔNG JSON) bằng tiếng Việt.
+
+ĐỊNH DẠNG ĐẦU RA: Sử dụng các tiêu đề sau:
+
+## TÊN NHÂN VẬT
+[Tên trích xuất hoặc suy luận]
+
+## NGOẠI HÌNH
+[Mô tả ngoại hình chi tiết — mở rộng nếu nguồn quá ngắn]
+
+## TÍNH CÁCH VÀ TÂM LÝ
+[Tính cách, nhược điểm, mối quan hệ với {{user}}]
+
+## TIỂU SỬ VÀ BỐI CẢNH
+[Quá khứ, lore thế giới — tổng hợp và mở rộng]
+
+## CẢNH MỞ ĐẦU
+[Bối cảnh mở đầu]
+
+## LỜI CHÀO ĐẦU
+[Tin nhắn mở đầu, 200-400 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại"]
+
+## MẪU HỘI THOẠI
+[1-2 lượt hội thoại mẫu <START>]
+
+## THẾ GIỚI (nếu có)
+[Lore, NPC]
+
+QUY TẮC QUAN TRỌNG:
+1. GIỮ NGUYÊN tất cả chi tiết từ nguồn. Mở rộng nếu quá ngắn.
+2. Dịch sang tiếng Việt tự nhiên, giữ nguyên tone (dark, NSFW, romance, v.v.).
+3. SỬA LỖI POV: Tuyệt đối KHÔNG viết thay {{user}}. Viết ở ngôi thứ 3 giới hạn hoặc ngôi thứ 1 (của {{char}}).
+4. Dùng {{char}} cho nhân vật, {{user}} cho người chơi.
+5. Không kiểm duyệt. Giữ nguyên chủ đề NSFW/tối nếu có trong nguồn.`;
+
+/** Step 2 (shared): JSON Formatter — strict chara_card_v2 output */
+const FORMAT_PROMPT = `Bạn là một trình tạo JSON chính xác. Nhiệm vụ duy nhất là chuyển đổi hồ sơ nhân vật thành JSON chara_card_v2 hợp lệ.
+
+Chỉ xuất JSON thuần bắt đầu bằng { và kết thúc bằng }. Không markdown, không giải thích.
+
+JSON phải có cấu trúc chính xác:
+{
+  "spec": "chara_card_v2",
+  "spec_version": "2.0",
+  "data": {
+    "name": "...",
+    "description": "...",
+    "personality": "...",
+    "scenario": "...",
+    "first_mes": "...",
+    "mes_example": "...",
+    "system_prompt": "...",
+    "post_history_instructions": "...",
+    "alternate_greetings": ["..."],
+    "character_book": [],
+    "tags": ["..."],
+    "creator": "VietRP Charagen AI",
+    "creator_notes": "Generated dynamically by VietRP Charagen AI.",
+    "character_version": "1.0",
+    "extensions": {}
+  }
+}
+
+ÁNH XẠ TRƯỜNG từ hồ sơ:
+- "name": Từ section TÊN NHÂN VẬT.
+- "description": Gộp NGOẠI HÌNH + TIỂU SỬ VÀ BỐI CẢNH (300-500 từ).
+- "personality": Từ TÍNH CÁCH VÀ TÂM LÝ.
+- "scenario": Từ CẢNH MỞ ĐẦU.
+- "first_mes": Từ LỜI CHÀO ĐẦU. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại". KHÔNG viết thay {{user}}.
+- "mes_example": Từ MẪU HỘI THOẠI. Dùng định dạng <START>.
+- "system_prompt": "Bạn là {{char}}. [tóm tắt tính cách]. Luôn giữ vai trò. Không bao giờ viết thay {{user}}. Phản hồi tự nhiên, bám sát tính cách."
+- "post_history_instructions": PHẢI bao gồm ĐẦY ĐỦ 5 chỉ dẫn (gộp thành 1 đoạn):
+  1. Giữ format: (Suy nghĩ) *Hành động* "Lời thoại". Tối đa 1-3 thành phần mỗi phản hồi.
   2. Giữ vững tính cách và vai trò của {{char}}. Không bao giờ hành động, suy nghĩ, hoặc nói thay {{user}}.
   3. Quan sát giọng văn và phong cách viết của {{user}}. Tự động điều chỉnh nhưng LUÔN giữ giọng riêng của {{char}}.
   4. Phản ánh đúng cảm xúc của {{char}} trước hành động {{user}} — tự nhiên và nhất quán.
   5. Đẩy câu chuyện tiến triển. Mỗi phản hồi mở ra tình huống mới — không lặp lại.
-- tags: 5-10 relevant tags.
-- alternate_greetings: 2-3 alternative openings (different scenarios/tones from source).
-- character_book: For Type B, 2-3 lorebook entries with "keys" and "content". For Type A, use [].
+- "tags": 5-10 tag liên quan.
+- "alternate_greetings": 2-3 lời chào thay thế (bối cảnh/tone khác nhau).
+- "character_book": [] (trừ khi là thế giới multi-character, tạo 2-3 entries).
+- Cố định: "creator": "VietRP Charagen AI", "character_version": "1.0", "spec": "chara_card_v2", "spec_version": "2.0".
 
-### VERIFY BEFORE OUTPUT
-- All fields non-empty (except character_book which may be [])
-- JSON valid (all quotes escaped, no trailing commas)
-- No text written as {{user}}
-- alternate_greetings has at least 1 entry
-`;
+QUY TẮC JSON NGHIÊM NGẶT:
+- Chuỗi phải escape đúng (\\n cho newline, \\" cho dấu nháy trong).
+- Không có dấu phẩy thừa.
+- Tất cả nội dung sáng tạo bằng tiếng Việt.
+- alternate_greetings phải có ít nhất 1 mục.`;
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
@@ -170,9 +215,10 @@ const AdminCharGenPage = () => {
   // Chat state
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
+  const [phase, setPhase] = useState<CharGenPhase>("idle");
   const [cloneMode, setCloneMode] = useState(false);
-  const [streamBuffer, setStreamBuffer] = useState("");
+  const [draftProfile, setDraftProfile] = useState("");
+  const [skipBrainstorm, setSkipBrainstorm] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -335,12 +381,12 @@ const AdminCharGenPage = () => {
   // Scroll to bottom on new messages
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamBuffer]);
+  }, [messages, phase]);
 
-  /* ---------- Send message to LLM ---------- */
+  /* ---------- Send message to LLM (2-step pipeline) ---------- */
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if (!text || phase !== "idle") return;
 
     if (!getApiKeyForProvider(activeProvider)) {
       const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
@@ -352,67 +398,47 @@ const AdminCharGenPage = () => {
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
-    setStreaming(true);
-    setStreamBuffer("");
 
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Build messages payload with system prompt (clone mode uses a different prompt)
-    const systemPrompt = cloneMode ? CHAR_CLONE_SYSTEM_PROMPT : CHAR_GEN_SYSTEM_PROMPT;
-    const apiMessages = [
-      { role: "system" as const, content: systemPrompt },
-      ...newMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    ];
+    const brainstormPrompt = cloneMode ? CLONE_BRAINSTORM_PROMPT : GEN_BRAINSTORM_PROMPT;
 
-    let fullResponse = "";
-
-    const callbacks: StreamCallbacks = {
-      onDelta: (delta) => {
-        fullResponse += delta;
-        setStreamBuffer(fullResponse);
+    await runCharGenPipeline(
+      {
+        userMessages: newMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        brainstormSystemPrompt: brainstormPrompt,
+        formatSystemPrompt: FORMAT_PROMPT,
+        provider: activeProvider,
+        signal: controller.signal,
+        skipBrainstorm: cloneMode && skipBrainstorm,
       },
-      onDone: () => {
-        const assistantMsg: ChatMsg = { role: "assistant", content: fullResponse };
-        setMessages((prev) => [...prev, assistantMsg]);
-        setStreamBuffer("");
-        setStreaming(false);
-
-        // Try to extract card
-        const card = extractCardJson(fullResponse);
-        if (card) {
+      {
+        onPhaseChange: setPhase,
+        onDraftReady: (draft) => {
+          setDraftProfile(draft);
+          setMessages((prev) => [...prev, { role: "assistant", content: draft }]);
+        },
+        onSuccess: (card) => {
           setGeneratedCard(card);
           setRenameFrom(card.data.name);
           setReviewOpen(true);
           toast.success(`Đã tạo card: ${card.data.name}`, { description: "Đang mở panel duyệt card." });
-        }
-        // Auto-refresh history cache
-        fetchHistory();
+          fetchHistory();
+        },
+        onError: (error, failedStep) => {
+          toast.error(error);
+          if (failedStep === "formatting") {
+            toast.info("Bạn có thể thử lại bước định dạng.");
+          }
+        },
       },
-      onError: (error) => {
-        toast.error(error);
-        setStreaming(false);
-        setStreamBuffer("");
-      },
-    };
-
-    await streamChat(apiMessages, callbacks, controller.signal, 16384, activeProvider);
-  }, [input, streaming, messages, cloneMode, fetchHistory, user, activeProvider]);
+    );
+  }, [input, phase, messages, cloneMode, skipBrainstorm, fetchHistory, user, activeProvider]);
 
   const handleStop = () => {
     abortRef.current?.abort();
-    if (streamBuffer) {
-      setMessages((prev) => [...prev, { role: "assistant", content: streamBuffer }]);
-      const card = extractCardJson(streamBuffer);
-      if (card) {
-        setGeneratedCard(card);
-        setRenameFrom(card.data.name);
-        setReviewOpen(true);
-        toast.success(`Đã tạo card: ${card.data.name}`, { description: "Đang mở panel duyệt card." });
-      }
-    }
-    setStreamBuffer("");
-    setStreaming(false);
+    setPhase("idle");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -542,7 +568,9 @@ const AdminCharGenPage = () => {
   /* ---------- Reset all ---------- */
   const handleReset = () => {
     setMessages([]);
-    setStreamBuffer("");
+    setPhase("idle");
+    setDraftProfile("");
+    setSkipBrainstorm(false);
     setGeneratedCard(null);
     setRenameFrom("");
     setReviewOpen(false);
@@ -937,7 +965,7 @@ const AdminCharGenPage = () => {
                     toast.info("Clone Mode tắt");
                   }
                 }}
-                disabled={streaming}
+                disabled={phase !== "idle"}
                 className={`p-2 transition-all ${
                   cloneMode
                     ? "text-neon-rose drop-shadow-[0_0_6px_rgba(255,38,100,0.4)]"
@@ -951,6 +979,27 @@ const AdminCharGenPage = () => {
               {cloneMode ? "Tắt Clone Mode" : "Clone Mode — Dán text từ web"}
             </TooltipContent>
           </Tooltip>
+          {/* Skip Brainstorm toggle — only visible in clone mode */}
+          {cloneMode && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setSkipBrainstorm(!skipBrainstorm)}
+                  disabled={phase !== "idle"}
+                  className={`px-2 py-1 text-[11px] rounded-lg font-medium transition-all border ${
+                    skipBrainstorm
+                      ? "bg-neon-blue/15 border-neon-blue/40 text-neon-blue"
+                      : "bg-oled-elevated border-gray-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {skipBrainstorm ? "Skip Brainstorm" : "Brainstorm"}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
+                {skipBrainstorm ? "Bỏ brainstorm → chuyển thẳng sang JSON" : "Brainstorm trước khi tạo JSON"}
+              </TooltipContent>
+            </Tooltip>
+          )}
           {/* History */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1059,7 +1108,7 @@ const AdminCharGenPage = () => {
           {/* Messages scroll area */}
           <div className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">
             {/* Empty state */}
-            {messages.length === 0 && !streamBuffer && (
+            {messages.length === 0 && phase === "idle" && (
               <div className="flex flex-col items-center justify-center h-full gap-5 px-4">
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
@@ -1233,43 +1282,8 @@ const AdminCharGenPage = () => {
               ))}
             </AnimatePresence>
 
-            {/* Streaming bubble */}
-            {streamBuffer && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 px-4 md:px-6 justify-start"
-              >
-                <div className="flex-shrink-0 mt-1">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border animate-breathing ${
-                    cloneMode ? "bg-neon-rose/10 border-neon-rose/30 text-neon-rose" : "bg-neon-purple/10 border-neon-purple/30 text-neon-purple"
-                  }`}>
-                    <Bot size={14} />
-                  </div>
-                </div>
-                <div className="max-w-[80%] md:max-w-[70%]">
-                  <span className={`text-[11px] ml-1 mb-1 block font-medium ${cloneMode ? "text-neon-rose/70" : "text-neon-purple/70"}`}>
-                    {cloneMode ? "Clone AI" : "Card Generator"}
-                  </span>
-                  <div
-                    className="rounded-2xl px-4 py-3 bg-oled-surface text-foreground/90"
-                    style={{
-                      background: cloneMode
-                        ? "linear-gradient(135deg, rgba(255, 38, 100, 0.05) 0%, #0A0A0A 100%)"
-                        : "linear-gradient(135deg, rgba(176, 38, 255, 0.05) 0%, #0A0A0A 100%)",
-                    }}
-                  >
-                    <span className="whitespace-pre-wrap text-sm leading-relaxed">
-                      <RoleplayMessage text={streamBuffer} />
-                      <span className={`animate-blink font-mono ml-0.5 ${cloneMode ? "text-neon-rose" : "text-neon-purple"}`}>|</span>
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Streaming typing indicator */}
-            {streaming && !streamBuffer && (
+            {/* Phase-aware loading indicator */}
+            {phase === "brainstorming" && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1280,9 +1294,31 @@ const AdminCharGenPage = () => {
                 }`}>
                   <Bot size={14} />
                 </div>
-                <div className="bg-oled-surface rounded-2xl px-4 py-3 flex items-center gap-1">
-                  <span className={`text-sm font-mono ${cloneMode ? "text-neon-rose/80" : "text-neon-purple/80"}`}>đang tạo</span>
-                  <span className={`animate-blink font-mono text-sm ${cloneMode ? "text-neon-rose" : "text-neon-purple"}`}>|</span>
+                <div className="bg-oled-surface rounded-2xl px-4 py-3 flex items-center gap-2">
+                  <Loader2 size={14} className={`animate-spin ${cloneMode ? "text-neon-rose" : "text-neon-purple"}`} />
+                  <span className={`text-sm ${cloneMode ? "text-neon-rose/80" : "text-neon-purple/80"}`}>
+                    {cloneMode ? "Đang phân tích mô tả nhân vật..." : "Đang phác thảo tâm lý và tiểu sử nhân vật..."}
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {phase === "formatting" && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-3 px-4 md:px-6"
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border animate-breathing ${
+                  cloneMode ? "bg-neon-rose/10 border-neon-rose/30 text-neon-rose" : "bg-neon-purple/10 border-neon-purple/30 text-neon-purple"
+                }`}>
+                  <Bot size={14} />
+                </div>
+                <div className="bg-oled-surface rounded-2xl px-4 py-3 flex items-center gap-2">
+                  <Loader2 size={14} className={`animate-spin ${cloneMode ? "text-neon-rose" : "text-neon-purple"}`} />
+                  <span className={`text-sm ${cloneMode ? "text-neon-rose/80" : "text-neon-purple/80"}`}>
+                    Đang đóng gói dữ liệu thẻ (JSON)...
+                  </span>
                 </div>
               </motion.div>
             )}
@@ -1402,7 +1438,7 @@ const AdminCharGenPage = () => {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={cloneMode ? "Dán mô tả nhân vật từ website, wiki, forum..." : "Mô tả ý tưởng nhân vật..."}
-                  disabled={streaming}
+                  disabled={phase !== "idle"}
                   rows={1}
                   className="flex-1 bg-transparent text-foreground text-base md:text-sm resize-none outline-none placeholder:text-muted-foreground py-1.5 scrollbar-thin"
                   style={{ minHeight: "40px", maxHeight: "160px" }}
@@ -1413,7 +1449,7 @@ const AdminCharGenPage = () => {
                   }}
                 />
                 <div className="flex items-center gap-1 pb-0.5">
-                  {streaming ? (
+                  {phase !== "idle" ? (
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
