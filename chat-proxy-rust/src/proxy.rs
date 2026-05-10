@@ -102,6 +102,7 @@ pub async fn handle_chat(
     }
 
     // 6. Build OpenRouter request
+    let message_count = req.messages.len() as i32;
     let or_req = OpenRouterRequest {
         model: ctx.model_id.clone(),
         messages: req.messages,
@@ -146,7 +147,6 @@ pub async fn handle_chat(
     let credits_used = if use_credit { 1 } else { 0 };
     let tier_key = req.tier_key.clone();
     let model_id = ctx.model_id.clone();
-    let message_count = req.messages.len() as i32;
 
     tokio::spawn(async move {
         // Increment daily chat count
