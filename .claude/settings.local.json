@@ -30,7 +30,8 @@
       "Bash(tar -xzf /tmp/wasm-pack.tar.gz -C /tmp/)",
       "Read(//c/tmp/**)",
       "Bash(export PATH=\"$HOME/.cargo/bin:$PATH\")",
-      "Bash(wasm-pack build *)"
+      "Bash(wasm-pack build *)",
+      "Bash(git commit *)"
     ]
   }
 }

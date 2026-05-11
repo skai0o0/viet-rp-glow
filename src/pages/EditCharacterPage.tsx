@@ -185,11 +185,13 @@ const EditCharacterPage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      if (isAdmin) {
+      if (isAdmin || !isPublic) {
+        // Admin hoặc private card: cập nhật trực tiếp
         await updateCharacter(characterId, card, isPublic, undefined, avatarUrl);
         toast({ title: "Thành công!", description: "Đã cập nhật nhân vật." });
         navigate("/profile");
       } else {
+        // Public card từ user thường: gửi duyệt
         const payload: ApprovalPayload = {
           action: "card_edit",
           target_table: "characters",

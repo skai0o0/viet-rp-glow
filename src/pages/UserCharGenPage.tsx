@@ -424,13 +424,13 @@ const UserCharGenPage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      if (isAdmin) {
-        // Admin: publish directly
+      if (isAdmin || !isPublic) {
+        // Admin hoặc private card: publish trực tiếp
         const saved = await createCharacter(generatedCard, user.id, isPublic, undefined, avatarUrl);
-        toast.success(`Đã xuất bản: ${saved.name}`);
+        toast.success(isPublic ? `Đã xuất bản: ${saved.name}` : `Đã lưu: ${saved.name}`);
         navigate(`/character/${saved.id}`);
       } else {
-        // Regular user: submit to approval queue
+        // Public card từ user thường: gửi duyệt
         await createApproval(
           user.id,
           `Tạo nhân vật AI: ${generatedCard.data.name}`,
