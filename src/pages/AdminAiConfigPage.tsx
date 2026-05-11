@@ -186,7 +186,10 @@ const AdminAiConfigPage = () => {
       .from("model_tiers")
       .select("*")
       .order("sort_order", { ascending: true })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("model_tiers query failed (table may not exist):", error.message);
+        }
         setTiers((data ?? []) as DbModelTier[]);
         const edits: Record<string, string> = {};
         (data ?? []).forEach((t: any) => { edits[t.tier_key] = t.model_id; });

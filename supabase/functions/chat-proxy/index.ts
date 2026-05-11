@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return jsonError("Missing or invalid authorization header", 401);
+      return jsonError("Missing or invalid authorization header", 401, headers);
     }
 
     // Call 1: Auth (required — cannot be combined)
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
-      return jsonError("Invalid or expired token", 401);
+      return jsonError("Invalid or expired token", 401, headers);
     }
 
     const body = await req.json();
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     } = body;
 
     if (!tier_key || !messages?.length) {
-      return jsonError("Missing tier_key or messages", 400);
+      return jsonError("Missing tier_key or messages", 400, headers);
     }
 
     // Check if client already deducted a credit for this request
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
     if (ctxError) {
       console.error("prepare_chat_context failed:", ctxError);
-      return jsonError("Could not prepare chat context", 500);
+      return jsonError("Could not prepare chat context", 500, headers);
     }
 
     const isPrivileged = ctx.is_privileged as boolean;
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
 
     // Check tier errors
     if (tierResult.error === "tier_not_found") {
-      return jsonError("Tier không tồn tại", 400);
+      return jsonError("Tier không tồn tại", 400, headers);
     }
 
     if (tierResult.error === "tier_restricted") {
@@ -121,6 +121,7 @@ Deno.serve(async (req) => {
       return jsonError(
         "Không có API key nào khả dụng. Liên hệ admin.",
         500,
+        headers,
       );
     }
 
@@ -206,15 +207,16 @@ Deno.serve(async (req) => {
     return jsonError(
       err instanceof Error ? err.message : "Internal server error",
       500,
+      headers,
     );
   }
 });
 
-function jsonError(message: string, status: number) {
+function jsonError(message: string, status: number, corsHeaders?: Record<string, string>) {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: {
-      ...headers,
+      ...(corsHeaders ?? {}),
       "Content-Type": "application/json",
     },
   });

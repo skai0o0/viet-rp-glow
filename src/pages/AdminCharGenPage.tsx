@@ -530,7 +530,8 @@ const AdminCharGenPage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      if (isOp && !isAdmin) {
+      if (isOp && !isAdmin && isPublic) {
+        // Op xuất bản public card: cần Admin duyệt
         await createApproval(
           user.id,
           `Xuất bản nhân vật: ${generatedCard.data.name}`,
