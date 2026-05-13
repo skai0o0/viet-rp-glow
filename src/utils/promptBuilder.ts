@@ -7,6 +7,8 @@ import {
   getGlobalPromptTypeB,
   getGlobalPostHistoryTypeA,
   getGlobalPostHistoryTypeB,
+  getNsfwGatePrompt,
+  getNsfwJailbreakPrompt,
 } from "@/services/globalSettingsDb";
 import { getResponseStylePrompt } from "@/components/GenerationSettings";
 import { countTokens } from "@/utils/tokenizer";
@@ -52,7 +54,7 @@ const DEFAULT_MAX_CONTEXT_TOKENS = 8000;
 
 /**
  * Truncate messages array to fit within token budget.
- * Strategy: keep system prompt + last N messages that fit.
+ * Strategy: keep all system messages (layers 1-5) + last N user/assistant messages that fit.
  */
 export function truncateMessages(
   messages: OpenRouterMessage[],
@@ -66,15 +68,15 @@ export function truncateMessages(
 
   if (totalTokens <= maxTokens) return messages;
 
-  // Keep system message(s) from the front, truncate from chat history
+  // Separate system messages (preserving order) from chat messages
   const systemMessages: OpenRouterMessage[] = [];
-  const otherMessages: OpenRouterMessage[] = [];
+  const chatMessages: OpenRouterMessage[] = [];
 
   for (const msg of messages) {
-    if (msg.role === "system" && systemMessages.length === 0) {
+    if (msg.role === "system") {
       systemMessages.push(msg);
     } else {
-      otherMessages.push(msg);
+      chatMessages.push(msg);
     }
   }
 
@@ -82,23 +84,32 @@ export function truncateMessages(
   const systemBudget = Math.floor(maxTokens * 0.4);
   const chatBudget = maxTokens - systemBudget;
 
-  // Truncate system prompt if needed
-  const systemTokens = estimateTokens(systemMessages[0]?.content || "") + 4;
-  if (systemTokens > systemBudget && systemMessages[0]) {
-    const maxChars = systemBudget * 4;
-    systemMessages[0] = {
-      ...systemMessages[0],
-      content: systemMessages[0].content.slice(0, maxChars) + "\n[...truncated...]",
-    };
+  // Truncate system messages if they exceed budget — drop from the middle
+  // (keep Layer 1 at top and Layer 5 at bottom for primacy/recency)
+  let systemTokens = systemMessages.reduce((sum, m) => sum + estimateTokens(m.content) + 4, 0);
+  if (systemTokens > systemBudget) {
+    while (systemMessages.length > 2 && systemTokens > systemBudget) {
+      // Remove the second-to-last system message (middle of the prompt)
+      const removed = systemMessages.splice(systemMessages.length - 2, 1)[0];
+      systemTokens -= estimateTokens(removed.content) + 4;
+    }
+    // If still over budget, truncate the first system message
+    if (systemTokens > systemBudget && systemMessages[0]) {
+      const maxChars = systemBudget * 4;
+      systemMessages[0] = {
+        ...systemMessages[0],
+        content: systemMessages[0].content.slice(0, maxChars) + "\n[...truncated...]",
+      };
+    }
   }
 
-  // Keep last N messages that fit in chat budget
+  // Keep last N chat messages that fit in budget
   let usedTokens = 0;
   const kept: OpenRouterMessage[] = [];
-  for (let i = otherMessages.length - 1; i >= 0; i--) {
-    const msgTokens = estimateTokens(otherMessages[i].content) + 4;
+  for (let i = chatMessages.length - 1; i >= 0; i--) {
+    const msgTokens = estimateTokens(chatMessages[i].content) + 4;
     if (usedTokens + msgTokens > chatBudget) break;
-    kept.unshift(otherMessages[i]);
+    kept.unshift(chatMessages[i]);
     usedTokens += msgTokens;
   }
 
@@ -106,12 +117,14 @@ export function truncateMessages(
 }
 
 /**
- * Replace {{user}} and {{char}} macros in text
+ * Replace {{user}}, {{char}}, <user>, <char> macros in text
  */
 export function replaceMacros(text: string, charName: string, userName: string = "User"): string {
   return text
+    .replace(/\{\{char\}\}/gi, charName)
     .replace(/\{\{user\}\}/gi, userName)
-    .replace(/\{\{char\}\}/gi, charName);
+    .replace(/<char>/gi, charName)
+    .replace(/<user>/gi, userName);
 }
 
 /**
@@ -364,7 +377,14 @@ export function parseMesExample(mesExample: string, charName: string, userName: 
 }
 
 /**
- * Build the full messages array for OpenRouter API
+ * Build the full messages array for OpenRouter API.
+ *
+ * SillyTavern-style 5-layer architecture combating "Lost in the Middle":
+ *   Layer 1: System Core (global prompt + NSFW jailbreak if ON)
+ *   Layer 2: Character & User Context (character sheet, user persona, world info)
+ *   Layer 3: Dialogue Examples (mes_example as single system block)
+ *   Layer 4: Memory & Chat History (memory archive + chat history)
+ *   Layer 5: The Anchor (post-history + response style + NSFW gate if OFF + prefill)
  */
 export function buildMessages(
   character: CharacterCard,
@@ -373,64 +393,144 @@ export function buildMessages(
   scenarioOverride?: string,
   summary?: string,
   facts?: string[],
+  prefillText?: string,
 ): OpenRouterMessage[] {
   const persona = getCachedUserPersona();
   const resolvedUserName = userName || persona.displayName || "User";
-
-  // If scenarioOverride provided, use it instead of character.scenario
   const effectiveCharacter = scenarioOverride !== undefined
     ? { ...character, scenario: scenarioOverride }
     : character;
 
   const messages: OpenRouterMessage[] = [];
 
-  // 1. System prompt (pass chat history for lorebook scanning + memory)
-  messages.push({
-    role: "system",
-    content: buildSystemPrompt(effectiveCharacter, resolvedUserName, chatHistory, summary, facts),
-  });
+  // ═══ LAYER 1: SYSTEM CORE ═══
 
-  // 2. Example messages (if any)
-  if (effectiveCharacter.mes_example) {
-    const examples = parseMesExample(effectiveCharacter.mes_example, effectiveCharacter.name, userName);
-    messages.push(...examples);
+  // 1a. Global System Prompt (type-specific)
+  const cardType = detectCardType(effectiveCharacter);
+  const typePrompt = cardType === "type_b"
+    ? getGlobalPromptTypeB()
+    : getGlobalPromptTypeA();
+  const globalPrompt = typePrompt || getGlobalSystemPrompt();
+  if (globalPrompt) {
+    messages.push({ role: "system", content: globalPrompt });
   }
 
-  // 3. Chat history
-  for (const msg of chatHistory) {
+  // 1b. NSFW Jailbreak (injected at TOP when NSFW is ENABLED)
+  const nsfwEnabled = localStorage.getItem("vietrp_nsfw_mode") === "true";
+  if (nsfwEnabled) {
+    const jailbreak = getNsfwJailbreakPrompt();
+    if (jailbreak) messages.push({ role: "system", content: jailbreak });
+  }
+
+  // ═══ LAYER 2: CHARACTER & USER CONTEXT ═══
+
+  // 2a. Character Sheet (macro-replaced)
+  const charParts: string[] = [];
+  charParts.push(`[CHARACTER SHEET]`);
+  charParts.push(`Name: ${effectiveCharacter.name}`);
+  if (effectiveCharacter.description) {
+    charParts.push(`Description:\n${replaceMacros(effectiveCharacter.description, effectiveCharacter.name, resolvedUserName)}`);
+  }
+  if (effectiveCharacter.personality) {
+    charParts.push(`Personality:\n${replaceMacros(effectiveCharacter.personality, effectiveCharacter.name, resolvedUserName)}`);
+  }
+  if (effectiveCharacter.scenario) {
+    charParts.push(`Scenario:\n${replaceMacros(effectiveCharacter.scenario, effectiveCharacter.name, resolvedUserName)}`);
+  }
+  messages.push({ role: "system", content: charParts.join("\n\n") });
+
+  // 2b. User Persona
+  const userInfoParts: string[] = [];
+  const identityStr = buildIdentityString(persona.gender, persona.sexuality);
+  if (identityStr) userInfoParts.push(identityStr);
+  if (persona.userDescription) userInfoParts.push(persona.userDescription);
+  if (userInfoParts.length > 0) {
     messages.push({
-      role: msg.role,
-      content: msg.content,
+      role: "system",
+      content: `[USER PERSONA]\n${resolvedUserName}: ${userInfoParts.join(". ")}`,
     });
   }
 
-  // 4. Post-history instructions (type-specific + response style + NSFW gate)
-  const postCardType = detectCardType(effectiveCharacter);
-  const postHistoryInstructions = postCardType === "type_b"
-    ? getGlobalPostHistoryTypeB()
-    : getGlobalPostHistoryTypeA();
+  // 2c. World Info (all lorebook entries combined)
+  const lorebook = resolveLorebookEntries(effectiveCharacter.character_book, chatHistory);
+  const allWorldInfo = [...lorebook.beforeChar, ...lorebook.afterChar];
+  if (allWorldInfo.length > 0) {
+    messages.push({
+      role: "system",
+      content: `[WORLD INFO]\n${allWorldInfo.join("\n\n")}`,
+    });
+  }
+
+  // ═══ LAYER 3: DIALOGUE EXAMPLES ═══
+  if (effectiveCharacter.mes_example?.trim()) {
+    messages.push({
+      role: "system",
+      content: `[EXAMPLE DIALOGUE]\n${effectiveCharacter.mes_example}`,
+    });
+  }
+
+  // ═══ LAYER 4: MEMORY & CHAT HISTORY ═══
+
+  // 4a. Memory Archive (summary + facts)
+  const memoryParts: string[] = [];
+  if (summary) memoryParts.push(`Rolling Summary:\n${summary}`);
+  if (facts?.length) memoryParts.push(`Key Facts:\n${facts.map(f => `- ${f}`).join("\n")}`);
+  if (memoryParts.length > 0) {
+    messages.push({ role: "system", content: `[MEMORY ARCHIVE]\n${memoryParts.join("\n\n")}` });
+  }
+
+  // 4b. Chat History (sliding window — already truncated by caller)
+  for (const msg of chatHistory) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+
+  // ═══ LAYER 5: THE ANCHOR (RECENCY BIAS) ═══
+  //
+  // CRITICAL: Post-history instructions are NOT injected as a separate
+  // {"role":"system"} message.  Strict ChatML/Instruct models (Llama 3,
+  // Mistral, Qwen) expect the turn sequence to end with User -> Assistant.
+  // A dangling system message between the last user turn and the assistant
+  // prefill causes token stuttering / overlapping output.
+  //
+  // Fix: append the anchor text to the LAST user message's content,
+  // wrapped in a [System Note: ...] pseudo-tag.
 
   const postParts: string[] = [];
-
-  if (postHistoryInstructions) {
-    postParts.push(postHistoryInstructions);
-  }
+  const postHistoryInstructions = cardType === "type_b"
+    ? getGlobalPostHistoryTypeB()
+    : getGlobalPostHistoryTypeA();
+  if (postHistoryInstructions) postParts.push(postHistoryInstructions);
 
   const stylePrompt = getResponseStylePrompt();
-  if (stylePrompt) {
-    postParts.push(stylePrompt);
-  }
+  if (stylePrompt) postParts.push(stylePrompt);
 
-  // NSFW mode gate
-  const nsfwEnabled = localStorage.getItem("vietrp_nsfw_mode") === "true";
   if (!nsfwEnabled) {
-    postParts.push(
-      "[System Note: NSFW/Sexual/Violence/Gore content is strictly forbidden. Keep all responses safe for work. Fade to black for any intimate scenes.]"
-    );
+    const nsfwGate = getNsfwGatePrompt();
+    if (nsfwGate) postParts.push(nsfwGate);
   }
 
   if (postParts.length > 0) {
-    messages.push({ role: "system", content: postParts.join("\n") });
+    const anchorText = `\n\n[System Note: ${postParts.join("\n")}]`;
+    // Find the last user message in the messages array (search backwards)
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx !== -1) {
+      messages[lastUserIdx] = {
+        ...messages[lastUserIdx],
+        content: messages[lastUserIdx].content + anchorText,
+      };
+    } else {
+      // Fallback: no user message exists (e.g. empty chat with first_mes only)
+      messages.push({ role: "system", content: postParts.join("\n") });
+    }
+  }
+
+  // 5b. Assistant Prefill — MUST be the absolute last object in the array.
+  // Trim trailing whitespace to avoid confusing the model's token prediction.
+  if (prefillText) {
+    messages.push({ role: "assistant", content: prefillText.trimEnd() });
   }
 
   return messages;

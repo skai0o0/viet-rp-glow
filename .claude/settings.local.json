@@ -31,7 +31,11 @@
       "Read(//c/tmp/**)",
       "Bash(export PATH=\"$HOME/.cargo/bin:$PATH\")",
       "Bash(wasm-pack build *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__list_pages"
     ]
   }
 }

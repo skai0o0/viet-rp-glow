@@ -16,34 +16,10 @@ import {
   getSelectedTier, setSelectedTier, getModel, setModel,
   getActiveProvider, setActiveProvider, type Provider,
 } from "@/services/openRouter";
-import { getCachedSamplingParameters, DEFAULT_MAX_TOKENS } from "@/services/globalSettingsDb";
+import { getCachedSamplingParameters, DEFAULT_MAX_TOKENS, getCachedResponseStyles } from "@/services/globalSettingsDb";
 
 const STORAGE_KEY_MAX_TOKENS = "vietrp_max_tokens";
 const STORAGE_KEY_RESPONSE_STYLE = "vietrp_response_style";
-
-export const RESPONSE_STYLES: { value: string; label: string; prompt: string }[] = [
-  { value: "none", label: "Mặc định (không thêm)", prompt: "" },
-  {
-    value: "short",
-    label: "Trả lời ngắn gọn, thẳng chủ đề",
-    prompt: "[System Note: Write a short, direct response. Avoid unnecessary fluff or overly long descriptions.]",
-  },
-  {
-    value: "detailed",
-    label: "Trả lời sâu, mô tả kĩ càng",
-    prompt: "[System Note: Write a highly detailed response. Emphasize sensory details, deep internal thoughts, and elaborate physical actions.]",
-  },
-  {
-    value: "match_char",
-    label: "Trả lời theo tin nhắn đầu tiên của {{char}}",
-    prompt: "[System Note: Strictly match the tone, length, and formatting style of {{char}}'s first message.]",
-  },
-  {
-    value: "match_user",
-    label: "Trả lời theo tin nhắn đầu tiên của {{user}}",
-    prompt: "[System Note: Strictly match the tone, length, and formatting style of the user's first message.]",
-  },
-];
 
 export function getMaxTokens(): number {
   const stored = localStorage.getItem(STORAGE_KEY_MAX_TOKENS);
@@ -65,7 +41,7 @@ export function setResponseStyle(val: string) {
 
 export function getResponseStylePrompt(): string {
   const style = getResponseStyle();
-  return RESPONSE_STYLES.find((s) => s.value === style)?.prompt || "";
+  return getCachedResponseStyles().find((s) => s.value === style)?.prompt || "";
 }
 
 interface GenerationSettingsProps {
@@ -160,7 +136,7 @@ const GenerationSettings = ({
                 <SelectValue placeholder="Chọn phong cách" />
               </SelectTrigger>
               <SelectContent className="bg-oled-elevated border-gray-border">
-                {RESPONSE_STYLES.map((s) => (
+                {getCachedResponseStyles().map((s) => (
                   <SelectItem key={s.value} value={s.value} className="text-xs text-foreground focus:bg-muted">
                     {s.label}
                   </SelectItem>
