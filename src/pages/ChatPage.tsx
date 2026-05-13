@@ -442,6 +442,7 @@ const ChatPage = () => {
       let assistantContent = "";
 
       const allMessages = [...messagesRef.current, userMsg];
+      prefillRef.current = prefillText;
       const rawMessages = buildMessages(
         activeCharacter,
         allMessages.map((m) => ({ role: m.role, content: m.content })),
@@ -449,14 +450,9 @@ const ChatPage = () => {
         scenarioOverride,
         summary,
         facts,
+        prefillText,
       );
       const apiMessages = truncateMessages(rawMessages);
-
-      // Append assistant prefill at the end if provided
-      prefillRef.current = prefillText;
-      if (prefillText) {
-        apiMessages.push({ role: "assistant", content: prefillText });
-      }
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -590,12 +586,8 @@ const ChatPage = () => {
       scenarioOverride,
       summary,
       facts,
+      prefillRef.current,
     ));
-
-    // Reuse prefill from previous send if any
-    if (prefillRef.current) {
-      apiMessages.push({ role: "assistant", content: prefillRef.current });
-    }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -776,12 +768,8 @@ const ChatPage = () => {
         scenarioOverride,
         summary,
         facts,
+        prefillRef.current,
       ));
-
-      // Reuse prefill from previous send if any
-      if (prefillRef.current) {
-        apiMessages.push({ role: "assistant", content: prefillRef.current });
-      }
 
       const controller = new AbortController();
       abortRef.current = controller;

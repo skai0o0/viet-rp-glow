@@ -233,7 +233,7 @@ const EditCharacterPage = () => {
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
+      <div className="shrink-0 h-14 px-4 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
             <Pencil className="text-neon-blue" size={18} />

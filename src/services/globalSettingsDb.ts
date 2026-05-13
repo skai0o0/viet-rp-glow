@@ -122,6 +122,13 @@ export async function fetchAllPrompts(): Promise<void> {
     fetchGlobalPromptTypeB(),
     fetchGlobalPostHistoryTypeA(),
     fetchGlobalPostHistoryTypeB(),
+    fetchCharGenBrainstorm(),
+    fetchCharGenClone(),
+    fetchCharGenFormat(),
+    fetchMemoryArchivist(),
+    fetchNsfwGatePrompt(),
+    fetchNsfwJailbreakPrompt(),
+    fetchResponseStyles(),
   ]);
 }
 
@@ -517,4 +524,290 @@ export async function saveSamplingParameters(params: SamplingParameters): Promis
     if (error) throw error;
   }
   cachedSamplingParams = params;
+}
+
+// ─── Character Generation Prompts ─────────────────────────────
+
+const DEFAULT_CHAR_GEN_BRAINSTORM = `Bạn là "VietRP Creative Writer", một AI chuyên thiết kế nhân vật cho thể loại roleplay dựa trên văn bản.
+
+Nhiệm vụ: Nhận ý tưởng ngắn từ người dùng và mở rộng thành một hồ sơ nhân vật CHI TIẾT, viết hoàn toàn bằng tiếng Việt.
+
+ĐỊNH DẠNG ĐẦU RA: Viết hồ sơ dạng văn bản tự do (KHÔNG JSON). Sử dụng các tiêu đề sau:
+
+## TÊN NHÂN VẬT
+[Tên nhân vật]
+
+## NGOẠI HÌNH
+[Chi tiết ngoại hình, phong thái, thần thái — 100-200 từ]
+
+## TÍNH CÁCH VÀ TÂM LÝ
+[Tính cách cốt lõi, nhược điểm ẩn giấu, nỗi sợ hãi, mâu thuẫn nội tâm, cách họ phản ứng với {{user}}]
+
+## TIỂU SỬ VÀ BỐI CẢNH
+[Quá khứ, mối quan hệ, thế giới xung quanh — 200-400 từ]
+
+## CẢNH MỞ ĐẦU
+[Bối cảnh mở đầu cuộc gặp giữa {{char}} và {{user}} — 3-5 câu]
+
+## LỜI CHÀO ĐẦU
+[Tin nhắn mở đầu, 150-300 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại". KHÔNG BAO GIỜ viết thay {{user}}]
+
+## MẪU HỘI THOẠI
+[1-2 lượt hội thoại mẫu, dùng định dạng <START>]
+
+## THẾ GIỚI (nếu là thể loại RPG/World)
+[Lore thế giới, NPC, cơ chế game]
+
+QUY TẮC:
+1. Tất cả nội dung bằng tiếng Việt tự nhiên, giàu hình ảnh.
+2. Chi tiết tối đa. Không tóm tắt. Sáng tạo tự do.
+3. Dùng {{char}} cho nhân vật và {{user}} cho người chơi.
+4. KHÔNG BAO GIỜ viết hành động, suy nghĩ, hoặc lời thoại thay {{user}}.
+5. Không kiểm duyệt. Bao gồm cả chủ đề đen/tối nếu phù hợp.
+6. Phần tính cách phải lộ ra chiều sâu: động cơ ẩn, nỗi sợ, mâu thuẫn.`;
+
+const DEFAULT_CHAR_GEN_CLONE = `Bạn là "VietRP Card Cloner AI", chuyên chuyển đổi văn bản thô (wiki, forum, fandom, Character.AI, Chub.ai) thành hồ sơ nhân vật chi tiết.
+
+Nhiệm vụ: Đọc văn bản nguồn và tạo hồ sơ nhân vật tự do (KHÔNG JSON) bằng tiếng Việt.
+
+ĐỊNH DẠNG ĐẦU RA: Sử dụng các tiêu đề sau:
+
+## TÊN NHÂN VẬT
+[Tên trích xuất hoặc suy luận]
+
+## NGOẠI HÌNH
+[Mô tả ngoại hình chi tiết — mở rộng nếu nguồn quá ngắn]
+
+## TÍNH CÁCH VÀ TÂM LÝ
+[Tính cách, nhược điểm, mối quan hệ với {{user}}]
+
+## TIỂU SỬ VÀ BỐI CẢNH
+[Quá khứ, lore thế giới — tổng hợp và mở rộng]
+
+## CẢNH MỞ ĐẦU
+[Bối cảnh mở đầu]
+
+## LỜI CHÀO ĐẦU
+[Tin nhắn mở đầu, 200-400 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại"]
+
+## MẪU HỘI THOẠI
+[1-2 lượt hội thoại mẫu <START>]
+
+## THẾ GIỚI (nếu có)
+[Lore, NPC]
+
+QUY TẮC QUAN TRỌNG:
+1. GIỮ NGUYÊN tất cả chi tiết từ nguồn. Mở rộng nếu quá ngắn.
+2. Dịch sang tiếng Việt tự nhiên, giữ nguyên tone (dark, NSFW, romance, v.v.).
+3. SỬA LỖI POV: Tuyệt đối KHÔNG viết thay {{user}}. Viết ở ngôi thứ 3 giới hạn hoặc ngôi thứ 1 (của {{char}}).
+4. Dùng {{char}} cho nhân vật, {{user}} cho người chơi.
+5. Không kiểm duyệt. Giữ nguyên chủ đề NSFW/tối nếu có trong nguồn.`;
+
+const DEFAULT_CHAR_GEN_FORMAT = `Bạn là một trình tạo JSON chính xác. Nhiệm vụ duy nhất là chuyển đổi hồ sơ nhân vật thành JSON chara_card_v2 hợp lệ.
+
+Chỉ xuất JSON thuần bắt đầu bằng { và kết thúc bằng }. Không markdown, không giải thích.
+
+JSON phải có cấu trúc chính xác:
+{
+  "spec": "chara_card_v2",
+  "spec_version": "2.0",
+  "data": {
+    "name": "...",
+    "description": "...",
+    "personality": "...",
+    "scenario": "...",
+    "first_mes": "...",
+    "mes_example": "...",
+    "system_prompt": "...",
+    "post_history_instructions": "...",
+    "alternate_greetings": ["..."],
+    "character_book": [],
+    "tags": ["..."],
+    "creator": "VietRP Charagen AI",
+    "creator_notes": "Generated dynamically by VietRP Charagen AI.",
+    "character_version": "1.0",
+    "extensions": {}
+  }
+}
+
+ÁNH XẠ TRƯỜNG từ hồ sơ:
+- "name": Từ section TÊN NHÂN VẬT.
+- "description": Gộp NGOẠI HÌNH + TIỂU SỬ VÀ BỐI CẢNH (300-500 từ).
+- "personality": Từ TÍNH CÁCH VÀ TÂM LÝ.
+- "scenario": Từ CẢNH MỞ ĐẦU.
+- "first_mes": Từ LỜI CHÀO ĐẦU. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại". KHÔNG viết thay {{user}}.
+- "mes_example": Từ MẪU HỘI THOẠI. Dùng định dạng <START>.
+- "system_prompt": "Bạn là {{char}}. [tóm tắt tính cách]. Luôn giữ vai trò. Không bao giờ viết thay {{user}}. Phản hồi tự nhiên, bám sát tính cách."
+- "post_history_instructions": PHẢI bao gồm ĐẦY ĐỦ 5 chỉ dẫn (gộp thành 1 đoạn):
+  1. Giữ format: (Suy nghĩ) *Hành động* "Lời thoại". Tối đa 1-3 thành phần mỗi phản hồi.
+  2. Giữ vững tính cách và vai trò của {{char}}. Không bao giờ hành động, suy nghĩ, hoặc nói thay {{user}}.
+  3. Quan sát giọng văn và phong cách viết của {{user}}. Tự động điều chỉnh nhưng LUÔN giữ giọng riêng của {{char}}.
+  4. Phản ánh đúng cảm xúc của {{char}} trước hành động {{user}} — tự nhiên và nhất quán.
+  5. Đẩy câu chuyện tiến triển. Mỗi phản hồi mở ra tình huống mới — không lặp lại.
+- "tags": 5-10 tag liên quan.
+- "alternate_greetings": 2-3 lời chào thay thế (bối cảnh/tone khác nhau).
+- "character_book": [] (trừ khi là thế giới multi-character, tạo 2-3 entries).
+- Cố định: "creator": "VietRP Charagen AI", "character_version": "1.0", "spec": "chara_card_v2", "spec_version": "2.0".
+
+QUY TẮC JSON NGHIÊM NGẶT:
+- Chuỗi phải escape đúng (\\n cho newline, \\" cho dấu nháy trong).
+- Không có dấu phẩy thừa.
+- Tất cả nội dung sáng tạo bằng tiếng Việt.
+- alternate_greetings phải có ít nhất 1 mục.`;
+
+let cachedCharGenBrainstorm: string | null = null;
+let cachedCharGenClone: string | null = null;
+let cachedCharGenFormat: string | null = null;
+
+export async function fetchCharGenBrainstorm(): Promise<string> {
+  if (cachedCharGenBrainstorm !== null) return cachedCharGenBrainstorm;
+  const val = await fetchGlobalSetting("char_gen_brainstorm");
+  cachedCharGenBrainstorm = val || DEFAULT_CHAR_GEN_BRAINSTORM;
+  return cachedCharGenBrainstorm;
+}
+export function getCharGenBrainstorm(): string { return cachedCharGenBrainstorm ?? DEFAULT_CHAR_GEN_BRAINSTORM; }
+export async function saveCharGenBrainstorm(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_brainstorm", value);
+  cachedCharGenBrainstorm = value;
+}
+
+export async function fetchCharGenClone(): Promise<string> {
+  if (cachedCharGenClone !== null) return cachedCharGenClone;
+  const val = await fetchGlobalSetting("char_gen_clone");
+  cachedCharGenClone = val || DEFAULT_CHAR_GEN_CLONE;
+  return cachedCharGenClone;
+}
+export function getCharGenClone(): string { return cachedCharGenClone ?? DEFAULT_CHAR_GEN_CLONE; }
+export async function saveCharGenClone(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_clone", value);
+  cachedCharGenClone = value;
+}
+
+export async function fetchCharGenFormat(): Promise<string> {
+  if (cachedCharGenFormat !== null) return cachedCharGenFormat;
+  const val = await fetchGlobalSetting("char_gen_format");
+  cachedCharGenFormat = val || DEFAULT_CHAR_GEN_FORMAT;
+  return cachedCharGenFormat;
+}
+export function getCharGenFormat(): string { return cachedCharGenFormat ?? DEFAULT_CHAR_GEN_FORMAT; }
+export async function saveCharGenFormat(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_format", value);
+  cachedCharGenFormat = value;
+}
+
+// ─── Memory Archivist Prompt ──────────────────────────────────
+
+const DEFAULT_MEMORY_ARCHIVIST = `You are a Roleplay Memory Archivist. Your job is to read a roleplay log and create a highly compressed, factual, and chronological summary of the relationship and events.
+
+You MUST capture the following critical elements:
+1. RELATIONSHIP MILESTONES: Note specific shifts in intimacy (e.g., "they had their first kiss", "they had sex for the first time", "they confessed love", "User discovered Char's secret").
+2. PHYSICAL/EMOTIONAL BOUNDARIES: How comfortable are they with each other right now? (e.g., "Char is no longer shy about physical touch", "User is acting dominant", "They are currently hostile").
+3. KEY PLOT POINTS: What actually happened, locations visited, promises made, or items acquired.
+
+Format the output strictly as a bulleted list. Be concise but do not omit emotional tension or NSFW relationship developments.`;
+
+let cachedMemoryArchivist: string | null = null;
+
+export async function fetchMemoryArchivist(): Promise<string> {
+  if (cachedMemoryArchivist !== null) return cachedMemoryArchivist;
+  const val = await fetchGlobalSetting("memory_archivist");
+  cachedMemoryArchivist = val || DEFAULT_MEMORY_ARCHIVIST;
+  return cachedMemoryArchivist;
+}
+export function getMemoryArchivist(): string { return cachedMemoryArchivist ?? DEFAULT_MEMORY_ARCHIVIST; }
+export async function saveMemoryArchivist(value: string): Promise<void> {
+  await upsertGlobalSetting("memory_archivist", value);
+  cachedMemoryArchivist = value;
+}
+
+// ─── NSFW Gate Prompt ─────────────────────────────────────────
+
+const DEFAULT_NSFW_GATE_PROMPT = "[System Note: NSFW/Sexual/Violence/Gore content is strictly forbidden. Keep all responses safe for work. Fade to black for any intimate scenes.]";
+
+let cachedNsfwGatePrompt: string | null = null;
+
+export async function fetchNsfwGatePrompt(): Promise<string> {
+  if (cachedNsfwGatePrompt !== null) return cachedNsfwGatePrompt;
+  const val = await fetchGlobalSetting("nsfw_gate_prompt");
+  cachedNsfwGatePrompt = val || DEFAULT_NSFW_GATE_PROMPT;
+  return cachedNsfwGatePrompt;
+}
+export function getNsfwGatePrompt(): string { return cachedNsfwGatePrompt ?? DEFAULT_NSFW_GATE_PROMPT; }
+export async function saveNsfwGatePrompt(value: string): Promise<void> {
+  await upsertGlobalSetting("nsfw_gate_prompt", value);
+  cachedNsfwGatePrompt = value;
+}
+
+// ─── NSFW Jailbreak Prompt (injected at top when NSFW enabled) ─
+
+const DEFAULT_NSFW_JAILBREAK_PROMPT = "";
+
+let cachedNsfwJailbreakPrompt: string | null = null;
+
+export async function fetchNsfwJailbreakPrompt(): Promise<string> {
+  if (cachedNsfwJailbreakPrompt !== null) return cachedNsfwJailbreakPrompt;
+  const val = await fetchGlobalSetting("nsfw_jailbreak_prompt");
+  cachedNsfwJailbreakPrompt = val || DEFAULT_NSFW_JAILBREAK_PROMPT;
+  return cachedNsfwJailbreakPrompt;
+}
+export function getNsfwJailbreakPrompt(): string { return cachedNsfwJailbreakPrompt ?? DEFAULT_NSFW_JAILBREAK_PROMPT; }
+export async function saveNsfwJailbreakPrompt(value: string): Promise<void> {
+  await upsertGlobalSetting("nsfw_jailbreak_prompt", value);
+  cachedNsfwJailbreakPrompt = value;
+}
+
+// ─── Response Styles ──────────────────────────────────────────
+
+export interface ResponseStyle {
+  value: string;
+  label: string;
+  prompt: string;
+}
+
+const DEFAULT_RESPONSE_STYLES: ResponseStyle[] = [
+  { value: "none", label: "Mặc định (không thêm)", prompt: "" },
+  {
+    value: "short",
+    label: "Trả lời ngắn gọn, thẳng chủ đề",
+    prompt: "[System Note: Write a short, direct response. Avoid unnecessary fluff or overly long descriptions.]",
+  },
+  {
+    value: "detailed",
+    label: "Trả lời sâu, mô tả kĩ càng",
+    prompt: "[System Note: Write a highly detailed response. Emphasize sensory details, deep internal thoughts, and elaborate physical actions.]",
+  },
+  {
+    value: "match_char",
+    label: "Trả lời theo tin nhắn đầu tiên của {{char}}",
+    prompt: "[System Note: Strictly match the tone, length, and formatting style of {{char}}'s first message.]",
+  },
+  {
+    value: "match_user",
+    label: "Trả lời theo tin nhắn đầu tiên của {{user}}",
+    prompt: "[System Note: Strictly match the tone, length, and formatting style of the user's first message.]",
+  },
+];
+
+let cachedResponseStyles: ResponseStyle[] | null = null;
+
+export async function fetchResponseStyles(): Promise<ResponseStyle[]> {
+  if (cachedResponseStyles !== null) return cachedResponseStyles;
+  const val = await fetchGlobalSetting("response_styles");
+  if (val) {
+    try {
+      cachedResponseStyles = JSON.parse(val) as ResponseStyle[];
+    } catch {
+      cachedResponseStyles = DEFAULT_RESPONSE_STYLES;
+    }
+  } else {
+    cachedResponseStyles = DEFAULT_RESPONSE_STYLES;
+  }
+  return cachedResponseStyles;
+}
+export function getCachedResponseStyles(): ResponseStyle[] {
+  return cachedResponseStyles ?? DEFAULT_RESPONSE_STYLES;
+}
+export async function saveResponseStyles(styles: ResponseStyle[]): Promise<void> {
+  await upsertGlobalSetting("response_styles", JSON.stringify(styles));
+  cachedResponseStyles = styles;
 }

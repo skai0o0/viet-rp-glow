@@ -26,6 +26,7 @@ import {
 } from "./chatMemoryDb";
 import { updateSessionRollingSummary } from "./chatDb";
 import { supabase } from "@/integrations/supabase/client";
+import { getMemoryArchivist } from "./globalSettingsDb";
 import {
   getApiKeyForProvider,
   getActiveProvider,
@@ -43,17 +44,6 @@ const USER_MESSAGE_THRESHOLD = 10;
  * The AI still has these in its direct context, so summarising them is wasteful.
  */
 const RECENT_KEPT = 5;
-
-// ── Archivist Prompt (the heart of the RP memory system) ────────────────────
-
-const ARCHIVIST_PROMPT = `You are a Roleplay Memory Archivist. Your job is to read a roleplay log and create a highly compressed, factual, and chronological summary of the relationship and events.
-
-You MUST capture the following critical elements:
-1. RELATIONSHIP MILESTONES: Note specific shifts in intimacy (e.g., "they had their first kiss", "they had sex for the first time", "they confessed love", "User discovered Char's secret").
-2. PHYSICAL/EMOTIONAL BOUNDARIES: How comfortable are they with each other right now? (e.g., "Char is no longer shy about physical touch", "User is acting dominant", "They are currently hostile").
-3. KEY PLOT POINTS: What actually happened, locations visited, promises made, or items acquired.
-
-Format the output strictly as a bulleted list. Be concise but do not omit emotional tension or NSFW relationship developments.`;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -176,7 +166,7 @@ export async function forceGenerateSummary(
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: ARCHIVIST_PROMPT },
+        { role: "system", content: getMemoryArchivist() },
         { role: "user", content: userPrompt },
       ],
       stream: false,
@@ -312,7 +302,7 @@ async function callSummarizeAPI(userPrompt: string): Promise<string | null> {
     },
     body: JSON.stringify({
       prompt: userPrompt,
-      systemPrompt: ARCHIVIST_PROMPT,
+      systemPrompt: getMemoryArchivist(),
     }),
   });
 

@@ -51,138 +51,7 @@ import { runCharGenPipeline, type CharGenPhase } from "@/services/charGenService
 import { TavernCardV2, TavernCardV2Data } from "@/types/taverncard";
 import { createApproval } from "@/services/approvalService";
 import CharGenAssistant from "@/components/CharGenAssistant";
-
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-/** Step 1 (Gen): Creative Writer — free-form character profile */
-const GEN_BRAINSTORM_PROMPT = `Bạn là "VietRP Creative Writer", một AI chuyên thiết kế nhân vật cho thể loại roleplay dựa trên văn bản.
-
-Nhiệm vụ: Nhận ý tưởng ngắn từ người dùng và mở rộng thành một hồ sơ nhân vật CHI TIẾT, viết hoàn toàn bằng tiếng Việt.
-
-ĐỊNH DẠNG ĐẦU RA: Viết hồ sơ dạng văn bản tự do (KHÔNG JSON). Sử dụng các tiêu đề sau:
-
-## TÊN NHÂN VẬT
-[Tên nhân vật]
-
-## NGOẠI HÌNH
-[Chi tiết ngoại hình, phong thái, thần thái — 100-200 từ]
-
-## TÍNH CÁCH VÀ TÂM LÝ
-[Tính cách cốt lõi, nhược điểm ẩn giấu, nỗi sợ hãi, mâu thuẫn nội tâm, cách họ phản ứng với {{user}}]
-
-## TIỂU SỬ VÀ BỐI CẢNH
-[Quá khứ, mối quan hệ, thế giới xung quanh — 200-400 từ]
-
-## CẢNH MỞ ĐẦU
-[Bối cảnh mở đầu cuộc gặp giữa {{char}} và {{user}} — 3-5 câu]
-
-## LỜI CHÀO ĐẦU
-[Tin nhắn mở đầu, 150-300 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại". KHÔNG BAO GIỜ viết thay {{user}}]
-
-## MẪU HỘI THOẠI
-[1-2 lượt hội thoại mẫu, dùng định dạng <START>]
-
-## THẾ GIỚI (nếu là thể loại RPG/World)
-[Lore thế giới, NPC, cơ chế game]
-
-QUY TẮC:
-1. Tất cả nội dung bằng tiếng Việt tự nhiên, giàu hình ảnh.
-2. Chi tiết tối đa. Không tóm tắt. Sáng tạo tự do.
-3. Dùng {{char}} cho nhân vật và {{user}} cho người chơi.
-4. KHÔNG BAO GIỜ viết hành động, suy nghĩ, hoặc lời thoại thay {{user}}.
-5. Không kiểm duyệt. Bao gồm cả chủ đề đen/tối nếu phù hợp.
-6. Phần tính cách phải lộ ra chiều sâu: động cơ ẩn, nỗi sợ, mâu thuẫn.`;
-
-/** Step 1 (Clone): Card Cloner — preserves source, expands, fixes POV */
-const CLONE_BRAINSTORM_PROMPT = `Bạn là "VietRP Card Cloner AI", chuyên chuyển đổi văn bản thô (wiki, forum, fandom, Character.AI, Chub.ai) thành hồ sơ nhân vật chi tiết.
-
-Nhiệm vụ: Đọc văn bản nguồn và tạo hồ sơ nhân vật tự do (KHÔNG JSON) bằng tiếng Việt.
-
-ĐỊNH DẠNG ĐẦU RA: Sử dụng các tiêu đề sau:
-
-## TÊN NHÂN VẬT
-[Tên trích xuất hoặc suy luận]
-
-## NGOẠI HÌNH
-[Mô tả ngoại hình chi tiết — mở rộng nếu nguồn quá ngắn]
-
-## TÍNH CÁCH VÀ TÂM LÝ
-[Tính cách, nhược điểm, mối quan hệ với {{user}}]
-
-## TIỂU SỬ VÀ BỐI CẢNH
-[Quá khứ, lore thế giới — tổng hợp và mở rộng]
-
-## CẢNH MỞ ĐẦU
-[Bối cảnh mở đầu]
-
-## LỜI CHÀO ĐẦU
-[Tin nhắn mở đầu, 200-400 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại"]
-
-## MẪU HỘI THOẠI
-[1-2 lượt hội thoại mẫu <START>]
-
-## THẾ GIỚI (nếu có)
-[Lore, NPC]
-
-QUY TẮC QUAN TRỌNG:
-1. GIỮ NGUYÊN tất cả chi tiết từ nguồn. Mở rộng nếu quá ngắn.
-2. Dịch sang tiếng Việt tự nhiên, giữ nguyên tone (dark, NSFW, romance, v.v.).
-3. SỬA LỖI POV: Tuyệt đối KHÔNG viết thay {{user}}. Viết ở ngôi thứ 3 giới hạn hoặc ngôi thứ 1 (của {{char}}).
-4. Dùng {{char}} cho nhân vật, {{user}} cho người chơi.
-5. Không kiểm duyệt. Giữ nguyên chủ đề NSFW/tối nếu có trong nguồn.`;
-
-/** Step 2 (shared): JSON Formatter — strict chara_card_v2 output */
-const FORMAT_PROMPT = `Bạn là một trình tạo JSON chính xác. Nhiệm vụ duy nhất là chuyển đổi hồ sơ nhân vật thành JSON chara_card_v2 hợp lệ.
-
-Chỉ xuất JSON thuần bắt đầu bằng { và kết thúc bằng }. Không markdown, không giải thích.
-
-JSON phải có cấu trúc chính xác:
-{
-  "spec": "chara_card_v2",
-  "spec_version": "2.0",
-  "data": {
-    "name": "...",
-    "description": "...",
-    "personality": "...",
-    "scenario": "...",
-    "first_mes": "...",
-    "mes_example": "...",
-    "system_prompt": "...",
-    "post_history_instructions": "...",
-    "alternate_greetings": ["..."],
-    "character_book": [],
-    "tags": ["..."],
-    "creator": "VietRP Charagen AI",
-    "creator_notes": "Generated dynamically by VietRP Charagen AI.",
-    "character_version": "1.0",
-    "extensions": {}
-  }
-}
-
-ÁNH XẠ TRƯỜNG từ hồ sơ:
-- "name": Từ section TÊN NHÂN VẬT.
-- "description": Gộp NGOẠI HÌNH + TIỂU SỬ VÀ BỐI CẢNH (300-500 từ).
-- "personality": Từ TÍNH CÁCH VÀ TÂM LÝ.
-- "scenario": Từ CẢNH MỞ ĐẦU.
-- "first_mes": Từ LỜI CHÀO ĐẦU. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại". KHÔNG viết thay {{user}}.
-- "mes_example": Từ MẪU HỘI THOẠI. Dùng định dạng <START>.
-- "system_prompt": "Bạn là {{char}}. [tóm tắt tính cách]. Luôn giữ vai trò. Không bao giờ viết thay {{user}}. Phản hồi tự nhiên, bám sát tính cách."
-- "post_history_instructions": PHẢI bao gồm ĐẦY ĐỦ 5 chỉ dẫn (gộp thành 1 đoạn):
-  1. Giữ format: (Suy nghĩ) *Hành động* "Lời thoại". Tối đa 1-3 thành phần mỗi phản hồi.
-  2. Giữ vững tính cách và vai trò của {{char}}. Không bao giờ hành động, suy nghĩ, hoặc nói thay {{user}}.
-  3. Quan sát giọng văn và phong cách viết của {{user}}. Tự động điều chỉnh nhưng LUÔN giữ giọng riêng của {{char}}.
-  4. Phản ánh đúng cảm xúc của {{char}} trước hành động {{user}} — tự nhiên và nhất quán.
-  5. Đẩy câu chuyện tiến triển. Mỗi phản hồi mở ra tình huống mới — không lặp lại.
-- "tags": 5-10 tag liên quan.
-- "alternate_greetings": 2-3 lời chào thay thế (bối cảnh/tone khác nhau).
-- "character_book": [] (trừ khi là thế giới multi-character, tạo 2-3 entries).
-- Cố định: "creator": "VietRP Charagen AI", "character_version": "1.0", "spec": "chara_card_v2", "spec_version": "2.0".
-
-QUY TẮC JSON NGHIÊM NGẶT:
-- Chuỗi phải escape đúng (\\n cho newline, \\" cho dấu nháy trong).
-- Không có dấu phẩy thừa.
-- Tất cả nội dung sáng tạo bằng tiếng Việt.`;
+import { getCharGenBrainstorm, getCharGenClone, getCharGenFormat } from "@/services/globalSettingsDb";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
@@ -297,13 +166,13 @@ const UserCharGenPage = () => {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const brainstormPrompt = cloneMode ? CLONE_BRAINSTORM_PROMPT : GEN_BRAINSTORM_PROMPT;
+    const brainstormPrompt = cloneMode ? getCharGenClone() : getCharGenBrainstorm();
 
     await runCharGenPipeline(
       {
         userMessages: newMessages,
         brainstormSystemPrompt: brainstormPrompt,
-        formatSystemPrompt: FORMAT_PROMPT,
+        formatSystemPrompt: getCharGenFormat(),
         provider: activeProvider,
         signal: controller.signal,
         skipBrainstorm: cloneMode && skipBrainstorm,
@@ -737,11 +606,11 @@ const UserCharGenPage = () => {
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
       {/* ═══════ Header ═══════ */}
-      <div className="shrink-0 flex items-center bg-oled-base border-b border-gray-border">
+      <div className="shrink-0 h-14 flex items-center bg-oled-base border-b border-gray-border">
         <Link to="/create" className="p-3 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft size={20} />
         </Link>
-        <div className="flex items-center gap-2.5 flex-1 min-w-0 py-2">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
             cloneMode
               ? "bg-gradient-to-br from-neon-rose to-orange-500"

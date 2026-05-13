@@ -28,6 +28,7 @@ import {
   ToggleRight,
   Terminal,
   Wand2,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,21 @@ import {
   saveGlobalPostHistoryTypeA,
   fetchGlobalPostHistoryTypeB,
   saveGlobalPostHistoryTypeB,
+  fetchCharGenBrainstorm,
+  saveCharGenBrainstorm,
+  fetchCharGenClone,
+  saveCharGenClone,
+  fetchCharGenFormat,
+  saveCharGenFormat,
+  fetchMemoryArchivist,
+  saveMemoryArchivist,
+  fetchNsfwGatePrompt,
+  saveNsfwGatePrompt,
+  fetchNsfwJailbreakPrompt,
+  saveNsfwJailbreakPrompt,
+  fetchResponseStyles,
+  saveResponseStyles,
+  type ResponseStyle,
 } from "@/services/globalSettingsDb";
 import { createApproval } from "@/services/approvalService";
 import {
@@ -177,6 +193,26 @@ const AdminAiConfigPage = () => {
   });
   const [savingSamplingParams, setSavingSamplingParams] = useState(false);
 
+  // Character Generation Prompts
+  const [charGenBrainstorm, setCharGenBrainstorm] = useState("");
+  const [savingCharGenBrainstorm, setSavingCharGenBrainstorm] = useState(false);
+  const [charGenClone, setCharGenClone] = useState("");
+  const [savingCharGenClone, setSavingCharGenClone] = useState(false);
+  const [charGenFormat, setCharGenFormat] = useState("");
+  const [savingCharGenFormat, setSavingCharGenFormat] = useState(false);
+
+  // Memory & NSFW Gate
+  const [memoryArchivist, setMemoryArchivist] = useState("");
+  const [savingMemoryArchivist, setSavingMemoryArchivist] = useState(false);
+  const [nsfwGatePrompt, setNsfwGatePrompt] = useState("");
+  const [savingNsfwGatePrompt, setSavingNsfwGatePrompt] = useState(false);
+  const [nsfwJailbreakPrompt, setNsfwJailbreakPrompt] = useState("");
+  const [savingNsfwJailbreakPrompt, setSavingNsfwJailbreakPrompt] = useState(false);
+
+  // Response Styles
+  const [responseStyles, setResponseStyles] = useState<ResponseStyle[]>([]);
+  const [savingResponseStyles, setSavingResponseStyles] = useState(false);
+
   useEffect(() => {
     fetchAllowedModels().then((m) => {
       setAllowedModels(m);
@@ -202,6 +238,13 @@ const AdminAiConfigPage = () => {
     fetchGlobalPromptTypeB().then(setPromptTypeB);
     fetchGlobalPostHistoryTypeA().then(setPostHistoryTypeA);
     fetchGlobalPostHistoryTypeB().then(setPostHistoryTypeB);
+    fetchCharGenBrainstorm().then(setCharGenBrainstorm);
+    fetchCharGenClone().then(setCharGenClone);
+    fetchCharGenFormat().then(setCharGenFormat);
+    fetchMemoryArchivist().then(setMemoryArchivist);
+    fetchNsfwGatePrompt().then(setNsfwGatePrompt);
+    fetchNsfwJailbreakPrompt().then(setNsfwJailbreakPrompt);
+    fetchResponseStyles().then(setResponseStyles);
     // Sync BYOK keys from Supabase → populate localStorage + inputs
     if (user) {
       syncKeysFromSupabase(user.id).then(() => {
@@ -445,6 +488,99 @@ const AdminAiConfigPage = () => {
     } finally {
       setSavingSamplingParams(false);
     }
+  };
+
+  // ── Char Gen Prompt handlers ──
+  const handleSaveCharGenBrainstorm = async () => {
+    setSavingCharGenBrainstorm(true);
+    try {
+      await saveCharGenBrainstorm(charGenBrainstorm);
+      toast.success("Đã lưu Brainstorm Prompt!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingCharGenBrainstorm(false);
+    }
+  };
+
+  const handleSaveCharGenClone = async () => {
+    setSavingCharGenClone(true);
+    try {
+      await saveCharGenClone(charGenClone);
+      toast.success("Đã lưu Clone Prompt!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingCharGenClone(false);
+    }
+  };
+
+  const handleSaveCharGenFormat = async () => {
+    setSavingCharGenFormat(true);
+    try {
+      await saveCharGenFormat(charGenFormat);
+      toast.success("Đã lưu Format Prompt!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingCharGenFormat(false);
+    }
+  };
+
+  // ── Memory & NSFW Gate handlers ──
+  const handleSaveMemoryArchivist = async () => {
+    setSavingMemoryArchivist(true);
+    try {
+      await saveMemoryArchivist(memoryArchivist);
+      toast.success("Đã lưu Memory Archivist Prompt!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingMemoryArchivist(false);
+    }
+  };
+
+  const handleSaveNsfwGatePrompt = async () => {
+    setSavingNsfwGatePrompt(true);
+    try {
+      await saveNsfwGatePrompt(nsfwGatePrompt);
+      toast.success("Đã lưu NSFW Gate Prompt!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingNsfwGatePrompt(false);
+    }
+  };
+
+  const handleSaveNsfwJailbreakPrompt = async () => {
+    setSavingNsfwJailbreakPrompt(true);
+    try {
+      await saveNsfwJailbreakPrompt(nsfwJailbreakPrompt);
+      toast.success("Đã lưu NSFW Jailbreak Prompt!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingNsfwJailbreakPrompt(false);
+    }
+  };
+
+  // ── Response Styles handler ──
+  const handleSaveResponseStyles = async () => {
+    setSavingResponseStyles(true);
+    try {
+      await saveResponseStyles(responseStyles);
+      toast.success("Đã lưu Response Styles!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingResponseStyles(false);
+    }
+  };
+
+  const handleResponseStyleChange = (index: number, field: "label" | "prompt", value: string) => {
+    setResponseStyles((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, [field]: value } : s))
+    );
   };
 
   const allowedModelIds = useMemo(
@@ -1352,6 +1488,241 @@ const AdminAiConfigPage = () => {
             >
               {savingSamplingParams ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
               Lưu Sampling Parameters
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ═══════ Character Generation Prompts ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-blue shadow-[0_0_6px] shadow-neon-blue" />
+              <Wand2 size={14} className="text-neon-blue" />
+              <h2 className="text-sm font-semibold text-foreground">Character Generation Prompts</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Prompts dùng cho AI tạo nhân vật (cả trang Admin và User).
+            </p>
+
+            {/* Brainstorm Prompt */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                Brainstorm — Creative Writer (Gen nhân vật mới)
+              </Label>
+              <Textarea
+                rows={12}
+                value={charGenBrainstorm}
+                onChange={(e) => setCharGenBrainstorm(e.target.value)}
+                placeholder="Prompt cho AI tạo nhân vật mới..."
+                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[180px]"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveCharGenBrainstorm}
+                disabled={savingCharGenBrainstorm}
+                className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
+                variant="outline"
+              >
+                {savingCharGenBrainstorm ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                Lưu Brainstorm
+              </Button>
+            </div>
+
+            {/* Clone Prompt */}
+            <div className="space-y-2 pt-4 border-t border-oled-border">
+              <Label className="text-xs text-muted-foreground">
+                Clone — Card Cloner (Sao chép từ nguồn)
+              </Label>
+              <Textarea
+                rows={12}
+                value={charGenClone}
+                onChange={(e) => setCharGenClone(e.target.value)}
+                placeholder="Prompt cho AI clone nhân vật..."
+                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[180px]"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveCharGenClone}
+                disabled={savingCharGenClone}
+                className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
+                variant="outline"
+              >
+                {savingCharGenClone ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                Lưu Clone
+              </Button>
+            </div>
+
+            {/* Format Prompt */}
+            <div className="space-y-2 pt-4 border-t border-oled-border">
+              <Label className="text-xs text-muted-foreground">
+                Format — JSON Formatter (Chuyển sang chara_card_v2)
+              </Label>
+              <Textarea
+                rows={15}
+                value={charGenFormat}
+                onChange={(e) => setCharGenFormat(e.target.value)}
+                placeholder="Prompt cho AI format JSON..."
+                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[220px]"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveCharGenFormat}
+                disabled={savingCharGenFormat}
+                className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
+                variant="outline"
+              >
+                {savingCharGenFormat ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                Lưu Format
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ═══════ Memory & Content Safety Prompts ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px] shadow-emerald-400" />
+              <Brain size={14} className="text-emerald-400" />
+              <h2 className="text-sm font-semibold text-foreground">Memory & Content Safety</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Prompt tóm tắt ngữ cảnh chat và chính sách nội dung NSFW.
+            </p>
+
+            {/* Memory Archivist */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                Memory Archivist — Tóm tắt ngữ cảnh chat
+              </Label>
+              <Textarea
+                rows={8}
+                value={memoryArchivist}
+                onChange={(e) => setMemoryArchivist(e.target.value)}
+                placeholder="Prompt cho AI tóm tắt ngữ cảnh..."
+                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[120px]"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveMemoryArchivist}
+                disabled={savingMemoryArchivist}
+                className="bg-emerald-400/10 text-emerald-400 border border-emerald-400/30 hover:bg-emerald-400/20"
+                variant="outline"
+              >
+                {savingMemoryArchivist ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                Lưu Memory Archivist
+              </Button>
+            </div>
+
+            {/* NSFW Gate */}
+            <div className="space-y-2 pt-4 border-t border-oled-border">
+              <Label className="text-xs text-muted-foreground">
+                NSFW Gate — Chính sách nội dung (khi NSFW tắt)
+              </Label>
+              <Textarea
+                rows={3}
+                value={nsfwGatePrompt}
+                onChange={(e) => setNsfwGatePrompt(e.target.value)}
+                placeholder="System note khi NSFW bị tắt..."
+                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[60px]"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Appended vào post-history khi user tắt NSFW mode. Để trống = không chặn.
+              </p>
+              <Button
+                size="sm"
+                onClick={handleSaveNsfwGatePrompt}
+                disabled={savingNsfwGatePrompt}
+                className="bg-emerald-400/10 text-emerald-400 border border-emerald-400/30 hover:bg-emerald-400/20"
+                variant="outline"
+              >
+                {savingNsfwGatePrompt ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                Lưu NSFW Gate
+              </Button>
+            </div>
+
+            {/* NSFW Jailbreak */}
+            <div className="space-y-2 pt-4 border-t border-oled-border">
+              <Label className="text-xs text-muted-foreground">
+                NSFW Jailbreak — Prompt khi NSFW bật (inject ở đầu payload)
+              </Label>
+              <Textarea
+                rows={3}
+                value={nsfwJailbreakPrompt}
+                onChange={(e) => setNsfwJailbreakPrompt(e.target.value)}
+                placeholder="System prompt inject ở đầu khi NSFW mode bật..."
+                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[60px]"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Inject vào Layer 1 (System Core) khi user bật NSFW mode. Để trống = không inject.
+              </p>
+              <Button
+                size="sm"
+                onClick={handleSaveNsfwJailbreakPrompt}
+                disabled={savingNsfwJailbreakPrompt}
+                className="bg-emerald-400/10 text-emerald-400 border border-emerald-400/30 hover:bg-emerald-400/20"
+                variant="outline"
+              >
+                {savingNsfwJailbreakPrompt ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
+                Lưu NSFW Jailbreak
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ═══════ Response Styles ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-purple shadow-[0_0_6px] shadow-neon-purple" />
+              <Sparkles size={14} className="text-neon-purple" />
+              <h2 className="text-sm font-semibold text-foreground">Response Styles</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tùy chọn phong cách trả lời cho user. Thay đổi ở đây cập nhật dropdown cho tất cả user.
+            </p>
+
+            <div className="space-y-4">
+              {responseStyles.map((style, index) => (
+                <div key={style.value} className="bg-oled-elevated rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] border-neon-purple/30 text-neon-purple font-mono">
+                      {style.value}
+                    </Badge>
+                    {style.value === "none" && (
+                      <span className="text-[10px] text-muted-foreground">— không thêm prompt</span>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Label (hiển thị cho user)</Label>
+                    <Input
+                      value={style.label}
+                      onChange={(e) => handleResponseStyleChange(index, "label", e.target.value)}
+                      className="bg-oled-base border-oled-border text-foreground text-xs h-8"
+                    />
+                  </div>
+                  {style.value !== "none" && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Prompt (inject vào post-history)</Label>
+                      <Textarea
+                        rows={2}
+                        value={style.prompt}
+                        onChange={(e) => handleResponseStyleChange(index, "prompt", e.target.value)}
+                        className="bg-oled-base border-oled-border text-foreground font-mono text-xs resize-y min-h-[40px]"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Button
+              onClick={handleSaveResponseStyles}
+              disabled={savingResponseStyles}
+              className="w-full bg-neon-purple hover:bg-neon-purple/80 text-white font-semibold"
+            >
+              {savingResponseStyles ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+              Lưu Response Styles
             </Button>
           </CardContent>
         </Card>
