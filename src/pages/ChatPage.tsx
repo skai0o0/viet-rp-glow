@@ -617,7 +617,6 @@ const ChatPage = () => {
           } else {
             assistantContent += text;
           }
-          assistantContent += text;
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last?.id === assistantId) {
