@@ -424,19 +424,36 @@ export function buildMessages(
 
   // ═══ LAYER 2: CHARACTER & USER CONTEXT ═══
 
-  // 2a. Character Sheet (macro-replaced)
+  // 2a. Character Sheet (XML-tagged for better LLM attention)
+  const charName = effectiveCharacter.name;
   const charParts: string[] = [];
-  charParts.push(`[CHARACTER SHEET]`);
-  charParts.push(`Name: ${effectiveCharacter.name}`);
+
+  charParts.push(`<character_identity>`);
+  charParts.push(`Name: ${charName}`);
   if (effectiveCharacter.description) {
-    charParts.push(`Description:\n${replaceMacros(effectiveCharacter.description, effectiveCharacter.name, resolvedUserName)}`);
+    charParts.push(replaceMacros(effectiveCharacter.description, charName, resolvedUserName));
   }
+  charParts.push(`</character_identity>`);
+
   if (effectiveCharacter.personality) {
-    charParts.push(`Personality:\n${replaceMacros(effectiveCharacter.personality, effectiveCharacter.name, resolvedUserName)}`);
+    charParts.push(`<personality_traits>`);
+    charParts.push(replaceMacros(effectiveCharacter.personality, charName, resolvedUserName));
+    charParts.push(`</personality_traits>`);
   }
+
   if (effectiveCharacter.scenario) {
-    charParts.push(`Scenario:\n${replaceMacros(effectiveCharacter.scenario, effectiveCharacter.name, resolvedUserName)}`);
+    charParts.push(`<current_scenario>`);
+    charParts.push(replaceMacros(effectiveCharacter.scenario, charName, resolvedUserName));
+    charParts.push(`</current_scenario>`);
   }
+
+  // Relationship anchor — forces AI to remember the relationship throughout the chat
+  charParts.push(`<relationship_with_user>`);
+  charParts.push(`Người ${charName} đang nói chuyện là: ${resolvedUserName}`);
+  charParts.push(`Mối quan hệ giữa ${charName} và ${resolvedUserName} được định nghĩa trong character_identity và current_scenario ở trên.`);
+  charParts.push(`${charName} phải nhớ và thể hiện mối quan hệ này nhất quán trong mọi response — không được hành xử như người lạ nếu lore định nghĩa mối quan hệ thân mật.`);
+  charParts.push(`</relationship_with_user>`);
+
   messages.push({ role: "system", content: charParts.join("\n\n") });
 
   // 2b. User Persona
@@ -447,7 +464,7 @@ export function buildMessages(
   if (userInfoParts.length > 0) {
     messages.push({
       role: "system",
-      content: `[USER PERSONA]\n${resolvedUserName}: ${userInfoParts.join(". ")}`,
+      content: `<user_persona>\n${resolvedUserName}: ${userInfoParts.join(". ")}\n</user_persona>`,
     });
   }
 
@@ -457,7 +474,7 @@ export function buildMessages(
   if (allWorldInfo.length > 0) {
     messages.push({
       role: "system",
-      content: `[WORLD INFO]\n${allWorldInfo.join("\n\n")}`,
+      content: `<world_lore>\n${allWorldInfo.join("\n\n")}\n</world_lore>`,
     });
   }
 

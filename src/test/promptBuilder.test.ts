@@ -413,14 +413,15 @@ describe("buildMessages", () => {
     expect(messages[messages.length - 1].content).toBe(prefill);
   });
 
-  it("includes CHARACTER SHEET with macro-replaced fields", () => {
+  it("includes character_identity with macro-replaced fields", () => {
     const char: CharacterCard = {
       ...baseChar,
       description: "{{char}} is a test character for {{user}}.",
     };
     const messages = buildMessages(char, [], "Alice");
-    const charSheet = messages.find((m) => m.role === "system" && m.content.includes("[CHARACTER SHEET]"));
+    const charSheet = messages.find((m) => m.role === "system" && m.content.includes("<character_identity>"));
     expect(charSheet?.content).toContain("TestChar is a test character for Alice.");
+    expect(charSheet?.content).toContain("<relationship_with_user>");
   });
 
   it("includes MEMORY ARCHIVE when summary and facts provided", () => {
