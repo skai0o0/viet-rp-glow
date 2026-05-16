@@ -2,7 +2,6 @@ import { ReactNode, ElementType } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 interface AdminPageShellProps {
@@ -31,7 +30,7 @@ const AdminPageShell = ({
   className,
 }: AdminPageShellProps) => {
   return (
-    <ScrollArea className="flex-1">
+    <div className="flex-1 overflow-y-auto w-full">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -79,7 +78,7 @@ const AdminPageShell = ({
         {/* Page content */}
         {children}
       </motion.div>
-    </ScrollArea>
+    </div>
   );
 };
 
