@@ -43,7 +43,7 @@ const AdminPageShell = ({
         )}
       >
         {/* Sticky header */}
-        <div className="sticky top-0 z-30 bg-oled-base/80 backdrop-blur-xl -mx-4 md:-mx-8 px-4 md:px-8 pt-4 pb-3 space-y-3">
+        <div className="sticky top-0 z-30 bg-oled-base/80 backdrop-blur-xl -mx-4 md:-mx-8 px-4 md:px-8 pt-[max(1rem,env(safe-area-inset-top))] pb-3 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               {backTo && (
