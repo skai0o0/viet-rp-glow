@@ -11,9 +11,9 @@ pub struct ChatContext {
     pub role: String,
     pub tier_key: String,
     pub model_id: String,
-    pub api_key: String,
     pub quota_remaining: i32,
     pub min_subscription: String,
+    pub subscription_tier: String,
 }
 
 /// Single query that resolves user role, quota, model tier, and picks an API key.
@@ -51,31 +51,23 @@ pub async fn prepare_chat_context(
             FROM model_tiers
             WHERE tier_key = $2 AND is_active = true
             LIMIT 1
-        ),
-        random_key AS (
-            SELECT api_key
-            FROM platform_api_keys
-            WHERE is_active = true
-            ORDER BY random()
-            LIMIT 1
         )
         SELECT
             $1 AS user_id,
             ur.role,
             $2 AS tier_key,
             COALESCE(t.model_id, 'google/gemma-3-12b-it:free') AS model_id,
-            COALESCE(rk.api_key, '') AS api_key,
             CASE
                 WHEN ur.role IN ('admin', 'op') THEN 999999
                 WHEN pi.monthly_chat_limit IS NOT NULL THEN GREATEST(pi.monthly_chat_limit - u.used, 0)
                 ELSE GREATEST(20 - u.used, 0)
             END AS quota_remaining,
-            COALESCE(t.min_subscription, 'free') AS min_subscription
+            COALESCE(t.min_subscription, 'free') AS min_subscription,
+            COALESCE(pi.plan_name, 'free') AS subscription_tier
         FROM user_role ur
         CROSS JOIN usage u
         LEFT JOIN plan_info pi ON true
         LEFT JOIN tier t ON true
-        LEFT JOIN random_key rk ON true
         "#,
     )
     .bind(user_id)

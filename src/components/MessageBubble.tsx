@@ -185,7 +185,7 @@ const MessageBubble = ({
                   onClick={handleCopy}
                   whileTap={{ scale: 0.85 }}
                   transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                  className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                  className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                   title="Sao chép"
                 >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -199,7 +199,7 @@ const MessageBubble = ({
                         onClick={handleStartEdit}
                         whileTap={{ scale: 0.85 }}
                         transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue hover:drop-shadow-[0_0_4px_rgba(0,170,255,0.5)] transition-all min-w-[32px] min-h-[32px] flex items-center justify-center"
+                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue hover:drop-shadow-[0_0_4px_rgba(0,170,255,0.5)] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         <Edit2 size={14} />
                       </motion.button>
@@ -218,7 +218,7 @@ const MessageBubble = ({
                         onClick={onDelete}
                         whileTap={{ scale: 0.85 }}
                         transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-rose active:text-neon-rose hover:drop-shadow-[0_0_4px_rgba(255,38,100,0.5)] transition-all min-w-[32px] min-h-[32px] flex items-center justify-center"
+                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-rose active:text-neon-rose hover:drop-shadow-[0_0_4px_rgba(255,38,100,0.5)] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         <Trash2 size={14} />
                       </motion.button>
@@ -234,7 +234,7 @@ const MessageBubble = ({
                     onClick={onRegenerate}
                     whileTap={{ scale: 0.85 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                    className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-purple active:text-neon-purple transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-purple active:text-neon-purple transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                     title="Tạo lại"
                   >
                     <RotateCcw size={14} />
@@ -248,7 +248,7 @@ const MessageBubble = ({
                         onClick={onBranch}
                         whileTap={{ scale: 0.85 }}
                         transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                        className="p-1.5 md:p-1 rounded text-muted-foreground hover:text-neon-blue active:text-neon-blue transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         <GitBranch size={14} />
                       </motion.button>

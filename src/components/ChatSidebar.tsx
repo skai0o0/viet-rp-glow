@@ -57,7 +57,12 @@ const ChatSidebar = ({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "-100%", opacity: 0 }}
             transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
-            className="fixed md:relative z-50 w-[280px] h-full bg-oled-surface border-r border-gray-border flex flex-col"
+            className="fixed md:relative z-50 w-[280px] bg-oled-surface border-r border-gray-border flex flex-col"
+            style={{
+              height: '100dvh',
+              paddingTop: 'env(safe-area-inset-top, 0px)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            }}
           >
             {/* Sidebar header */}
             <div className="h-14 flex items-center justify-between px-4 border-b border-gray-border flex-shrink-0">
@@ -163,7 +168,7 @@ const ChatSidebar = ({
                       <DropdownMenuTrigger asChild>
                         <button
                           onClick={(e) => e.stopPropagation()}
-                          className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground transition-opacity"
+                          className="p-1 rounded text-muted-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-foreground transition-opacity min-w-[44px] min-h-[44px] flex items-center justify-center"
                         >
                           <MoreVertical size={14} />
                         </button>

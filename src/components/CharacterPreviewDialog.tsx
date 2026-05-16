@@ -105,7 +105,7 @@ const CharacterPreviewDialog = ({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="relative w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl"
+          className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close button */}
@@ -148,7 +148,9 @@ const CharacterPreviewDialog = ({
                   onClick={() => handleRate(star)}
                   onMouseEnter={() => setHoverRating(star)}
                   onMouseLeave={() => setHoverRating(0)}
-                  className="p-0.5 transition-transform hover:scale-125"
+                  onTouchStart={() => setHoverRating(star)}
+                  onTouchEnd={() => { handleRate(star); setHoverRating(0); }}
+                  className="p-1.5 transition-transform active:scale-125 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   disabled={ratingLoading}
                 >
                   <Star

@@ -6,10 +6,19 @@ use axum::Json;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::sync::oneshot;
 
 use crate::db;
 use crate::error::AppError;
 use crate::AppState;
+
+/// Token usage data extracted from OpenRouter SSE stream.
+#[derive(Debug, Clone)]
+struct TokenUsage {
+    prompt_tokens: u32,
+    completion_tokens: u32,
+    total_tokens: u32,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ChatRequest {
@@ -115,12 +124,20 @@ pub async fn handle_chat(
     };
 
     // 7. Call OpenRouter with streaming
-    let or_response = state
+    let mut or_request_builder = state
         .http_client
         .post("https://openrouter.ai/api/v1/chat/completions")
         .bearer_auth(&api_key)
         .header("HTTP-Referer", "https://vietrp.com")
-        .header("X-Title", "VietRP")
+        .header("X-Title", "VietRP");
+
+    // Enable prompt caching for Claude models
+    if ctx.model_id.starts_with("anthropic/") {
+        or_request_builder = or_request_builder
+            .header("anthropic-beta", "prompt-caching-2024-07-31");
+    }
+
+    let or_response = or_request_builder
         .json(&or_req)
         .send()
         .await
@@ -136,7 +153,8 @@ pub async fn handle_chat(
         )));
     }
 
-    // 8. Fire-and-forget: async logging (does NOT block the response)
+    // 8. Set up usage tracking + fire-and-forget logging
+    let (usage_tx, usage_rx) = oneshot::channel::<Option<TokenUsage>>();
     let pool_clone = state.pool.clone();
     let user_id_clone = user_id;
     let use_credit = headers
@@ -153,21 +171,32 @@ pub async fn handle_chat(
         if let Err(e) = db::increment_chat_count(&pool_clone, user_id_clone).await {
             tracing::error!("Failed to increment chat count: {}", e);
         }
-        // Log usage
+
+        // Wait for usage data from stream (timeout 10s — stream may end before usage arrives)
+        let usage = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            usage_rx,
+        )
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .flatten();
+
         let metadata = json!({
             "tier_key": tier_key,
             "model": model_id,
             "message_count": message_count,
+            "input_tokens": usage.as_ref().map(|u| u.prompt_tokens),
+            "output_tokens": usage.as_ref().map(|u| u.completion_tokens),
+            "total_tokens": usage.as_ref().map(|u| u.total_tokens),
         });
         if let Err(e) = db::log_usage(&pool_clone, user_id_clone, "chat", credits_used, metadata).await {
             tracing::error!("Failed to log usage: {}", e);
         }
     });
 
-    // 9. Zero-copy SSE passthrough: pipe bytes directly from reqwest → Axum response
-    let stream = or_response.bytes_stream().map(|result| {
-        result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-    });
+    // 9. SSE passthrough with usage extraction: peek at bytes for token usage, forward unchanged
+    let stream = track_usage_stream(or_response.bytes_stream(), usage_tx);
 
     let body = Body::from_stream(stream);
 
@@ -189,4 +218,77 @@ fn tier_access_allowed(user_level: &str, required: &str) -> bool {
     let user_idx = levels.iter().position(|&l| l == user_level).unwrap_or(0);
     let required_idx = levels.iter().position(|&l| l == required).unwrap_or(0);
     user_idx >= required_idx
+}
+
+/// Wrap an SSE byte stream to extract token usage from the final event.
+/// Bytes are forwarded unchanged — zero-copy behavior is preserved.
+fn track_usage_stream(
+    stream: impl futures_util::Stream<Item = reqwest::Result<bytes::Bytes>> + Send + 'static,
+    usage_tx: oneshot::Sender<Option<TokenUsage>>,
+) -> impl futures_util::Stream<Item = std::io::Result<bytes::Bytes>> {
+    use std::sync::{Arc, Mutex};
+
+    let state = Arc::new(Mutex::new(TrackingState {
+        usage_tx: Some(usage_tx),
+        buffer: String::new(),
+    }));
+
+    stream.map(move |result| {
+        match result {
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+            Ok(bytes) => {
+                // Peek at bytes to extract usage — does not modify or delay the stream
+                if let Ok(text) = std::str::from_utf8(&bytes) {
+                    let mut st = state.lock().unwrap();
+                    st.buffer.push_str(text);
+
+                    // Look for usage data in SSE events
+                    if st.usage_tx.is_some() && st.buffer.contains("\"usage\"") {
+                        if let Some(usage) = extract_usage_from_sse(&st.buffer) {
+                            if let Some(tx) = st.usage_tx.take() {
+                                let _ = tx.send(Some(usage));
+                            }
+                        }
+                    }
+
+                    // Keep buffer from growing unbounded — only need recent tail
+                    if st.buffer.len() > 8192 {
+                        let keep = st.buffer.len() - 4096;
+                        st.buffer.drain(..keep);
+                    }
+                }
+                Ok(bytes)
+            }
+        }
+    })
+}
+
+/// Extract token usage from SSE buffer text.
+fn extract_usage_from_sse(buffer: &str) -> Option<TokenUsage> {
+    for line in buffer.lines().rev() {
+        let line = line.trim();
+        if !line.starts_with("data: ") {
+            continue;
+        }
+        let json_str = line.strip_prefix("data: ").unwrap_or(line);
+        if json_str == "[DONE]" {
+            continue;
+        }
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+            if let Some(usage) = val.get("usage") {
+                return Some(TokenUsage {
+                    prompt_tokens: usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                    completion_tokens: usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                    total_tokens: usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                });
+            }
+        }
+    }
+    None
+}
+
+/// Internal state for the usage tracking stream wrapper.
+struct TrackingState {
+    usage_tx: Option<oneshot::Sender<Option<TokenUsage>>>,
+    buffer: String,
 }

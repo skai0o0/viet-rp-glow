@@ -112,6 +112,15 @@
     background: hsl(var(--muted));
     border-radius: 2px;
   }
+
+  /* Minimum touch target size (Apple HIG + Material Design: 44×44px) */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 @keyframes breathing {
