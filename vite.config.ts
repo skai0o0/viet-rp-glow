@@ -3,6 +3,19 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+// Plugin: serve .wasm files with correct application/wasm MIME type
+const wasmMimeTypePlugin = () => ({
+  name: "wasm-mime-type",
+  configureServer(server: any) {
+    server.middlewares.use((req: any, res: any, next: any) => {
+      if (req.url?.endsWith(".wasm")) {
+        res.setHeader("Content-Type", "application/wasm");
+      }
+      next();
+    });
+  },
+});
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -14,7 +27,7 @@ export default defineConfig(({ mode }) => ({
   },
   // WASM support: allow importing .wasm files as static assets
   assetsInclude: ["**/*.wasm"],
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react(), wasmMimeTypePlugin(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
