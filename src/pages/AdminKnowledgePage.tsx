@@ -257,7 +257,7 @@ const AdminKnowledgePage = () => {
     >
 
         {/* Search & Filter */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="relative flex-1">
             <Search
               size={14}
@@ -267,11 +267,11 @@ const AdminKnowledgePage = () => {
               placeholder="Tìm kiếm..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-oled-surface border-oled-border text-foreground"
+              className="pl-9 bg-oled-surface border-oled-border text-foreground text-base md:text-sm"
             />
           </div>
           <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-[140px] bg-oled-surface border-oled-border text-foreground">
+            <SelectTrigger className="w-full sm:w-[140px] bg-oled-surface border-oled-border text-foreground">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -375,12 +375,12 @@ const AdminKnowledgePage = () => {
                                 <pre className="bg-oled-base border border-oled-border rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap break-words max-h-[400px] overflow-y-auto">
                                   {item.content}
                                 </pre>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleCopy(item.content)}
-                                    className="border-neon-blue/30 text-neon-blue hover:bg-neon-blue/10"
+                                    className="border-neon-blue/30 text-neon-blue hover:bg-neon-blue/10 min-h-[44px]"
                                   >
                                     <Copy size={12} className="mr-1" /> Copy
                                   </Button>
@@ -390,7 +390,7 @@ const AdminKnowledgePage = () => {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => openEdit(item)}
-                                        className="border-neon-purple/30 text-neon-purple hover:bg-neon-purple/10"
+                                        className="border-neon-purple/30 text-neon-purple hover:bg-neon-purple/10 min-h-[44px]"
                                       >
                                         <Pencil size={12} className="mr-1" />{" "}
                                         Chỉnh sửa
@@ -399,7 +399,7 @@ const AdminKnowledgePage = () => {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => setDeleteConfirm(item.id)}
-                                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                        className="border-red-500/30 text-red-400 hover:bg-red-500/10 min-h-[44px]"
                                       >
                                         <Trash2 size={12} className="mr-1" /> Xoá
                                       </Button>
@@ -421,7 +421,7 @@ const AdminKnowledgePage = () => {
 
         {/* Edit/Add Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="bg-oled-surface border-oled-border max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-oled-surface border-oled-border max-w-2xl w-[95vw] max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">
                 {editingItem.id ? "Chỉnh sửa" : "Thêm mục mới"}
@@ -488,7 +488,7 @@ const AdminKnowledgePage = () => {
                     setEditingItem((p) => ({ ...p, content: e.target.value }))
                   }
                   placeholder="Nhập nội dung file tại đây..."
-                  className="bg-oled-base border-oled-border text-foreground font-mono text-xs resize-y min-h-[300px]"
+                  className="bg-oled-base border-oled-border text-foreground font-mono text-base md:text-xs resize-y min-h-[300px]"
                 />
               </div>
             </div>
@@ -517,7 +517,7 @@ const AdminKnowledgePage = () => {
           open={!!deleteConfirm}
           onOpenChange={() => setDeleteConfirm(null)}
         >
-          <DialogContent className="bg-oled-surface border-oled-border max-w-sm">
+          <DialogContent className="bg-oled-surface border-oled-border max-w-sm w-[95vw]">
             <DialogHeader>
               <DialogTitle className="text-foreground">
                 Xác nhận xoá
