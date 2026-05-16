@@ -14,7 +14,7 @@ const AppLayout = () => {
   const location = useLocation();
 
   return (
-    <div className="h-[100dvh] flex bg-oled-base overflow-hidden overscroll-none [-webkit-tap-highlight-color:transparent] pt-[env(safe-area-inset-top)]">
+    <div className="h-[100dvh] flex bg-oled-base overflow-hidden overscroll-none [-webkit-tap-highlight-color:transparent] safe-header-pt">
       {/* Desktop Navigation Rail */}
       <NavigationRail />
 
