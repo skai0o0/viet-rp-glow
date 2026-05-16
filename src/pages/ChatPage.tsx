@@ -1029,7 +1029,7 @@ const ChatPage = () => {
           onSelectSession={handleSelectSession} onNewChat={() => {}} onDeleteSession={handleDeleteSession}
         />
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="h-14 flex items-center px-4 md:px-6 border-b border-gray-border flex-shrink-0">
+          <div className="safe-header-pt safe-header-h pb-2 flex items-center px-4 md:px-6 border-b border-gray-border flex-shrink-0">
             <button onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 mr-2 text-muted-foreground hover:text-foreground transition-colors md:hidden">
               <Menu size={20} />

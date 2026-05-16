@@ -36,11 +36,7 @@ const ChatHeader = ({
 
   return (
     <header
-      className="flex items-center bg-oled-base flex-shrink-0"
-      style={{
-        height: 'calc(3.5rem + env(safe-area-inset-top, 0px))',
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-      }}
+      className="flex items-center bg-oled-base flex-shrink-0 safe-header-pt safe-header-h pb-2"
     >
       <div className="flex items-center gap-3">
         {character.avatar && character.avatar.startsWith("http") ? (

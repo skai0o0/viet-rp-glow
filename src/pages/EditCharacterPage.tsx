@@ -233,7 +233,7 @@ const EditCharacterPage = () => {
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 h-14 px-4 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
+      <div className="shrink-0 safe-header-pt safe-header-h pb-2 px-4 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
             <Pencil className="text-neon-blue" size={18} />
@@ -509,7 +509,7 @@ const EditCharacterPage = () => {
           {/* Preview Dialog */}
           {showPreview && createPortal(
             <AnimatePresence>
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))]" onClick={() => setShowPreview(false)}>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4 safe-header-pt" onClick={() => setShowPreview(false)}>
                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto scrollbar-thin rounded-2xl border border-gray-border bg-oled-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => setShowPreview(false)} className="sticky top-[max(0.75rem,env(safe-area-inset-top))] ml-auto mr-3 z-10 w-8 h-8 rounded-full bg-oled-base/80 border border-gray-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
                     <X size={16} />

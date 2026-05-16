@@ -606,7 +606,7 @@ const UserCharGenPage = () => {
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
       {/* ═══════ Header ═══════ */}
-      <div className="shrink-0 h-14 flex items-center bg-oled-base border-b border-gray-border">
+      <div className="shrink-0 safe-header-pt safe-header-h pb-2 flex items-center bg-oled-base border-b border-gray-border">
         <Link to="/create" className="p-3 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft size={20} />
         </Link>

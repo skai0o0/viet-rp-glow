@@ -411,7 +411,7 @@ const CreatePage = () => {
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 h-14 px-4 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
+      <div className="shrink-0 safe-header-pt safe-header-h pb-2 px-4 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
             <PlusCircle className="text-neon-purple" size={18} />
@@ -527,7 +527,7 @@ const CreatePage = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))]"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-4 safe-header-pt"
             onClick={() => setShowPreview(false)}
           >
             <motion.div
