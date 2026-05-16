@@ -31,9 +31,12 @@ export async function upsertProfile(
   userId: string,
   updates: { display_name?: string; user_description?: string; nsfw_mode?: boolean; gender?: string; sexuality?: string }
 ): Promise<UserProfile> {
+  // Only send columns that exist in the Supabase profiles table.
+  // gender/sexuality are stored in localStorage only.
+  const { gender: _gender, sexuality: _sexuality, ...dbFields } = updates;
   const { data, error } = await supabase
     .from("profiles")
-    .upsert({ user_id: userId, ...updates }, { onConflict: "user_id" })
+    .upsert({ user_id: userId, ...dbFields }, { onConflict: "user_id" })
     .select()
     .single();
 
