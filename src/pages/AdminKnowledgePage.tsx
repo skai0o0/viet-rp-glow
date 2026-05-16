@@ -257,7 +257,7 @@ const AdminKnowledgePage = () => {
     >
 
         {/* Search & Filter */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search
               size={14}
