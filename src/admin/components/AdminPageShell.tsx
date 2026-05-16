@@ -30,7 +30,7 @@ const AdminPageShell = ({
   className,
 }: AdminPageShellProps) => {
   return (
-    <div className="flex-1 overflow-y-auto w-full">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

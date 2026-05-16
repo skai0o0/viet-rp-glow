@@ -714,7 +714,6 @@ const AdminAiConfigPage = () => {
       title="AI Configuration"
       subtitle="API Keys, Models, Prompts & Sampling"
     >
-    <div className="debug-safe-area"></div>
 
         {/* API Key Verification */}
         <Card className="bg-oled-surface border-oled-border">
@@ -726,7 +725,7 @@ const AdminAiConfigPage = () => {
             <p className="text-xs text-muted-foreground">
               Nhập API Key OpenRouter, verify để kiểm tra, rồi lưu (mã hoá) lên Supabase.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1 min-w-0">
                 <Input
                   type={showKey ? "text" : "password"}
@@ -743,34 +742,36 @@ const AdminAiConfigPage = () => {
                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              <Button
-                onClick={handleVerify}
-                disabled={verifying || !testApiKey.trim()}
-                className={`min-w-[100px] ${
-                  verified === true
-                    ? "bg-green-500/20 text-green-400 border-green-500/30"
-                    : verified === false
-                    ? "bg-destructive/20 text-destructive border-destructive/30"
-                    : "bg-neon-blue/10 text-neon-blue border-neon-blue/30 hover:bg-neon-blue/20"
-                }`}
-                variant="outline"
-              >
-                {verifying ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-1" />}
-                {verified === true ? "Hợp lệ ✓" : verified === false ? "Lỗi ✗" : "Verify"}
-              </Button>
-              <Button
-                onClick={handleSaveKey}
-                disabled={verified !== true || saved}
-                className={`min-w-[80px] ${
-                  saved
-                    ? "bg-green-500/20 text-green-400 border-green-500/30"
-                    : "bg-neon-purple/10 text-neon-purple border-neon-purple/30 hover:bg-neon-purple/20"
-                }`}
-                variant="outline"
-              >
-                <Save size={14} className="mr-1" />
-                {saved ? "Đã lưu" : "Lưu"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleVerify}
+                  disabled={verifying || !testApiKey.trim()}
+                  className={`flex-1 sm:flex-none sm:min-w-[100px] ${
+                    verified === true
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : verified === false
+                      ? "bg-destructive/20 text-destructive border-destructive/30"
+                      : "bg-neon-blue/10 text-neon-blue border-neon-blue/30 hover:bg-neon-blue/20"
+                  }`}
+                  variant="outline"
+                >
+                  {verifying ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-1" />}
+                  {verified === true ? "Hợp lệ ✓" : verified === false ? "Lỗi ✗" : "Verify"}
+                </Button>
+                <Button
+                  onClick={handleSaveKey}
+                  disabled={verified !== true || saved}
+                  className={`flex-1 sm:flex-none sm:min-w-[80px] ${
+                    saved
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : "bg-neon-purple/10 text-neon-purple border-neon-purple/30 hover:bg-neon-purple/20"
+                  }`}
+                  variant="outline"
+                >
+                  <Save size={14} className="mr-1" />
+                  {saved ? "Đã lưu" : "Lưu"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -789,7 +790,7 @@ const AdminAiConfigPage = () => {
               BYOK cho Xiaomi Mimo. Endpoint có thể tùy chỉnh bên dưới.
             </p>
             {/* Mimo API Endpoint */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 value={mimoEndpoint}
                 onChange={(e) => { setMimoEndpointState(e.target.value); setSavedMimoEndpoint(false); }}
@@ -799,7 +800,7 @@ const AdminAiConfigPage = () => {
               <Button
                 onClick={handleSaveMimoEndpoint}
                 disabled={savedMimoEndpoint}
-                className={`min-w-[80px] ${
+                className={`sm:min-w-[80px] ${
                   savedMimoEndpoint
                     ? "bg-green-500/20 text-green-400 border-green-500/30"
                     : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
@@ -811,7 +812,7 @@ const AdminAiConfigPage = () => {
               </Button>
             </div>
             {/* Mimo API Key */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1 min-w-0">
                 <Input
                   type={showMimoKey ? "text" : "password"}
@@ -828,34 +829,36 @@ const AdminAiConfigPage = () => {
                   {showMimoKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              <Button
-                onClick={handleVerifyMimo}
-                disabled={verifyingMimo || !testMimoKey.trim()}
-                className={`min-w-[100px] ${
-                  verifiedMimo === true
-                    ? "bg-green-500/20 text-green-400 border-green-500/30"
-                    : verifiedMimo === false
-                    ? "bg-destructive/20 text-destructive border-destructive/30"
-                    : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
-                }`}
-                variant="outline"
-              >
-                {verifyingMimo ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-1" />}
-                {verifiedMimo === true ? "Hợp lệ ✓" : verifiedMimo === false ? "Lỗi ✗" : "Verify"}
-              </Button>
-              <Button
-                onClick={handleSaveMimoKey}
-                disabled={verifiedMimo !== true || savedMimo}
-                className={`min-w-[80px] ${
-                  savedMimo
-                    ? "bg-green-500/20 text-green-400 border-green-500/30"
-                    : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
-                }`}
-                variant="outline"
-              >
-                <Save size={14} className="mr-1" />
-                {savedMimo ? "Đã lưu" : "Lưu"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleVerifyMimo}
+                  disabled={verifyingMimo || !testMimoKey.trim()}
+                  className={`flex-1 sm:flex-none sm:min-w-[100px] ${
+                    verifiedMimo === true
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : verifiedMimo === false
+                      ? "bg-destructive/20 text-destructive border-destructive/30"
+                      : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
+                  }`}
+                  variant="outline"
+                >
+                  {verifyingMimo ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-1" />}
+                  {verifiedMimo === true ? "Hợp lệ ✓" : verifiedMimo === false ? "Lỗi ✗" : "Verify"}
+                </Button>
+                <Button
+                  onClick={handleSaveMimoKey}
+                  disabled={verifiedMimo !== true || savedMimo}
+                  className={`flex-1 sm:flex-none sm:min-w-[80px] ${
+                    savedMimo
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : "bg-neon-rose/10 text-neon-rose border-neon-rose/30 hover:bg-neon-rose/20"
+                  }`}
+                  variant="outline"
+                >
+                  <Save size={14} className="mr-1" />
+                  {savedMimo ? "Đã lưu" : "Lưu"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -877,25 +880,25 @@ const AdminAiConfigPage = () => {
               <p className="text-xs text-muted-foreground">
                 Pool OpenRouter API keys — Edge Function xoay vòng giữa các key active khi user chat.
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
                   placeholder="Tên (VD: Key #1)"
-                  className="bg-oled-elevated border-gray-border text-foreground text-base md:text-sm h-10 md:h-9 min-w-[100px] flex-1 sm:flex-[0.3]"
+                  className="bg-oled-elevated border-gray-border text-foreground text-base md:text-sm h-10 md:h-9 sm:flex-[0.3]"
                 />
                 <Input
                   value={newKeyValue}
                   onChange={(e) => setNewKeyValue(e.target.value)}
                   placeholder="sk-or-v1-..."
                   type="password"
-                  className="bg-oled-elevated border-gray-border text-foreground text-base md:text-sm h-10 md:h-9 min-w-[140px] flex-1 sm:flex-[0.7] font-mono"
+                  className="bg-oled-elevated border-gray-border text-foreground text-base md:text-sm h-10 md:h-9 sm:flex-[0.7] font-mono"
                 />
                 <Button
                   size="sm"
                   onClick={handleAddKey}
                   disabled={addingKey}
-                  className="h-9 bg-amber-500 hover:bg-amber-600 text-white shrink-0"
+                  className="h-10 md:h-9 bg-amber-500 hover:bg-amber-600 text-white shrink-0"
                 >
                   {addingKey ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 </Button>
@@ -984,7 +987,7 @@ const AdminAiConfigPage = () => {
                           <p className="text-[10px] text-muted-foreground">{tier.description}</p>
                         </div>
                       </div>
-                      <div className="flex gap-2 items-center">
+                      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                         <Input
                           value={tierEdits[tier.tier_key] ?? tier.model_id}
                           onChange={(e) => setTierEdits((prev) => ({ ...prev, [tier.tier_key]: e.target.value }))}
@@ -996,7 +999,7 @@ const AdminAiConfigPage = () => {
                           size="sm"
                           onClick={() => handleSaveTierModel(tier)}
                           disabled={!edited || savingTier === tier.tier_key || !isAdmin}
-                          className="h-10 md:h-8 px-3 text-xs bg-neon-purple hover:bg-neon-purple/80 text-white disabled:opacity-30"
+                          className="h-10 md:h-8 px-3 text-xs bg-neon-purple hover:bg-neon-purple/80 text-white disabled:opacity-30 sm:shrink-0"
                         >
                           {savingTier === tier.tier_key ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                         </Button>
