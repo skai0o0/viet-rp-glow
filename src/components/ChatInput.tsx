@@ -91,7 +91,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
             onChange={(e) => setPrefillText(e.target.value)}
             placeholder="Nhập hành động mớm lời cho AI..."
             disabled={disabled}
-            className="w-full bg-oled-elevated border border-neon-purple/30 rounded-xl px-3 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-neon-purple/60 transition-colors"
+            className="w-full bg-oled-elevated border border-neon-purple/30 rounded-xl px-3 py-1.5 text-base md:text-xs text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-neon-purple/60 transition-colors"
           />
         </motion.div>
       )}
@@ -140,9 +140,10 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
               ? "text-neon-purple bg-neon-purple/15 shadow-[0_0_8px_rgba(176,38,255,0.2)]"
               : "text-muted-foreground hover:text-neon-purple/60 hover:bg-neon-purple/5"
           }`}
-          title="Mớm lời (Prefill)"
+          aria-label="Mớm lời cho AI (Prefill)"
         >
           <Quote size={16} />
+          <span className="text-[10px] hidden sm:block">Mớm lời</span>
         </motion.button>
       </div>
       <p className="text-[10px] text-muted-foreground text-center mt-2 hidden md:block">

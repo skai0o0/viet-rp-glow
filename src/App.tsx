@@ -9,6 +9,7 @@ import AppLayout from "@/layouts/AppLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { fetchAllPrompts, fetchSamplingParameters } from "@/services/globalSettingsDb";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { useVisibilityRefresh } from "@/hooks/useVisibilityRefresh";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/utils/lazyWithRetry";
@@ -59,6 +60,7 @@ const PageLoader = () => (
 
 const PageTracker = ({ children }: { children: React.ReactNode }) => {
   usePageTracking();
+  useVisibilityRefresh();
   return <>{children}</>;
 };
 

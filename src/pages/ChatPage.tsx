@@ -5,7 +5,7 @@ import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Ch
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard } from "@/types/character";
 import { buildMessages, replaceMacros, truncateMessages } from "@/utils/promptBuilder";
-import { streamChat, streamChatViaProxy } from "@/services/openRouter";
+import { streamChat, streamChatViaProxy, getModel } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getCharacterById, dbCharToCard, CharacterSummary } from "@/services/characterDb";
@@ -39,13 +39,17 @@ import { useChatMemory } from "@/hooks/useChatMemory";
 import { forceGenerateSummary } from "@/services/memoryManager";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useUserCredits } from "@/hooks/useUserCredits";
+import { useVisualViewportHeight } from "@/hooks/useVisualViewport";
 import { useCredits } from "@/services/creditDb";
 import { deriveChatAccess } from "@/utils/chatAccess";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useScrollToBottom } from "@/hooks/useScrollToBottom";
+import { haptic } from "@/utils/haptics";
 
 const ChatPage = () => {
   const { characterId } = useParams<{ characterId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const isMobile = useIsMobile();
 
   const { quota, refresh: refreshQuota } = useChatQuota();
@@ -55,6 +59,12 @@ const ChatPage = () => {
   const { role } = useUserRole();
   const { summary, facts, loadMemory, clearMemory, triggerSummarize } = useChatMemory();
   const { track } = useAnalytics();
+  const viewportHeight = useVisualViewportHeight();
+  const isOnline = useOnlineStatus();
+  const { containerRef: scrollContainerRef, showButton: showScrollBtn, scrollToBottom } = useScrollToBottom({
+    threshold: 150,
+    deps: [messages, isStreaming],
+  });
   const { isSubscriptionUser, effectiveQuota } = useMemo(
     () => deriveChatAccess(role, quota),
     [role, quota]
@@ -75,7 +85,7 @@ const ChatPage = () => {
   const [customFirstMes, setCustomFirstMes] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = scrollContainerRef;
   const abortRef = useRef<AbortController | null>(null);
   const usedCreditRef = useRef(false);
   const customFirstMesRef = useRef("");
@@ -247,13 +257,17 @@ const ChatPage = () => {
       .catch(() => toast.error("Không thể tải nhân vật này"));
   }, [characterId]);
 
-  // Load sessions when user changes
+  // Load sessions when user changes (wait for auth to resolve first)
   useEffect(() => {
-    if (!user) return;
+    if (authLoading) return;
+    if (!user) {
+      setSessions([]);
+      return;
+    }
     getUserSessions()
       .then(setSessions)
       .catch(() => setSessions([]));
-  }, [user]);
+  }, [user?.id, authLoading]);
 
   // Populate charMap for all sessions' characters
   useEffect(() => {
@@ -273,6 +287,7 @@ const ChatPage = () => {
 
   // Auto-load existing session or show first_mes locally (no DB creation yet)
   useEffect(() => {
+    if (authLoading) return;
     if (!user || !activeCharId || !activeCharacter) return;
     if (activeSessionId) return;
 
@@ -388,12 +403,6 @@ const ChatPage = () => {
     [user, activeCharId, activeSessionId, messages, charSessions.length]
   );
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isStreaming]);
-
   const handleSend = useCallback(
     async (content: string, prefillText?: string) => {
       if (!user) {
@@ -436,6 +445,7 @@ const ChatPage = () => {
       };
 
       setMessages((prev) => [...prev, userMsg]);
+      haptic("light");
       setIsStreaming(true);
 
       const assistantId = "streaming-" + Date.now();
@@ -452,7 +462,8 @@ const ChatPage = () => {
         facts,
         prefillText,
       );
-      const apiMessages = truncateMessages(rawMessages);
+      const modelForBudget = isSubscriptionUser ? undefined : getModel();
+      const apiMessages = truncateMessages(rawMessages, undefined, modelForBudget);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -587,7 +598,7 @@ const ChatPage = () => {
       summary,
       facts,
       prefillRef.current,
-    ));
+    ), undefined, isSubscriptionUser ? undefined : getModel());
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -768,7 +779,7 @@ const ChatPage = () => {
         summary,
         facts,
         prefillRef.current,
-      ));
+      ), undefined, isSubscriptionUser ? undefined : getModel());
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -1126,7 +1137,7 @@ const ChatPage = () => {
                                     </div>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
-                                      className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded text-muted-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 active:text-red-400 hover:text-red-400 transition-all"
+                                      className="p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded text-muted-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 active:text-red-400 hover:text-red-400 transition-all"
                                     >
                                       <Trash2 size={13} />
                                     </button>
@@ -1150,7 +1161,7 @@ const ChatPage = () => {
 
   return (
     <>
-    <div className="flex-1 flex overflow-hidden min-w-0">
+    <div className="flex-1 flex overflow-hidden min-w-0" style={{ height: `${viewportHeight}px` }}>
       <ChatSidebar
         open={sidebarOpen} onClose={() => setSidebarOpen(false)}
         sessions={sessions} characters={charMap} activeSessionId={activeSessionId}
@@ -1266,9 +1277,23 @@ const ChatPage = () => {
           )}
         </AnimatePresence>
 
+        {/* Offline banner */}
+        <AnimatePresence>
+          {!isOnline && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-1.5 text-center"
+            >
+              <p className="text-xs text-amber-400 font-medium">Bạn đang offline — tin nhắn sẽ không gửi được</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex-1 flex overflow-hidden min-w-0">
           {/* Chat messages area */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 relative">
             <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4">
               {/* Profile incomplete caution */}
               {(() => {
@@ -1332,6 +1357,21 @@ const ChatPage = () => {
 
               {isStreaming && messages[messages.length - 1]?.content === "" && <TypingIndicator />}
             </div>
+
+            {/* Scroll-to-bottom button */}
+            <AnimatePresence>
+              {showScrollBtn && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={() => { scrollToBottom(); haptic("light"); }}
+                  className="absolute bottom-2 right-4 z-10 w-9 h-9 rounded-full bg-oled-surface border border-gray-border shadow-lg flex items-center justify-center text-muted-foreground hover:text-neon-purple hover:border-neon-purple/40 transition-colors"
+                >
+                  <ChevronDown size={18} />
+                </motion.button>
+              )}
+            </AnimatePresence>
 
             {isSubscriptionUser && quotaExceeded && (
               <motion.div

@@ -16,6 +16,8 @@ import { countTokens } from "@/utils/tokenizer";
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  /** OpenRouter/Claude prompt caching hint — ignored by models that don't support it. */
+  cache_control?: { type: "ephemeral" };
 }
 
 export interface PromptSection {
@@ -26,6 +28,43 @@ export interface PromptSection {
 
 /** @deprecated Use `countTokens` from `@/utils/tokenizer` instead. */
 export const estimateTokens = countTokens;
+
+// ─── Model-Aware Token Budgets ────────────────────────────────
+
+/**
+ * Conservative context window limits per model family.
+ * These are intentionally lower than actual limits to leave headroom
+ * for tokenizer inaccuracies and provider-side overhead.
+ */
+const MODEL_CONTEXT_LIMITS: Record<string, number> = {
+  "google/gemini-2.0-flash": 32000,
+  "google/gemini-2.5-flash": 32000,
+  "google/gemini-2.5-pro": 32000,
+  "google/gemma": 7000,
+  "anthropic/claude-3.5-haiku": 50000,
+  "anthropic/claude-sonnet": 50000,
+  "anthropic/claude-opus": 50000,
+  "gryphe/mythomax": 3800,
+  "mistralai/mistral": 7500,
+  "nousresearch": 7000,
+  "microsoft/phi": 7000,
+  "qwen": 7000,
+};
+
+/** Default context budget for unknown models. */
+const DEFAULT_CONTEXT_BUDGET = 7000;
+
+/**
+ * Get the token budget for a model, matching by prefix.
+ * Exported so callers can pass the correct budget to truncateMessages.
+ */
+export function getModelTokenBudget(modelId: string): number {
+  const normalized = modelId.toLowerCase();
+  for (const [prefix, limit] of Object.entries(MODEL_CONTEXT_LIMITS)) {
+    if (normalized.startsWith(prefix)) return limit;
+  }
+  return DEFAULT_CONTEXT_BUDGET;
+}
 
 // ─── Card Type Detection ──────────────────────────────────────
 
@@ -55,18 +94,24 @@ const DEFAULT_MAX_CONTEXT_TOKENS = 8000;
 /**
  * Truncate messages array to fit within token budget.
  * Strategy: keep all system messages (layers 1-5) + last N user/assistant messages that fit.
+ *
+ * @param messages - The full messages array from buildMessages()
+ * @param maxTokens - Token budget. If omitted, uses DEFAULT_MAX_CONTEXT_TOKENS.
+ * @param modelId - Optional model ID for model-aware budgeting (overrides maxTokens if both provided via getModelTokenBudget).
  */
 export function truncateMessages(
   messages: OpenRouterMessage[],
-  maxTokens: number = DEFAULT_MAX_CONTEXT_TOKENS,
+  maxTokens?: number,
+  modelId?: string,
 ): OpenRouterMessage[] {
+  const budget = maxTokens ?? (modelId ? getModelTokenBudget(modelId) : DEFAULT_MAX_CONTEXT_TOKENS);
   // Count total tokens
   let totalTokens = 0;
   for (const msg of messages) {
     totalTokens += estimateTokens(msg.content) + 4; // +4 for role overhead
   }
 
-  if (totalTokens <= maxTokens) return messages;
+  if (totalTokens <= budget) return messages;
 
   // Separate system messages (preserving order) from chat messages
   const systemMessages: OpenRouterMessage[] = [];
@@ -80,9 +125,9 @@ export function truncateMessages(
     }
   }
 
-  // Calculate system token budget (max 40% of context for system)
-  const systemBudget = Math.floor(maxTokens * 0.4);
-  const chatBudget = maxTokens - systemBudget;
+  // Calculate system token budget (max 35% of context for system, 65% for chat)
+  const systemBudget = Math.floor(budget * 0.35);
+  const chatBudget = budget - systemBudget;
 
   // Truncate system messages if they exceed budget — drop from the middle
   // (keep Layer 1 at top and Layer 5 at bottom for primacy/recency)
@@ -412,14 +457,14 @@ export function buildMessages(
     : getGlobalPromptTypeA();
   const globalPrompt = typePrompt || getGlobalSystemPrompt();
   if (globalPrompt) {
-    messages.push({ role: "system", content: globalPrompt });
+    messages.push({ role: "system", content: globalPrompt, cache_control: { type: "ephemeral" } });
   }
 
   // 1b. NSFW Jailbreak (injected at TOP when NSFW is ENABLED)
   const nsfwEnabled = localStorage.getItem("vietrp_nsfw_mode") === "true";
   if (nsfwEnabled) {
     const jailbreak = getNsfwJailbreakPrompt();
-    if (jailbreak) messages.push({ role: "system", content: jailbreak });
+    if (jailbreak) messages.push({ role: "system", content: jailbreak, cache_control: { type: "ephemeral" } });
   }
 
   // ═══ LAYER 2: CHARACTER & USER CONTEXT ═══
@@ -454,7 +499,7 @@ export function buildMessages(
   charParts.push(`${charName} phải nhớ và thể hiện mối quan hệ này nhất quán trong mọi response — không được hành xử như người lạ nếu lore định nghĩa mối quan hệ thân mật.`);
   charParts.push(`</relationship_with_user>`);
 
-  messages.push({ role: "system", content: charParts.join("\n\n") });
+  messages.push({ role: "system", content: charParts.join("\n\n"), cache_control: { type: "ephemeral" } });
 
   // 2b. User Persona
   const userInfoParts: string[] = [];
@@ -483,6 +528,7 @@ export function buildMessages(
     messages.push({
       role: "system",
       content: `[EXAMPLE DIALOGUE]\n${effectiveCharacter.mes_example}`,
+      cache_control: { type: "ephemeral" },
     });
   }
 

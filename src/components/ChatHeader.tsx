@@ -35,7 +35,13 @@ const ChatHeader = ({
   const sessionCount = sessions.length;
 
   return (
-    <header className="h-14 flex items-center bg-oled-base flex-shrink-0">
+    <header
+      className="flex items-center bg-oled-base flex-shrink-0"
+      style={{
+        height: 'calc(3.5rem + env(safe-area-inset-top, 0px))',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}
+    >
       <div className="flex items-center gap-3">
         {character.avatar && character.avatar.startsWith("http") ? (
           <img
