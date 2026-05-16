@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   Loader2,
   ShieldCheck,
@@ -10,7 +10,6 @@ import {
   Trash2,
   Star,
   Search,
-  ArrowLeft,
   Zap,
   BadgeCheck,
   DollarSign,
@@ -34,11 +33,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { AdminPageShell, AdminSection } from "@/admin/components";
 import {
   fetchAllowedModels,
   addAllowedModel,
@@ -708,29 +706,13 @@ const AdminAiConfigPage = () => {
   }
 
   return (
-    <ScrollArea className="flex-1">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-6 pb-24"
-      >
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link to="/admin">
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft size={20} />
-            </Button>
-          </Link>
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-neon-blue to-cyan-500 flex items-center justify-center shadow-lg">
-            <Zap className="text-white" size={24} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">AI Configuration</h1>
-            <p className="text-sm text-muted-foreground">
-              API Keys, Models, Prompts & Sampling
-            </p>
-          </div>
-        </div>
+    <AdminPageShell
+      backTo="/admin"
+      icon={Zap}
+      iconGradient="bg-gradient-to-br from-neon-blue to-cyan-500"
+      title="AI Configuration"
+      subtitle="API Keys, Models, Prompts & Sampling"
+    >
 
         {/* API Key Verification */}
         <Card className="bg-oled-surface border-oled-border">
@@ -1726,8 +1708,7 @@ const AdminAiConfigPage = () => {
             </Button>
           </CardContent>
         </Card>
-      </motion.div>
-    </ScrollArea>
+    </AdminPageShell>
   );
 };
 

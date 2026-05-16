@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Navigate, Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Navigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +21,15 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { motion } from "framer-motion";
 import {
   Loader2,
-  ArrowLeft,
   Coins,
+  Users,
   Search,
   Gift,
   History,
   RefreshCw,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -40,6 +39,7 @@ import {
   type UserWithCredits,
   type CreditTransaction,
 } from "@/services/creditDb";
+import { AdminPageShell, AdminStatCard, AdminSection, AdminIconButton } from "@/admin/components";
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
   admin: { label: "Admin", color: "bg-neon-rose/20 text-neon-rose" },
@@ -123,150 +123,113 @@ const AdminCreditsPage = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin bg-oled-base p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="max-w-5xl mx-auto space-y-6"
-      >
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link to="/admin">
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft size={20} />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Coins className="text-neon-purple" size={24} />
-              Quản lý Credit
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Cấp và quản lý credit cho user và moderator.
-            </p>
+    <AdminPageShell
+      backTo="/admin"
+      icon={Coins}
+      title="Quản lý Credit"
+      subtitle="Cấp và quản lý credit cho user và moderator."
+      actions={
+        <AdminIconButton
+          icon={RefreshCw}
+          label="Tải lại"
+          variant="outline"
+          onClick={loadUsers}
+        />
+      }
+    >
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <AdminStatCard icon={Users} label="Tổng user" value={users.length} color="text-neon-blue" delay={0} />
+        <AdminStatCard icon={Coins} label="Tổng credit" value={totalCredits.toLocaleString()} color="text-neon-purple" delay={0.05} />
+        <AdminStatCard icon={TrendingUp} label="User có credit" value={users.filter((u) => u.balance > 0).length} color="text-neon-green" delay={0.1} />
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Tìm theo tên hoặc user ID..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10 bg-oled-surface border-gray-border text-foreground"
+        />
+      </div>
+
+      {/* User Table */}
+      <AdminSection title="Danh sách người dùng" icon={Users}>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="animate-spin text-neon-purple" size={24} />
           </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          <Card className="bg-oled-surface border-gray-border">
-            <CardContent className="p-4">
-              <div className="text-xs text-muted-foreground">Tổng user</div>
-              <div className="text-2xl font-bold text-foreground">{users.length}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-oled-surface border-gray-border">
-            <CardContent className="p-4">
-              <div className="text-xs text-muted-foreground">Tổng credit</div>
-              <div className="text-2xl font-bold text-neon-purple">{totalCredits.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-oled-surface border-gray-border">
-            <CardContent className="p-4">
-              <div className="text-xs text-muted-foreground">User có credit &gt; 0</div>
-              <div className="text-2xl font-bold text-neon-blue">{users.filter((u) => u.balance > 0).length}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search + Refresh */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Tìm theo tên hoặc user ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-oled-surface border-gray-border text-foreground"
-            />
-          </div>
-          <Button variant="outline" size="icon" onClick={loadUsers} className="border-gray-border text-muted-foreground hover:text-foreground">
-            <RefreshCw size={16} />
-          </Button>
-        </div>
-
-        {/* User Table */}
-        <Card className="bg-oled-surface border-gray-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-foreground">Danh sách người dùng</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="animate-spin text-neon-purple" size={24} />
-              </div>
-            ) : (
-              <ScrollArea className="max-h-[60vh]">
-                <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-gray-border hover:bg-transparent">
-                      <TableHead className="text-muted-foreground">Tên</TableHead>
-                      <TableHead className="text-muted-foreground">Vai trò</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Credit</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Thao tác</TableHead>
+        ) : (
+          <ScrollArea className="max-h-[60vh]">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-gray-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground">Tên</TableHead>
+                    <TableHead className="text-muted-foreground">Vai trò</TableHead>
+                    <TableHead className="text-muted-foreground text-right">Credit</TableHead>
+                    <TableHead className="text-muted-foreground text-right">Thao tác</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        Không tìm thấy người dùng.
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy người dùng.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filtered.map((u) => {
-                        const roleInfo = ROLE_LABELS[u.role] ?? ROLE_LABELS.user;
-                        return (
-                          <TableRow key={u.user_id} className="border-gray-border hover:bg-oled-elevated/50">
-                            <TableCell>
-                              <div className="font-medium text-foreground">{u.display_name}</div>
-                              <div className="text-[10px] text-muted-foreground font-mono">{u.user_id.slice(0, 8)}...</div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={`text-[10px] ${roleInfo.color}`}>
-                                {roleInfo.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <span className={`font-mono font-semibold ${u.balance > 0 ? "text-neon-purple" : "text-muted-foreground"}`}>
-                                {u.balance.toLocaleString()}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-neon-purple hover:text-neon-purple hover:bg-neon-purple/10 h-8 px-2"
-                                  onClick={() => setGrantTarget(u)}
-                                >
-                                  <Gift size={14} className="mr-1" />
-                                  Grant
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-muted-foreground hover:text-foreground hover:bg-oled-elevated h-8 px-2"
-                                  onClick={() => openHistory(u)}
-                                >
-                                  <History size={14} />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-                </div>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+                  ) : (
+                    filtered.map((u) => {
+                      const roleInfo = ROLE_LABELS[u.role] ?? ROLE_LABELS.user;
+                      return (
+                        <TableRow key={u.user_id} className="border-gray-border hover:bg-oled-elevated/50">
+                          <TableCell>
+                            <div className="font-medium text-foreground">{u.display_name}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">{u.user_id.slice(0, 8)}...</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className={`text-[10px] ${roleInfo.color}`}>
+                              {roleInfo.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={`font-mono font-semibold ${u.balance > 0 ? "text-neon-purple" : "text-muted-foreground"}`}>
+                              {u.balance.toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-neon-purple hover:text-neon-purple hover:bg-neon-purple/10 h-8 px-2"
+                                onClick={() => setGrantTarget(u)}
+                              >
+                                <Gift size={14} className="mr-1" />
+                                Grant
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground hover:bg-oled-elevated h-8 px-2"
+                                onClick={() => openHistory(u)}
+                              >
+                                <History size={14} />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </ScrollArea>
+        )}
+      </AdminSection>
 
       {/* Grant Dialog */}
       <Dialog open={!!grantTarget} onOpenChange={(open) => { if (!open) setGrantTarget(null); }}>
@@ -361,7 +324,7 @@ const AdminCreditsPage = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPageShell>
   );
 };
 

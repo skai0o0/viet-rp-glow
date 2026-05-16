@@ -67,6 +67,8 @@ export default {
         "gray-border": "#1E1E1E",
         "neon-blue": "#00F0FF",
         "neon-purple": "#B026FF",
+        "neon-rose": "#FF2664",
+        "neon-green": "#00FF94",
       },
       boxShadow: {
         "neon-blue": "0 0 10px rgba(0, 240, 255, 0.4), 0 0 20px rgba(0, 240, 255, 0.2)",
@@ -78,6 +80,10 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      spacing: {
+        "safe-top": "env(safe-area-inset-top, 0px)",
+        "safe-bottom": "env(safe-area-inset-bottom, 0px)",
       },
       keyframes: {
         "accordion-down": {

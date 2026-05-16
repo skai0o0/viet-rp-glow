@@ -3,7 +3,6 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   Loader2,
   Play,
@@ -15,9 +14,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { AdminPageShell, AdminSection } from "@/admin/components";
 
 const HISTORY_KEY = "vietrp_sql_history";
 const MAX_HISTORY = 20;
@@ -195,24 +194,14 @@ const AdminSqlEditorPage = () => {
   const columns = isArray && result.length > 0 ? Object.keys(result[0]) : [];
 
   return (
-    <ScrollArea className="flex-1">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-4 md:p-8 max-w-6xl mx-auto w-full space-y-4 pb-24"
-      >
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-            <Database size={20} className="text-amber-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">SQL Editor</h1>
-            <p className="text-xs text-muted-foreground">
-              Truy vấn Database từ Supabase trực tiếp từ website — chỉ đọc (SELECT)
-            </p>
-          </div>
-        </div>
+    <AdminPageShell
+      backTo="/admin"
+      icon={Database}
+      iconGradient="bg-gradient-to-br from-amber-500 to-amber-600"
+      title="SQL Editor"
+      subtitle="Truy vấn Database — chỉ đọc (SELECT)"
+      maxWidth="max-w-6xl"
+    >
 
         {/* Read-only warning */}
         <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex items-center gap-2">
@@ -440,8 +429,7 @@ const AdminSqlEditorPage = () => {
             )}
           </div>
         )}
-      </motion.div>
-    </ScrollArea>
+    </AdminPageShell>
   );
 };
 

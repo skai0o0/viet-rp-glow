@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Navigate, Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Navigate } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2,
-  ArrowLeft,
   ClipboardCheck,
   CheckCircle2,
   XCircle,
@@ -21,6 +19,7 @@ import {
   User,
   Filter,
 } from "lucide-react";
+import { AdminPageShell, AdminStatCard } from "@/admin/components";
 import {
   Select,
   SelectContent,
@@ -238,49 +237,33 @@ const AdminApprovalsPage = () => {
 
   /* ---------- Render ---------- */
   return (
-    <ScrollArea className="flex-1">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-6 pb-24"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/admin">
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft size={20} />
-              </Button>
-            </Link>
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-              <ClipboardCheck className="text-white" size={24} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-foreground">Approval Queue</h1>
-                {pendingCount > 0 && (
-                  <Badge className="bg-yellow-400/20 text-yellow-400 border-yellow-400/30 text-xs">
-                    {pendingCount} chờ duyệt
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {isAdmin ? "Duyệt yêu cầu chỉnh sửa từ Operator" : "Theo dõi yêu cầu chỉnh sửa của bạn"}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={refreshing || loading}
-            className="text-muted-foreground hover:text-neon-blue"
-          >
-            <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
-          </Button>
-        </div>
-
-        {/* Filters */}
+    <>
+    <AdminPageShell
+      backTo="/admin"
+      icon={ClipboardCheck}
+      iconGradient="bg-gradient-to-br from-amber-500 to-orange-500"
+      title="Approval Queue"
+      subtitle={isAdmin ? "Duyệt yêu cầu chỉnh sửa từ Operator" : "Theo dõi yêu cầu chỉnh sửa của bạn"}
+      headerExtra={
+        pendingCount > 0 ? (
+          <Badge className="bg-yellow-400/20 text-yellow-400 border-yellow-400/30 text-xs">
+            {pendingCount} chờ duyệt
+          </Badge>
+        ) : undefined
+      }
+      actions={
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={refreshing || loading}
+          className="text-muted-foreground hover:text-neon-blue"
+        >
+          <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
+        </Button>
+      }
+    >
+      {/* Filters */}
         <div className="flex flex-wrap gap-2">
           <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
             <SelectTrigger className="w-36 h-8 bg-oled-surface border-oled-border text-foreground text-xs">
@@ -497,13 +480,13 @@ const AdminApprovalsPage = () => {
 
         {/* Stats footer */}
         {items.length > 0 && (
-          <div className="flex justify-center gap-4 text-xs text-muted-foreground pt-2">
-            <span className="flex items-center gap-1"><Clock size={10} className="text-yellow-400" /> {items.filter(i => i.status === "pending").length} chờ</span>
-            <span className="flex items-center gap-1"><CheckCircle2 size={10} className="text-green-400" /> {items.filter(i => i.status === "approved").length} duyệt</span>
-            <span className="flex items-center gap-1"><XCircle size={10} className="text-red-400" /> {items.filter(i => i.status === "rejected").length} từ chối</span>
+          <div className="flex justify-center gap-3 pt-2">
+            <AdminStatCard icon={Clock} label="Chờ duyệt" value={items.filter(i => i.status === "pending").length} color="text-yellow-400" delay={0} />
+            <AdminStatCard icon={CheckCircle2} label="Đã duyệt" value={items.filter(i => i.status === "approved").length} color="text-green-400" delay={0.05} />
+            <AdminStatCard icon={XCircle} label="Từ chối" value={items.filter(i => i.status === "rejected").length} color="text-red-400" delay={0.1} />
           </div>
         )}
-      </motion.div>
+    </AdminPageShell>
 
       {/* Review Dialog */}
       <Dialog open={!!reviewDialog} onOpenChange={() => setReviewDialog(null)}>
@@ -575,7 +558,7 @@ const AdminApprovalsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </ScrollArea>
+    </>
   );
 };
 
