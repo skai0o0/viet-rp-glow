@@ -916,9 +916,9 @@ const AdminAiConfigPage = () => {
                         {k.is_active ? <ToggleRight size={22} className="text-green-400" /> : <ToggleLeft size={22} className="text-muted-foreground" />}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{k.key_name}</span>
-                          <span className="text-[10px] text-muted-foreground font-mono">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-foreground truncate">{k.key_name}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono truncate">
                             {showKeyId === k.id ? k.api_key : `${k.api_key.slice(0, 12)}...${k.api_key.slice(-4)}`}
                           </span>
                           <button onClick={() => setShowKeyId(showKeyId === k.id ? null : k.id)} className="text-muted-foreground hover:text-foreground">
