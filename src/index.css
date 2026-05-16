@@ -144,3 +144,35 @@
 .animate-blink {
   animation: blink 1s step-end infinite;
 }
+
+/* ═══════════════════════════════════════
+   ADMIN HUB — Mobile Utilities
+   ═══════════════════════════════════════ */
+
+/* Scrollbar hidden but still scrollable — for tab nav */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Admin page enter animation */
+.admin-page-enter {
+  animation: adminSlideIn 0.18s ease-out;
+}
+@keyframes adminSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Fix recharts overflow on mobile containers */
+.recharts-responsive-container {
+  min-width: 0 !important;
+}
+
+/* Admin bottom action bar spacer — avoid content being hidden */
+.admin-has-bottom-bar {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Admin root — prevent horizontal overflow */
+.admin-root {
+  overflow-x: hidden;
+}

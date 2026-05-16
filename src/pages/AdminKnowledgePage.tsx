@@ -16,10 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +40,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createApproval, type ApprovalPayload } from "@/services/approvalService";
+import { AdminPageShell, AdminSection, AdminForm, AdminFormField, AdminDataList } from "@/admin/components";
 
 interface KnowledgeItem {
   id: string;
@@ -238,35 +238,23 @@ const AdminKnowledgePage = () => {
   };
 
   return (
-    <ScrollArea className="flex-1">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-4 md:p-8 max-w-4xl mx-auto w-full space-y-6 pb-24"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <BookOpen className="text-neon-blue" size={28} />
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Knowledge Base
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Kho kiến thức & prompt hệ thống
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={openAdd}
-            size="sm"
-            className="bg-neon-purple hover:bg-neon-purple/80 text-white"
-            disabled={!canEditAdminHub}
-            title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm" : ""}
-          >
-            <Plus size={14} className="mr-1" /> Thêm mục
-          </Button>
-        </div>
+    <AdminPageShell
+      backTo="/admin"
+      icon={BookOpen}
+      iconGradient="bg-gradient-to-br from-neon-blue to-cyan-500"
+      title="Knowledge Base"
+      subtitle="Kho kiến thức & prompt hệ thống"
+      actions={
+        <Button
+          onClick={openAdd}
+          size="sm"
+          className="bg-neon-purple hover:bg-neon-purple/80 text-white"
+          disabled={!canEditAdminHub}
+        >
+          <Plus size={14} className="mr-1" /> Thêm mục
+        </Button>
+      }
+    >
 
         {/* Search & Filter */}
         <div className="flex gap-2">
@@ -554,8 +542,7 @@ const AdminKnowledgePage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </motion.div>
-    </ScrollArea>
+    </AdminPageShell>
   );
 };
 

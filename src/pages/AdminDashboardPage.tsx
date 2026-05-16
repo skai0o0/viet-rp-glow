@@ -2,16 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate, Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import {
   Loader2,
-  ArrowLeft,
   Users,
   Sparkles,
   MessageSquare,
@@ -32,6 +29,14 @@ import {
   Crown,
   Layers,
 } from "lucide-react";
+import {
+  AdminPageShell,
+  AdminTabs,
+  TabsContent,
+  AdminStatCard,
+  AdminSection,
+  AdminIconButton,
+} from "@/admin/components";
 import { supabase } from "@/integrations/supabase/client";
 import { buildMessages, buildLayeredPrompt, estimateTokens, type PromptSection } from "@/utils/promptBuilder";
 import { dbCharToCard } from "@/services/characterDb";
@@ -124,37 +129,6 @@ interface TopPage {
 /* ------------------------------------------------------------------ */
 /*  Reusable                                                           */
 /* ------------------------------------------------------------------ */
-const BigStatCard = ({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  color,
-  delay = 0,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  sub?: string;
-  color: string;
-  delay?: number;
-}) => (
-  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }} className="h-full">
-    <Card className="bg-oled-surface border-oled-border hover:border-neon-purple/30 transition-colors h-full">
-      <CardContent className="p-4 flex items-center gap-3 h-full">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
-          <Icon size={20} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
-          <p className="text-xs text-muted-foreground truncate">{label}</p>
-          {sub && <p className="text-[10px] text-muted-foreground/60 mt-0.5">{sub}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  </motion.div>
-);
-
 const MiniBar = ({ value, max, color }: { value: number; max: number; color: string }) => {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
@@ -404,597 +378,467 @@ const AdminDashboardPage = () => {
   if (!user || !canViewAdminHub) return <Navigate to="/" replace />;
 
   return (
-    <ScrollArea className="flex-1">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-6 pb-24"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/admin">
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft size={20} />
-              </Button>
-            </Link>
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-neon-blue to-neon-purple flex items-center justify-center shadow-lg">
-              <BarChart3 className="text-white" size={24} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-              <p className="text-sm text-muted-foreground">Thống kê tổng quan & Analytics</p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={refreshing || loading}
-            className="text-muted-foreground hover:text-neon-blue"
-          >
-            <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
-          </Button>
+    <AdminPageShell
+      backTo="/admin"
+      icon={BarChart3}
+      title="Dashboard"
+      subtitle="Thống kê tổng quan & Analytics"
+      actions={
+        <AdminIconButton
+          icon={RefreshCw}
+          label="Làm mới"
+          variant="ghost"
+          color="blue"
+          onClick={handleRefresh}
+          disabled={refreshing || loading}
+        />
+      }
+    >
+      {loading || !stats ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={28} className="animate-spin text-neon-purple" />
         </div>
+      ) : (
+        <AdminTabs
+          tabs={[
+            { value: "overview", label: "Tổng quan", color: "neon-purple" },
+            { value: "analytics", label: "Analytics", color: "neon-blue" },
+            { value: "models", label: "Models & API", color: "neon-rose" },
+            { value: "debug", label: "Debug", color: "cyan-400" },
+          ]}
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-4"
+        >
+          {/* ═══════════════ TAB: OVERVIEW ═══════════════ */}
+          <TabsContent value="overview" className="space-y-4">
+            {/* Primary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <AdminStatCard size="lg" icon={Sparkles} label="Tổng nhân vật" value={formatNumber(stats.total_characters)} color="text-neon-purple" delay={0} />
+              <AdminStatCard size="lg" icon={Users} label="Người dùng" value={formatNumber(stats.total_users)} color="text-neon-blue" delay={0.05} />
+              <AdminStatCard size="lg" icon={MessageSquare} label="Phiên chat" value={formatNumber(stats.total_sessions)} color="text-neon-rose" delay={0.1} />
+              <AdminStatCard size="lg" icon={MessagesSquare} label="Tổng tin nhắn" value={formatNumber(stats.total_messages)} color="text-cyan-400" delay={0.15} />
+            </div>
 
-        {loading || !stats ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={28} className="animate-spin text-neon-purple" />
-          </div>
-        ) : (
-          <>
-            {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="bg-oled-surface border border-oled-border overflow-x-auto justify-start w-full">
-                <TabsTrigger value="overview" className="shrink-0 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-                  Tổng quan
-                </TabsTrigger>
-                <TabsTrigger value="analytics" className="shrink-0 data-[state=active]:bg-neon-blue/20 data-[state=active]:text-neon-blue">
-                  Analytics
-                </TabsTrigger>
-                <TabsTrigger value="models" className="shrink-0 data-[state=active]:bg-neon-rose/20 data-[state=active]:text-neon-rose">
-                  Models & API
-                </TabsTrigger>
-                <TabsTrigger value="debug" className="shrink-0 data-[state=active]:bg-cyan-400/20 data-[state=active]:text-cyan-400">
-                  Debug
-                </TabsTrigger>
-              </TabsList>
+            {/* Secondary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <AdminStatCard size="lg" icon={Heart} label="Lượt yêu thích" value={formatNumber(stats.total_favorites)} color="text-pink-400" delay={0.2} />
+              <AdminStatCard size="lg" icon={Star} label="Lượt đánh giá" value={formatNumber(stats.total_ratings)} sub={`TB: ${stats.avg_rating}/5`} color="text-amber-400" delay={0.25} />
+              <AdminStatCard size="lg" icon={Globe} label="Công khai" value={stats.public_characters} color="text-green-400" delay={0.3} />
+              <AdminStatCard size="lg" icon={Lock} label="Riêng tư" value={stats.private_characters} color="text-gray-400" delay={0.35} />
+            </div>
 
-              {/* ═══════════════ TAB: OVERVIEW ═══════════════ */}
-              <TabsContent value="overview" className="space-y-4">
-                {/* Primary stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <BigStatCard icon={Sparkles} label="Tổng nhân vật" value={formatNumber(stats.total_characters)} color="text-neon-purple bg-neon-purple/10" delay={0} />
-                  <BigStatCard icon={Users} label="Người dùng" value={formatNumber(stats.total_users)} color="text-neon-blue bg-neon-blue/10" delay={0.05} />
-                  <BigStatCard icon={MessageSquare} label="Phiên chat" value={formatNumber(stats.total_sessions)} color="text-neon-rose bg-neon-rose/10" delay={0.1} />
-                  <BigStatCard icon={MessagesSquare} label="Tổng tin nhắn" value={formatNumber(stats.total_messages)} color="text-cyan-400 bg-cyan-400/10" delay={0.15} />
+            {/* Today's activity */}
+            <AdminSection icon={Activity} title="Hoạt động hôm nay" dotColor="bg-neon-blue">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="bg-oled-base rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-neon-blue">{stats.active_users_today}</p>
+                  <p className="text-[10px] text-muted-foreground">Active Users</p>
                 </div>
-
-                {/* Secondary stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <BigStatCard icon={Heart} label="Lượt yêu thích" value={formatNumber(stats.total_favorites)} color="text-pink-400 bg-pink-400/10" delay={0.2} />
-                  <BigStatCard icon={Star} label="Lượt đánh giá" value={formatNumber(stats.total_ratings)} sub={`TB: ${stats.avg_rating}/5`} color="text-amber-400 bg-amber-400/10" delay={0.25} />
-                  <BigStatCard icon={Globe} label="Công khai" value={stats.public_characters} color="text-green-400 bg-green-400/10" delay={0.3} />
-                  <BigStatCard icon={Lock} label="Riêng tư" value={stats.private_characters} color="text-gray-400 bg-gray-400/10" delay={0.35} />
+                <div className="bg-oled-base rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-cyan-400">{stats.total_chat_messages_today}</p>
+                  <p className="text-[10px] text-muted-foreground">Chat Messages</p>
                 </div>
-
-                {/* Today's activity */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-                  <Card className="bg-oled-surface border-oled-border">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                        <Activity size={14} className="text-neon-blue" />
-                        Hoạt động hôm nay
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                        <div className="bg-oled-base rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-neon-blue">{stats.active_users_today}</p>
-                          <p className="text-[10px] text-muted-foreground">Active Users</p>
-                        </div>
-                        <div className="bg-oled-base rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-cyan-400">{stats.total_chat_messages_today}</p>
-                          <p className="text-[10px] text-muted-foreground">Chat Messages</p>
-                        </div>
-                        <div className="bg-oled-base rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-neon-purple">{stats.total_page_views_today}</p>
-                          <p className="text-[10px] text-muted-foreground">Page Views</p>
-                        </div>
-                        <div className="bg-oled-base rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-green-400">{stats.unique_visitors_today}</p>
-                          <p className="text-[10px] text-muted-foreground">Unique Visitors</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">Người dùng mới</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-neon-blue">+{stats.new_users_today}</span>
-                          <TrendingUp size={14} className="text-neon-blue" />
-                        </div>
-                      </div>
-                      <MiniBar value={stats.new_users_today} max={Math.max(stats.total_users, 1)} color="bg-neon-blue" />
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">Nhân vật mới</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-neon-purple">+{stats.new_chars_today}</span>
-                          <TrendingUp size={14} className="text-neon-purple" />
-                        </div>
-                      </div>
-                      <MiniBar value={stats.new_chars_today} max={Math.max(stats.total_characters, 1)} color="bg-neon-purple" />
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">Phiên chat mới</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-neon-rose">+{stats.new_sessions_today}</span>
-                          <TrendingUp size={14} className="text-neon-rose" />
-                        </div>
-                      </div>
-                      <MiniBar value={stats.new_sessions_today} max={Math.max(stats.total_sessions, 1)} color="bg-neon-rose" />
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-foreground">Tin nhắn mới</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-cyan-400">+{stats.new_messages_today}</span>
-                          <TrendingUp size={14} className="text-cyan-400" />
-                        </div>
-                      </div>
-                      <MiniBar value={stats.new_messages_today} max={Math.max(stats.total_messages, 1)} color="bg-cyan-400" />
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Character ratio */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-                  <Card className="bg-oled-surface border-oled-border">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                        <BarChart3 size={14} className="text-neon-purple" />
-                        Tỷ lệ nhân vật
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-green-400 flex items-center gap-1.5"><Globe size={12} /> Công khai</span>
-                        <span className="font-bold text-foreground">{stats.public_characters}</span>
-                      </div>
-                      <MiniBar value={stats.public_characters} max={Math.max(stats.total_characters, 1)} color="bg-green-400" />
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400 flex items-center gap-1.5"><Lock size={12} /> Riêng tư</span>
-                        <span className="font-bold text-foreground">{stats.private_characters}</span>
-                      </div>
-                      <MiniBar value={stats.private_characters} max={Math.max(stats.total_characters, 1)} color="bg-gray-400" />
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Top characters */}
-                {topChars.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <Crown size={14} className="text-amber-400" />
-                          Top nhân vật phổ biến
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {topChars.map((c, idx) => (
-                          <Link key={c.id} to={`/character/${c.id}`}>
-                            <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-oled-elevated/50 transition-colors group">
-                              <span className="text-xs font-bold text-muted-foreground w-5 text-right">#{idx + 1}</span>
-                              <div className="w-9 h-9 rounded-lg bg-oled-base overflow-hidden shrink-0 flex items-center justify-center">
-                                {c.avatar_url ? (
-                                  <img src={c.avatar_url} alt={c.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <Sparkles size={14} className="text-muted-foreground" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate group-hover:text-neon-purple transition-colors">
-                                  {c.name}
-                                </p>
-                                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
-                                  <span className="flex items-center gap-0.5"><MessagesSquare size={10} /> {c.message_count}</span>
-                                  <span className="flex items-center gap-0.5"><Heart size={10} /> {c.fav_count}</span>
-                                  <span className="flex items-center gap-0.5"><MessageSquare size={10} /> {c.session_count}</span>
-                                  {c.rating > 0 && <span className="flex items-center gap-0.5"><Star size={10} /> {c.rating}</span>}
-                                </div>
-                              </div>
-                              {c.tags?.slice(0, 2).map((t) => (
-                                <Badge key={t} variant="outline" className="text-[10px] px-1.5 py-0 border-oled-border text-muted-foreground hidden md:inline-flex">
-                                  {t}
-                                </Badge>
-                              ))}
-                            </div>
-                          </Link>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-              </TabsContent>
-
-              {/* ═══════════════ TAB: ANALYTICS ═══════════════ */}
-              <TabsContent value="analytics" className="space-y-4">
-                {/* Live metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <BigStatCard icon={Eye} label="Page Views hôm nay" value={stats.total_page_views_today} color="text-neon-purple bg-neon-purple/10" />
-                  <BigStatCard icon={MousePointerClick} label="Visitors hôm nay" value={stats.unique_visitors_today} color="text-neon-blue bg-neon-blue/10" />
-                  <BigStatCard icon={Zap} label="Active Users" value={stats.active_users_today} color="text-green-400 bg-green-400/10" />
-                  <BigStatCard icon={MessagesSquare} label="Chat hôm nay" value={stats.total_chat_messages_today} color="text-cyan-400 bg-cyan-400/10" />
+                <div className="bg-oled-base rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-neon-purple">{stats.total_page_views_today}</p>
+                  <p className="text-[10px] text-muted-foreground">Page Views</p>
                 </div>
+                <div className="bg-oled-base rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-green-400">{stats.unique_visitors_today}</p>
+                  <p className="text-[10px] text-muted-foreground">Unique Visitors</p>
+                </div>
+              </div>
 
-                {/* Chat usage 30-day sparkline */}
-                {analytics && analytics.chat_usage.length > 1 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <MessagesSquare size={14} className="text-cyan-400" />
-                          Chat Messages — 30 ngày qua
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <SparkLine data={analytics.chat_usage.map((d) => d.messages)} color="#22d3ee" height={60} />
-                        <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-                          <span>{analytics.chat_usage[0]?.day}</span>
-                          <span className="text-cyan-400 font-bold">
-                            Tổng: {analytics.chat_usage.reduce((s, d) => s + d.messages, 0)} messages
-                          </span>
-                          <span>{analytics.chat_usage[analytics.chat_usage.length - 1]?.day}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Người dùng mới</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-neon-blue">+{stats.new_users_today}</span>
+                  <TrendingUp size={14} className="text-neon-blue" />
+                </div>
+              </div>
+              <MiniBar value={stats.new_users_today} max={Math.max(stats.total_users, 1)} color="bg-neon-blue" />
 
-                {/* Active users 30-day sparkline */}
-                {analytics && analytics.chat_usage.length > 1 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <Users size={14} className="text-neon-blue" />
-                          Active Users — 30 ngày qua
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <SparkLine data={analytics.chat_usage.map((d) => d.active_users)} color="#60a5fa" height={60} />
-                        <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-                          <span>{analytics.chat_usage[0]?.day}</span>
-                          <span className="text-neon-blue font-bold">
-                            Cao nhất: {Math.max(...analytics.chat_usage.map((d) => d.active_users))} users/ngày
-                          </span>
-                          <span>{analytics.chat_usage[analytics.chat_usage.length - 1]?.day}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Nhân vật mới</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-neon-purple">+{stats.new_chars_today}</span>
+                  <TrendingUp size={14} className="text-neon-purple" />
+                </div>
+              </div>
+              <MiniBar value={stats.new_chars_today} max={Math.max(stats.total_characters, 1)} color="bg-neon-purple" />
 
-                {/* Page views sparkline */}
-                {analytics && analytics.page_views.length > 1 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <Eye size={14} className="text-neon-purple" />
-                          Page Views — 30 ngày qua
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <SparkLine data={analytics.page_views.map((d) => d.views)} color="#a855f7" height={60} />
-                        <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-                          <span>{analytics.page_views[0]?.day}</span>
-                          <span className="text-neon-purple font-bold">
-                            Tổng: {analytics.page_views.reduce((s, d) => s + d.views, 0)} views
-                          </span>
-                          <span>{analytics.page_views[analytics.page_views.length - 1]?.day}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Phiên chat mới</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-neon-rose">+{stats.new_sessions_today}</span>
+                  <TrendingUp size={14} className="text-neon-rose" />
+                </div>
+              </div>
+              <MiniBar value={stats.new_sessions_today} max={Math.max(stats.total_sessions, 1)} color="bg-neon-rose" />
 
-                {/* Signups sparkline */}
-                {analytics && analytics.signups.length > 1 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <TrendingUp size={14} className="text-green-400" />
-                          Đăng ký mới — 30 ngày qua
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <SparkLine data={analytics.signups.map((d) => d.count)} color="#4ade80" height={60} />
-                        <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-                          <span>{analytics.signups[0]?.day}</span>
-                          <span className="text-green-400 font-bold">
-                            Tổng: {analytics.signups.reduce((s, d) => s + d.count, 0)} users
-                          </span>
-                          <span>{analytics.signups[analytics.signups.length - 1]?.day}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground">Tin nhắn mới</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-cyan-400">+{stats.new_messages_today}</span>
+                  <TrendingUp size={14} className="text-cyan-400" />
+                </div>
+              </div>
+              <MiniBar value={stats.new_messages_today} max={Math.max(stats.total_messages, 1)} color="bg-cyan-400" />
+            </AdminSection>
 
-                {/* Top pages */}
-                {topPages.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <Eye size={14} className="text-neon-purple" />
-                          Trang được xem nhiều nhất (7 ngày)
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-1">
-                        {topPages.map((p, i) => {
-                          const maxViews = topPages[0]?.views ?? 1;
-                          return (
-                            <div key={p.path} className="flex items-center gap-3 py-1.5">
-                              <span className="text-xs font-bold text-muted-foreground w-5 text-right">#{i + 1}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-foreground font-mono truncate">{p.path}</p>
-                                <div className="mt-1">
-                                  <MiniBar value={p.views} max={maxViews} color="bg-neon-purple" />
-                                </div>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className="text-sm font-bold text-foreground">{p.views}</p>
-                                <p className="text-[10px] text-muted-foreground">{p.unique_users} users</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-              </TabsContent>
+            {/* Character ratio */}
+            <AdminSection icon={BarChart3} title="Tỷ lệ nhân vật" dotColor="bg-neon-purple">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-green-400 flex items-center gap-1.5"><Globe size={12} /> Công khai</span>
+                <span className="font-bold text-foreground">{stats.public_characters}</span>
+              </div>
+              <MiniBar value={stats.public_characters} max={Math.max(stats.total_characters, 1)} color="bg-green-400" />
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-400 flex items-center gap-1.5"><Lock size={12} /> Riêng tư</span>
+                <span className="font-bold text-foreground">{stats.private_characters}</span>
+              </div>
+              <MiniBar value={stats.private_characters} max={Math.max(stats.total_characters, 1)} color="bg-gray-400" />
+            </AdminSection>
 
-              {/* ═══════════════ TAB: MODELS & API ═══════════════ */}
-              <TabsContent value="models" className="space-y-4">
-                {/* Tier usage breakdown */}
-                {modelStats && modelStats.by_tier.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <Layers size={14} className="text-neon-rose" />
-                          Sử dụng theo Tier (30 ngày)
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {modelStats.by_tier.map((t) => {
-                          const maxCount = modelStats.by_tier[0]?.count ?? 1;
-                          const tierColor = t.tier === "free" ? "bg-green-400" : t.tier === "pro" ? "bg-neon-blue" : "bg-neon-purple";
-                          const tierTextColor = t.tier === "free" ? "text-green-400" : t.tier === "pro" ? "text-neon-blue" : "text-neon-purple";
-                          return (
-                            <div key={`${t.tier}-${t.model}`} className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${tierTextColor} border-current`}>
-                                    {t.tier?.toUpperCase() ?? "N/A"}
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">{t.model}</span>
-                                </div>
-                                <span className="text-sm font-bold text-foreground">{formatNumber(t.count)}</span>
-                              </div>
-                              <MiniBar value={t.count} max={maxCount} color={tierColor} />
-                            </div>
-                          );
-                        })}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {/* API Key Health */}
-                {modelStats && modelStats.api_key_health.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                    <Card className="bg-oled-surface border-oled-border">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                          <Server size={14} className="text-amber-400" />
-                          API Key Pool Health
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {modelStats.api_key_health.map((k) => (
-                          <div key={k.key_name} className="flex items-center gap-3 p-2 rounded-lg bg-oled-base">
-                            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${k.is_active ? "bg-green-400" : "bg-red-400"}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{k.key_name}</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {formatNumber(k.request_count)} requests
-                              </p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] px-1.5 py-0 ${k.is_active ? "text-green-400 border-green-400/30" : "text-red-400 border-red-400/30"}`}
-                              >
-                                {k.is_active ? "Active" : "Inactive"}
-                              </Badge>
-                              <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 justify-end">
-                                <Clock size={9} /> {timeAgo(k.last_used_at)}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                        <div className="mt-2 pt-2 border-t border-oled-border flex items-center justify-between text-xs text-muted-foreground">
-                          <span>
-                            {modelStats.api_key_health.filter((k) => k.is_active).length}/{modelStats.api_key_health.length} keys active
-                          </span>
-                          <span>
-                            Tổng: {formatNumber(modelStats.api_key_health.reduce((s, k) => s + k.request_count, 0))} requests
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {/* Empty states */}
-                {modelStats && modelStats.by_tier.length === 0 && modelStats.api_key_health.length === 0 && (
-                  <Card className="bg-oled-surface border-oled-border">
-                    <CardContent className="p-8 text-center">
-                      <Server size={32} className="mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-sm text-muted-foreground">Chưa có dữ liệu model usage.</p>
-                      <p className="text-xs text-muted-foreground/60 mt-1">Data sẽ xuất hiện khi users bắt đầu chat qua platform proxy.</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              {/* ═══════════════ TAB: DEBUG ═══════════════ */}
-              <TabsContent value="debug" className="space-y-4">
-                <Card className="bg-oled-surface border-oled-border">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Prompt Inspector</CardTitle>
-                    <CardDescription>Chọn nhân vật để xem cấu trúc prompt phân tầng (SillyTavern-style) và raw messages gửi tới AI.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col sm:flex-row gap-3">
-                    <Select value={selectedCharId} onValueChange={setSelectedCharId}>
-                      <SelectTrigger className="flex-1 bg-oled-base border-oled-border">
-                        <SelectValue placeholder="Chọn nhân vật..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {debugChars.map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      onClick={handleInspect}
-                      disabled={!selectedCharId || inspectLoading}
-                      className="bg-neon-purple hover:bg-neon-purple/80 text-white font-semibold"
-                    >
-                      {inspectLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : <Eye size={14} className="mr-2" />}
-                      Xem Payload
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {(builtMessages || layeredSections) && (
-                  <div className="space-y-3">
-                    {/* View toggle */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setInspectView("layered")}
-                          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                            inspectView === "layered"
-                              ? "bg-neon-purple/20 border-neon-purple/50 text-neon-purple"
-                              : "border-oled-border text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          <Layers size={12} className="inline mr-1" />
-                          Layered Sections
-                        </button>
-                        <button
-                          onClick={() => setInspectView("raw")}
-                          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                            inspectView === "raw"
-                              ? "bg-neon-blue/20 border-neon-blue/50 text-neon-blue"
-                              : "border-oled-border text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          Raw Messages
-                        </button>
+            {/* Top characters */}
+            {topChars.length > 0 && (
+              <AdminSection icon={Crown} title="Top nhân vật phổ biến" dotColor="bg-amber-400">
+                {topChars.map((c, idx) => (
+                  <Link key={c.id} to={`/character/${c.id}`}>
+                    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-oled-elevated/50 transition-colors group">
+                      <span className="text-xs font-bold text-muted-foreground w-5 text-right">#{idx + 1}</span>
+                      <div className="w-9 h-9 rounded-lg bg-oled-base overflow-hidden shrink-0 flex items-center justify-center">
+                        {c.avatar_url ? (
+                          <img src={c.avatar_url} alt={c.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Sparkles size={14} className="text-muted-foreground" />
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        ~{estimateTokens(
-                          inspectView === "layered"
-                            ? (layeredSections?.map(s => s.content).join("\n\n") ?? "")
-                            : (builtMessages?.map(m => m.content).join("\n\n") ?? "")
-                        )} tokens
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate group-hover:text-neon-purple transition-colors">
+                          {c.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+                          <span className="flex items-center gap-0.5"><MessagesSquare size={10} /> {c.message_count}</span>
+                          <span className="flex items-center gap-0.5"><Heart size={10} /> {c.fav_count}</span>
+                          <span className="flex items-center gap-0.5"><MessageSquare size={10} /> {c.session_count}</span>
+                          {c.rating > 0 && <span className="flex items-center gap-0.5"><Star size={10} /> {c.rating}</span>}
+                        </div>
+                      </div>
+                      {c.tags?.slice(0, 2).map((t) => (
+                        <Badge key={t} variant="outline" className="text-[10px] px-1.5 py-0 border-oled-border text-muted-foreground hidden md:inline-flex">
+                          {t}
+                        </Badge>
+                      ))}
                     </div>
+                  </Link>
+                ))}
+              </AdminSection>
+            )}
+          </TabsContent>
 
-                    {/* Layered view */}
-                    {inspectView === "layered" && layeredSections && (
-                      <div className="space-y-3">
-                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                          Prompt Sections ({layeredSections.length} layers)
-                        </h2>
-                        {layeredSections.map((section, i) => (
-                          <motion.div
-                            key={section.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                          >
-                            <Card className={`border ${sectionColors[section.id] || "border-oled-border"}`}>
-                              <CardHeader className="pb-2 pt-3 px-4">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold uppercase tracking-wider">
-                                    #{section.order + 1} — {section.id.replace(/_/g, " ")}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {estimateTokens(section.content)} tokens · {section.content.length} chars
-                                  </span>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="px-4 pb-3">
-                                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground/80 max-h-96 overflow-auto">
-                                  {section.content}
-                                </pre>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
+          {/* ═══════════════ TAB: ANALYTICS ═══════════════ */}
+          <TabsContent value="analytics" className="space-y-4">
+            {/* Live metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <AdminStatCard size="lg" icon={Eye} label="Page Views hôm nay" value={stats.total_page_views_today} color="text-neon-purple" />
+              <AdminStatCard size="lg" icon={MousePointerClick} label="Visitors hôm nay" value={stats.unique_visitors_today} color="text-neon-blue" />
+              <AdminStatCard size="lg" icon={Zap} label="Active Users" value={stats.active_users_today} color="text-green-400" />
+              <AdminStatCard size="lg" icon={MessagesSquare} label="Chat hôm nay" value={stats.total_chat_messages_today} color="text-cyan-400" />
+            </div>
 
-                    {/* Raw messages view */}
-                    {inspectView === "raw" && builtMessages && (
-                      <div className="space-y-3">
-                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                          Messages Array ({builtMessages.length} items)
-                        </h2>
-                        {builtMessages.map((msg, i) => (
-                          <motion.div
-                            key={i}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                          >
-                            <Card className={`border ${roleColors[msg.role] || "border-oled-border"}`}>
-                              <CardHeader className="pb-2 pt-3 px-4">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold uppercase tracking-wider">
-                                    [{i}] {msg.role}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {msg.content?.length || 0} chars
-                                  </span>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="px-4 pb-3">
-                                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground/80 max-h-96 overflow-auto">
-                                  {msg.content}
-                                </pre>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
+            {/* Chat usage 30-day sparkline */}
+            {analytics && analytics.chat_usage.length > 1 && (
+              <AdminSection icon={MessagesSquare} title="Chat Messages — 30 ngày qua" dotColor="bg-cyan-400">
+                <SparkLine data={analytics.chat_usage.map((d) => d.messages)} color="#22d3ee" height={60} />
+                <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+                  <span>{analytics.chat_usage[0]?.day}</span>
+                  <span className="text-cyan-400 font-bold">
+                    Tổng: {analytics.chat_usage.reduce((s, d) => s + d.messages, 0)} messages
+                  </span>
+                  <span>{analytics.chat_usage[analytics.chat_usage.length - 1]?.day}</span>
+                </div>
+              </AdminSection>
+            )}
+
+            {/* Active users 30-day sparkline */}
+            {analytics && analytics.chat_usage.length > 1 && (
+              <AdminSection icon={Users} title="Active Users — 30 ngày qua" dotColor="bg-neon-blue">
+                <SparkLine data={analytics.chat_usage.map((d) => d.active_users)} color="#60a5fa" height={60} />
+                <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+                  <span>{analytics.chat_usage[0]?.day}</span>
+                  <span className="text-neon-blue font-bold">
+                    Cao nhất: {Math.max(...analytics.chat_usage.map((d) => d.active_users))} users/ngày
+                  </span>
+                  <span>{analytics.chat_usage[analytics.chat_usage.length - 1]?.day}</span>
+                </div>
+              </AdminSection>
+            )}
+
+            {/* Page views sparkline */}
+            {analytics && analytics.page_views.length > 1 && (
+              <AdminSection icon={Eye} title="Page Views — 30 ngày qua" dotColor="bg-neon-purple">
+                <SparkLine data={analytics.page_views.map((d) => d.views)} color="#a855f7" height={60} />
+                <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+                  <span>{analytics.page_views[0]?.day}</span>
+                  <span className="text-neon-purple font-bold">
+                    Tổng: {analytics.page_views.reduce((s, d) => s + d.views, 0)} views
+                  </span>
+                  <span>{analytics.page_views[analytics.page_views.length - 1]?.day}</span>
+                </div>
+              </AdminSection>
+            )}
+
+            {/* Signups sparkline */}
+            {analytics && analytics.signups.length > 1 && (
+              <AdminSection icon={TrendingUp} title="Đăng ký mới — 30 ngày qua" dotColor="bg-green-400">
+                <SparkLine data={analytics.signups.map((d) => d.count)} color="#4ade80" height={60} />
+                <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+                  <span>{analytics.signups[0]?.day}</span>
+                  <span className="text-green-400 font-bold">
+                    Tổng: {analytics.signups.reduce((s, d) => s + d.count, 0)} users
+                  </span>
+                  <span>{analytics.signups[analytics.signups.length - 1]?.day}</span>
+                </div>
+              </AdminSection>
+            )}
+
+            {/* Top pages */}
+            {topPages.length > 0 && (
+              <AdminSection icon={Eye} title="Trang được xem nhiều nhất (7 ngày)" dotColor="bg-neon-purple">
+                {topPages.map((p, i) => {
+                  const maxViews = topPages[0]?.views ?? 1;
+                  return (
+                    <div key={p.path} className="flex items-center gap-3 py-1.5">
+                      <span className="text-xs font-bold text-muted-foreground w-5 text-right">#{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground font-mono truncate">{p.path}</p>
+                        <div className="mt-1">
+                          <MiniBar value={p.views} max={maxViews} color="bg-neon-purple" />
+                        </div>
                       </div>
-                    )}
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-foreground">{p.views}</p>
+                        <p className="text-[10px] text-muted-foreground">{p.unique_users} users</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </AdminSection>
+            )}
+          </TabsContent>
+
+          {/* ═══════════════ TAB: MODELS & API ═══════════════ */}
+          <TabsContent value="models" className="space-y-4">
+            {/* Tier usage breakdown */}
+            {modelStats && modelStats.by_tier.length > 0 && (
+              <AdminSection icon={Layers} title="Sử dụng theo Tier (30 ngày)" dotColor="bg-neon-rose">
+                {modelStats.by_tier.map((t) => {
+                  const maxCount = modelStats.by_tier[0]?.count ?? 1;
+                  const tierColor = t.tier === "free" ? "bg-green-400" : t.tier === "pro" ? "bg-neon-blue" : "bg-neon-purple";
+                  const tierTextColor = t.tier === "free" ? "text-green-400" : t.tier === "pro" ? "text-neon-blue" : "text-neon-purple";
+                  return (
+                    <div key={`${t.tier}-${t.model}`} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${tierTextColor} border-current`}>
+                            {t.tier?.toUpperCase() ?? "N/A"}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">{t.model}</span>
+                        </div>
+                        <span className="text-sm font-bold text-foreground">{formatNumber(t.count)}</span>
+                      </div>
+                      <MiniBar value={t.count} max={maxCount} color={tierColor} />
+                    </div>
+                  );
+                })}
+              </AdminSection>
+            )}
+
+            {/* API Key Health */}
+            {modelStats && modelStats.api_key_health.length > 0 && (
+              <AdminSection icon={Server} title="API Key Pool Health" dotColor="bg-amber-400">
+                {modelStats.api_key_health.map((k) => (
+                  <div key={k.key_name} className="flex items-center gap-3 p-2 rounded-lg bg-oled-base">
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${k.is_active ? "bg-green-400" : "bg-red-400"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{k.key_name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatNumber(k.request_count)} requests
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 ${k.is_active ? "text-green-400 border-green-400/30" : "text-red-400 border-red-400/30"}`}
+                      >
+                        {k.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 justify-end">
+                        <Clock size={9} /> {timeAgo(k.last_used_at)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div className="mt-2 pt-2 border-t border-oled-border flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {modelStats.api_key_health.filter((k) => k.is_active).length}/{modelStats.api_key_health.length} keys active
+                  </span>
+                  <span>
+                    Tổng: {formatNumber(modelStats.api_key_health.reduce((s, k) => s + k.request_count, 0))} requests
+                  </span>
+                </div>
+              </AdminSection>
+            )}
+
+            {/* Empty states */}
+            {modelStats && modelStats.by_tier.length === 0 && modelStats.api_key_health.length === 0 && (
+              <Card className="bg-oled-surface border-oled-border">
+                <CardContent className="p-8 text-center">
+                  <Server size={32} className="mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">Chưa có dữ liệu model usage.</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Data sẽ xuất hiện khi users bắt đầu chat qua platform proxy.</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* ═══════════════ TAB: DEBUG ═══════════════ */}
+          <TabsContent value="debug" className="space-y-4">
+            <AdminSection title="Prompt Inspector" description="Chọn nhân vật để xem cấu trúc prompt phân tầng (SillyTavern-style) và raw messages gửi tới AI.">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Select value={selectedCharId} onValueChange={setSelectedCharId}>
+                  <SelectTrigger className="flex-1 bg-oled-base border-oled-border">
+                    <SelectValue placeholder="Chọn nhân vật..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {debugChars.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleInspect}
+                  disabled={!selectedCharId || inspectLoading}
+                  className="bg-neon-purple hover:bg-neon-purple/80 text-white font-semibold"
+                >
+                  {inspectLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : <Eye size={14} className="mr-2" />}
+                  Xem Payload
+                </Button>
+              </div>
+            </AdminSection>
+
+            {(builtMessages || layeredSections) && (
+              <div className="space-y-3">
+                {/* View toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setInspectView("layered")}
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                        inspectView === "layered"
+                          ? "bg-neon-purple/20 border-neon-purple/50 text-neon-purple"
+                          : "border-oled-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Layers size={12} className="inline mr-1" />
+                      Layered Sections
+                    </button>
+                    <button
+                      onClick={() => setInspectView("raw")}
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                        inspectView === "raw"
+                          ? "bg-neon-blue/20 border-neon-blue/50 text-neon-blue"
+                          : "border-oled-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Raw Messages
+                    </button>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    ~{estimateTokens(
+                      inspectView === "layered"
+                        ? (layeredSections?.map(s => s.content).join("\n\n") ?? "")
+                        : (builtMessages?.map(m => m.content).join("\n\n") ?? "")
+                    )} tokens
+                  </span>
+                </div>
+
+                {/* Layered view */}
+                {inspectView === "layered" && layeredSections && (
+                  <div className="space-y-3">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      Prompt Sections ({layeredSections.length} layers)
+                    </h2>
+                    {layeredSections.map((section, i) => (
+                      <motion.div
+                        key={section.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                      >
+                        <Card className={`border ${sectionColors[section.id] || "border-oled-border"}`}>
+                          <CardHeader className="pb-2 pt-3 px-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold uppercase tracking-wider">
+                                #{section.order + 1} — {section.id.replace(/_/g, " ")}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {estimateTokens(section.content)} tokens · {section.content.length} chars
+                              </span>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="px-4 pb-3">
+                            <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground/80 max-h-96 overflow-auto">
+                              {section.content}
+                            </pre>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
-      </motion.div>
-    </ScrollArea>
+
+                {/* Raw messages view */}
+                {inspectView === "raw" && builtMessages && (
+                  <div className="space-y-3">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      Messages Array ({builtMessages.length} items)
+                    </h2>
+                    {builtMessages.map((msg, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                      >
+                        <Card className={`border ${roleColors[msg.role] || "border-oled-border"}`}>
+                          <CardHeader className="pb-2 pt-3 px-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold uppercase tracking-wider">
+                                [{i}] {msg.role}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {msg.content?.length || 0} chars
+                              </span>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="px-4 pb-3">
+                            <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground/80 max-h-96 overflow-auto">
+                              {msg.content}
+                            </pre>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+        </AdminTabs>
+      )}
+    </AdminPageShell>
   );
 };
 
