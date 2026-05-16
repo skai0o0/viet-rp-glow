@@ -496,7 +496,7 @@ const AdminRoadmapPage = () => {
                 <Badge variant="outline" className="border-neon-purple text-neon-purple text-xs">
                   {phase.phase}
                 </Badge>
-                <span className="text-sm font-semibold text-foreground">{phase.label}</span>
+                <span className="text-sm font-semibold text-foreground truncate">{phase.label}</span>
               </div>
               <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
                 {phase.items.map((item) => {
@@ -504,7 +504,7 @@ const AdminRoadmapPage = () => {
                   return (
                     <Card key={item.id} className="bg-oled-surface border-oled-border group relative">
                       <CardHeader className="p-3 pb-1">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2 min-w-0">
                           <button
                             onClick={() => canEditAdminHub ? handleStatusToggle(item) : undefined}
                             disabled={!canEditAdminHub}
@@ -513,7 +513,7 @@ const AdminRoadmapPage = () => {
                           >
                             <StatusIcon size={14} className={color} />
                           </button>
-                          <span className="text-foreground flex-1">{item.title}</span>
+                          <span className="text-foreground flex-1 truncate">{item.title}</span>
                           {canEditAdminHub && (
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                               <button onClick={() => openEdit(item)} className="text-muted-foreground hover:text-neon-blue">

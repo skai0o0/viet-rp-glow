@@ -178,7 +178,7 @@ const AdminPage = () => {
                         ) : null}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">{link.label}</p>
+                        <p className="text-sm font-medium text-foreground truncate">{link.label}</p>
                         <p className="text-[10px] text-muted-foreground truncate">{link.description}</p>
                       </div>
                       <ChevronRight size={16} className="text-muted-foreground/30 group-hover:text-neon-purple transition-colors" />

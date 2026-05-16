@@ -42,7 +42,7 @@ const AdminStatCard = forwardRef<HTMLDivElement, AdminStatCardProps>(
               >
                 <Icon size={isLg ? 20 : 16} className={color} />
               </div>
-              <div className="min-w-0">
+              <div className="flex-1 min-w-0">
                 <p className={cn("font-bold text-foreground", isLg ? "text-2xl" : "text-lg")}>
                   {value}
                 </p>
