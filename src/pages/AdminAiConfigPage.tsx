@@ -713,6 +713,7 @@ const AdminAiConfigPage = () => {
       title="AI Configuration"
       subtitle="API Keys, Models, Prompts & Sampling"
     >
+    <div className="debug-safe-area"></div>
 
         {/* API Key Verification */}
         <Card className="bg-oled-surface border-oled-border">

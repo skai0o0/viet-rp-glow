@@ -122,13 +122,27 @@
     justify-content: center;
   }
   .safe-header-pt {
-    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-top: calc(max(1rem, env(safe-area-inset-top))) !important;
   }
+  
   .safe-header-h {
-    min-height: calc(3.5rem + env(safe-area-inset-top));
+    height: auto !important;
+    min-height: calc(3.5rem + env(safe-area-inset-top)) !important;
   }
+
   .safe-content-mt {
-    margin-top: calc(3.5rem + env(safe-area-inset-top));
+    margin-top: calc(3.5rem + env(safe-area-inset-top)) !important;
+  }
+
+  /* CLASS DÙNG ĐỂ DEBUG (Kiểm tra xem đt có nhận env() không) */
+  .debug-safe-area {
+    background-color: red !important;
+    height: env(safe-area-inset-top) !important;
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
   }
 }
 
