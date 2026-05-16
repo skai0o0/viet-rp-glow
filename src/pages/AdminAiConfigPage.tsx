@@ -736,7 +736,7 @@ const AdminAiConfigPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -792,7 +792,7 @@ const AdminAiConfigPage = () => {
                 value={mimoEndpoint}
                 onChange={(e) => { setMimoEndpointState(e.target.value); setSavedMimoEndpoint(false); }}
                 placeholder="https://token-plan-sgp.xiaomimimo.com/v1"
-                className="bg-oled-elevated border-gray-border text-foreground text-xs font-mono focus:border-neon-rose focus:ring-neon-rose/30"
+                className="bg-oled-elevated border-gray-border text-foreground text-base md:text-xs font-mono focus:border-neon-rose focus:ring-neon-rose/30"
               />
               <Button
                 onClick={handleSaveMimoEndpoint}
@@ -821,7 +821,7 @@ const AdminAiConfigPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowMimoKey(!showMimoKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   {showMimoKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -880,14 +880,14 @@ const AdminAiConfigPage = () => {
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
                   placeholder="Tên (VD: Key #1)"
-                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 min-w-[100px] flex-1 sm:flex-[0.3]"
+                  className="bg-oled-elevated border-gray-border text-foreground text-base md:text-sm h-10 md:h-9 min-w-[100px] flex-1 sm:flex-[0.3]"
                 />
                 <Input
                   value={newKeyValue}
                   onChange={(e) => setNewKeyValue(e.target.value)}
                   placeholder="sk-or-v1-..."
                   type="password"
-                  className="bg-oled-elevated border-gray-border text-foreground text-sm h-9 min-w-[140px] flex-1 sm:flex-[0.7] font-mono"
+                  className="bg-oled-elevated border-gray-border text-foreground text-base md:text-sm h-10 md:h-9 min-w-[140px] flex-1 sm:flex-[0.7] font-mono"
                 />
                 <Button
                   size="sm"
@@ -925,7 +925,7 @@ const AdminAiConfigPage = () => {
                           {k.last_used_at && <span>· Last: {new Date(k.last_used_at).toLocaleDateString("vi-VN")}</span>}
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-400" onClick={() => handleDeleteKey(k.id)}>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 md:h-7 md:w-7 text-muted-foreground hover:text-red-400" onClick={() => handleDeleteKey(k.id)}>
                         <Trash2 size={14} />
                       </Button>
                     </div>
@@ -987,14 +987,14 @@ const AdminAiConfigPage = () => {
                           value={tierEdits[tier.tier_key] ?? tier.model_id}
                           onChange={(e) => setTierEdits((prev) => ({ ...prev, [tier.tier_key]: e.target.value }))}
                           placeholder="google/gemini-2.0-flash-001"
-                          className="bg-oled-base border-gray-border text-foreground text-xs h-8 font-mono flex-1"
+                          className="bg-oled-base border-gray-border text-foreground text-base md:text-xs h-10 md:h-8 font-mono flex-1"
                           disabled={!isAdmin}
                         />
                         <Button
                           size="sm"
                           onClick={() => handleSaveTierModel(tier)}
                           disabled={!edited || savingTier === tier.tier_key || !isAdmin}
-                          className="h-8 px-3 text-xs bg-neon-purple hover:bg-neon-purple/80 text-white disabled:opacity-30"
+                          className="h-10 md:h-8 px-3 text-xs bg-neon-purple hover:bg-neon-purple/80 text-white disabled:opacity-30"
                         >
                           {savingTier === tier.tier_key ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                         </Button>
@@ -1042,7 +1042,7 @@ const AdminAiConfigPage = () => {
                     exit={{ opacity: 0, x: 10 }}
                     className="flex items-center gap-2 bg-oled-elevated rounded-xl px-3 py-2.5 group"
                   >
-                    <GripVertical size={14} className="text-muted-foreground/30 shrink-0" />
+                    <GripVertical size={14} className="hidden sm:block text-muted-foreground/30 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-medium text-foreground truncate">{model.model_name}</span>
@@ -1057,12 +1057,12 @@ const AdminAiConfigPage = () => {
                       </div>
                       <p className="text-[10px] text-muted-foreground truncate">{model.model_id}</p>
                     </div>
-                    <span className="text-[10px] text-muted-foreground bg-oled-base px-2 py-0.5 rounded-full shrink-0">
+                    <span className="hidden sm:inline-flex text-[10px] text-muted-foreground bg-oled-base px-2 py-0.5 rounded-full shrink-0">
                       {model.provider}
                     </span>
                     <button
                       onClick={() => handleToggleRecommended(model)}
-                      className={`p-1.5 rounded-lg transition-colors ${
+                      className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors ${
                         model.is_recommended
                           ? "text-yellow-500 bg-yellow-500/10"
                           : canEditAdminHub
@@ -1076,7 +1076,7 @@ const AdminAiConfigPage = () => {
                     </button>
                     <button
                       onClick={() => handleRemoveModel(model.id)}
-                      className={`p-1.5 rounded-lg transition-colors ${
+                      className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors ${
                         canEditAdminHub
                           ? "text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10"
                           : "text-muted-foreground/20 cursor-not-allowed"
@@ -1135,7 +1135,7 @@ const AdminAiConfigPage = () => {
                   Hiển thị {filteredModels.length} / {allModels.length} model. Click "+" để thêm vào danh sách cho phép.
                 </p>
 
-                <ScrollArea className="h-[400px] pr-2">
+                <ScrollArea className="h-[50vh] md:h-[400px] pr-2">
                   <div className="space-y-1">
                     {filteredModels.map((model) => {
                       const isAdded = allowedModelIds.has(model.id);
@@ -1179,7 +1179,7 @@ const AdminAiConfigPage = () => {
                               disabled={adding === model.id || !canEditAdminHub}
                               size="sm"
                               variant="ghost"
-                              className="h-8 w-8 p-0 text-muted-foreground hover:text-neon-purple hover:bg-neon-purple/10"
+                              className="h-10 w-10 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-neon-purple hover:bg-neon-purple/10"
                               title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm model" : undefined}
                             >
                               {adding === model.id ? (
@@ -1680,7 +1680,7 @@ const AdminAiConfigPage = () => {
                     <Input
                       value={style.label}
                       onChange={(e) => handleResponseStyleChange(index, "label", e.target.value)}
-                      className="bg-oled-base border-oled-border text-foreground text-xs h-8"
+                      className="bg-oled-base border-oled-border text-foreground text-base md:text-xs h-10 md:h-8"
                     />
                   </div>
                   {style.value !== "none" && (
@@ -1690,7 +1690,7 @@ const AdminAiConfigPage = () => {
                         rows={2}
                         value={style.prompt}
                         onChange={(e) => handleResponseStyleChange(index, "prompt", e.target.value)}
-                        className="bg-oled-base border-oled-border text-foreground font-mono text-xs resize-y min-h-[40px]"
+                        className="bg-oled-base border-oled-border text-foreground font-mono text-base md:text-xs resize-y min-h-[40px]"
                       />
                     </div>
                   )}

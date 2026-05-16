@@ -708,7 +708,7 @@ const AdminDashboardPage = () => {
             <AdminSection title="Prompt Inspector" description="Chọn nhân vật để xem cấu trúc prompt phân tầng (SillyTavern-style) và raw messages gửi tới AI.">
               <div className="flex flex-col sm:flex-row gap-3">
                 <Select value={selectedCharId} onValueChange={setSelectedCharId}>
-                  <SelectTrigger className="flex-1 bg-oled-base border-oled-border">
+                  <SelectTrigger className="flex-1 bg-oled-base border-oled-border text-base md:text-sm">
                     <SelectValue placeholder="Chọn nhân vật..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -735,7 +735,7 @@ const AdminDashboardPage = () => {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setInspectView("layered")}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                      className={`text-xs px-3 py-2 min-h-[44px] rounded-lg border transition-colors ${
                         inspectView === "layered"
                           ? "bg-neon-purple/20 border-neon-purple/50 text-neon-purple"
                           : "border-oled-border text-muted-foreground hover:text-foreground"
@@ -746,7 +746,7 @@ const AdminDashboardPage = () => {
                     </button>
                     <button
                       onClick={() => setInspectView("raw")}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                      className={`text-xs px-3 py-2 min-h-[44px] rounded-lg border transition-colors ${
                         inspectView === "raw"
                           ? "bg-neon-blue/20 border-neon-blue/50 text-neon-blue"
                           : "border-oled-border text-muted-foreground hover:text-foreground"

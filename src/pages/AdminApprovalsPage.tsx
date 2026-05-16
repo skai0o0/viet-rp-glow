@@ -266,7 +266,7 @@ const AdminApprovalsPage = () => {
       {/* Filters */}
         <div className="flex flex-wrap gap-2">
           <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
-            <SelectTrigger className="w-36 h-8 bg-oled-surface border-oled-border text-foreground text-xs">
+            <SelectTrigger className="w-full sm:w-36 h-10 md:h-8 bg-oled-surface border-oled-border text-foreground text-base md:text-xs">
               <Filter size={12} className="mr-1 text-muted-foreground" />
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
@@ -279,7 +279,7 @@ const AdminApprovalsPage = () => {
           </Select>
 
           <Select value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
-            <SelectTrigger className="w-36 h-8 bg-oled-surface border-oled-border text-foreground text-xs">
+            <SelectTrigger className="w-full sm:w-36 h-10 md:h-8 bg-oled-surface border-oled-border text-foreground text-base md:text-xs">
               <FileText size={12} className="mr-1 text-muted-foreground" />
               <SelectValue placeholder="Loại" />
             </SelectTrigger>
@@ -407,7 +407,7 @@ const AdminApprovalsPage = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              className="h-9 w-9 md:h-7 md:w-7 text-muted-foreground hover:text-foreground"
                               onClick={() => setExpandedId(isExpanded ? null : item.id)}
                             >
                               <ChevronDown size={14} className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
@@ -419,7 +419,7 @@ const AdminApprovalsPage = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 px-2 text-xs border-green-500/30 text-green-400 hover:bg-green-500/10"
+                                  className="h-9 md:h-7 px-2 text-xs border-green-500/30 text-green-400 hover:bg-green-500/10"
                                   onClick={() => { setReviewDialog({ item, action: "approved" }); setReviewNote(""); }}
                                 >
                                   <CheckCircle2 size={12} className="mr-1" /> Duyệt
@@ -427,7 +427,7 @@ const AdminApprovalsPage = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 px-2 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                  className="h-9 md:h-7 px-2 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
                                   onClick={() => { setReviewDialog({ item, action: "rejected" }); setReviewNote(""); }}
                                 >
                                   <XCircle size={12} className="mr-1" /> Từ chối
@@ -480,7 +480,7 @@ const AdminApprovalsPage = () => {
 
         {/* Stats footer */}
         {items.length > 0 && (
-          <div className="flex justify-center gap-3 pt-2">
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
             <AdminStatCard icon={Clock} label="Chờ duyệt" value={items.filter(i => i.status === "pending").length} color="text-yellow-400" delay={0} />
             <AdminStatCard icon={CheckCircle2} label="Đã duyệt" value={items.filter(i => i.status === "approved").length} color="text-green-400" delay={0.05} />
             <AdminStatCard icon={XCircle} label="Từ chối" value={items.filter(i => i.status === "rejected").length} color="text-red-400" delay={0.1} />
@@ -490,7 +490,7 @@ const AdminApprovalsPage = () => {
 
       {/* Review Dialog */}
       <Dialog open={!!reviewDialog} onOpenChange={() => setReviewDialog(null)}>
-        <DialogContent className="bg-oled-elevated border-gray-border max-w-md">
+        <DialogContent className="bg-oled-elevated border-gray-border max-w-md w-[95vw] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
               {reviewDialog?.action === "approved" ? (
@@ -522,7 +522,7 @@ const AdminApprovalsPage = () => {
                 value={reviewNote}
                 onChange={(e) => setReviewNote(e.target.value)}
                 placeholder={reviewDialog?.action === "approved" ? "Ghi chú cho người gửi..." : "Lý do từ chối..."}
-                className="bg-oled-base border-oled-border text-foreground text-sm resize-none"
+                className="bg-oled-base border-oled-border text-foreground text-base md:text-sm resize-none"
                 rows={3}
               />
             </div>
