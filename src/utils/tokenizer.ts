@@ -22,7 +22,11 @@ let wasmModule: {
 export async function initWasm(): Promise<void> {
   try {
     const mod = await import("@/wasm-pkg/wasm_lib");
-    await mod.default(); // wasm-pack --target web requires calling default export
+    // Import WASM URL via Vite, then fetch as ArrayBuffer to bypass
+    // instantiateStreaming MIME type check (servers often lack application/wasm)
+    const { default: wasmUrl } = await import("@/wasm-pkg/wasm_lib_bg.wasm?url");
+    const wasmBytes = await fetch(wasmUrl).then((r) => r.arrayBuffer());
+    await mod.default({ module_or_path: wasmBytes });
     wasmModule = mod;
     wasmReady = true;
     console.log("[tokenizer] WASM loaded — using tiktoken-rs (cl100k_base)");

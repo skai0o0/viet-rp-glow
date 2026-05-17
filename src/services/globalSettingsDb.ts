@@ -41,7 +41,7 @@ async function upsertGlobalSetting(key: string, value: string): Promise<void> {
     .from("global_settings")
     .select("key")
     .eq("key", key)
-    .single();
+    .maybeSingle();
   if (data) {
     const { error } = await supabase
       .from("global_settings")
@@ -450,7 +450,7 @@ export async function saveSubscriptionPlan(plan: PlanPhase[]): Promise<void> {
     .from("global_settings")
     .select("key")
     .eq("key", "subscription_plan")
-    .single();
+    .maybeSingle();
   if (data) {
     const { error } = await supabase
       .from("global_settings")
@@ -510,7 +510,7 @@ export async function saveSamplingParameters(params: SamplingParameters): Promis
     .from("global_settings")
     .select("key")
     .eq("key", "sampling_parameters")
-    .single();
+    .maybeSingle();
   if (data) {
     const { error } = await supabase
       .from("global_settings")

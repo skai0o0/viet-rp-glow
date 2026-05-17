@@ -134,7 +134,11 @@ let nsfwWasm: {
 export async function initNsfwWasm(): Promise<void> {
   try {
     const mod = await import("@/wasm-pkg/wasm_lib");
-    await mod.default(); // idempotent — safe to call even if initWasm already called it
+    // Import WASM URL via Vite, then fetch as ArrayBuffer to bypass
+    // instantiateStreaming MIME type check (idempotent — safe if initWasm already ran)
+    const { default: wasmUrl } = await import("@/wasm-pkg/wasm_lib_bg.wasm?url");
+    const wasmBytes = await fetch(wasmUrl).then((r) => r.arrayBuffer());
+    await mod.default({ module_or_path: wasmBytes });
     nsfwWasm = mod;
     nsfwWasmReady = true;
     console.log("[nsfwFilter] WASM loaded — using Aho-Corasick (O(n))");
