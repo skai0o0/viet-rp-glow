@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, updateCharacter } from "@/services/characterDb";
 import type { TavernCardV2 } from "@/types/taverncard";
+import type { Json } from "@/integrations/supabase/types";
 
 export type ApprovalAction =
   | "roadmap_add"
@@ -50,7 +51,7 @@ export async function createApproval(
     user_id: userId,
     type: approvalType,
     title,
-    payload: payload as unknown as Record<string, unknown>,
+    payload: payload as unknown as Json,
     status: "pending" as const,
   });
   if (error) throw error;
@@ -59,12 +60,15 @@ export async function createApproval(
 export async function applyApprovalPayload(
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const { action, target_table, target_id, data } =
+  const { action, target_table, target_id, data: rawData } =
     payload as unknown as ApprovalPayload;
 
   if (!action || !target_table) {
     throw new Error("Payload thiếu action hoặc target_table");
   }
+
+  // data is dynamic — each action branch knows the expected shape at runtime
+  const data = rawData as any;
 
   switch (action) {
     case "roadmap_add": {
@@ -151,7 +155,7 @@ export async function applyApprovalPayload(
     }
     case "chargen_publish":
     case "card_create": {
-      const card = data.card as unknown as TavernCardV2;
+      const card = normalizeToTavernCard(data.card as Record<string, unknown>);
       const ownerId = data.owner_id as string;
       const isPublic = data.is_public as boolean;
       const avatarUrl = (data.avatar_url as string) || null;
@@ -160,7 +164,7 @@ export async function applyApprovalPayload(
     }
     case "card_edit": {
       if (!target_id) throw new Error("Thiếu target_id");
-      const card = data.card as unknown as TavernCardV2;
+      const card = normalizeToTavernCard(data.card as Record<string, unknown>);
       const isPublic = data.is_public as boolean;
       const avatarUrl = data.avatar_url as string | null | undefined;
       await updateCharacter(target_id, card, isPublic, undefined, avatarUrl);
@@ -169,4 +173,45 @@ export async function applyApprovalPayload(
     default:
       throw new Error(`Unknown action: ${action}`);
   }
+}
+
+/**
+ * Normalize card data to TavernCardV2 format.
+ * CreatePage sends flat card data (no .data wrapper),
+ * while EditCharacterPage sends full TavernCardV2 { spec, spec_version, data }.
+ * This function handles both cases.
+ */
+function normalizeToTavernCard(raw: Record<string, unknown>): TavernCardV2 {
+  // Already in TavernCardV2 format
+  if (
+    raw &&
+    typeof raw.data === "object" &&
+    raw.data !== null &&
+    "name" in (raw.data as Record<string, unknown>)
+  ) {
+    return raw as unknown as TavernCardV2;
+  }
+
+  // Flat card data — wrap into TavernCardV2
+  return {
+    spec: "chara_card_v2",
+    spec_version: "2.0",
+    data: {
+      name: (raw.name as string) || "",
+      description: (raw.description as string) || "",
+      personality: (raw.personality as string) || "",
+      scenario: (raw.scenario as string) || "",
+      first_mes: (raw.first_mes as string) || "",
+      mes_example: (raw.mes_example as string) || "",
+      creator_notes: (raw.creator_notes as string) || "",
+      system_prompt: (raw.system_prompt as string) || "",
+      post_history_instructions: (raw.post_history_instructions as string) || "",
+      alternate_greetings: (raw.alternate_greetings as string[]) || [],
+      character_book: raw.character_book as TavernCardV2["data"]["character_book"],
+      tags: (raw.tags as string[]) || [],
+      creator: (raw.creator as string) || "",
+      character_version: (raw.character_version as string) || "1.0",
+      extensions: (raw.extensions as Record<string, unknown>) || {},
+    },
+  };
 }
