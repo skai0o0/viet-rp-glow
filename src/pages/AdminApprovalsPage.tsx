@@ -264,34 +264,34 @@ const AdminApprovalsPage = () => {
       }
     >
       {/* Filters */}
-        <div className="flex flex-wrap gap-2">
-          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
-            <SelectTrigger className="w-full sm:w-36 h-10 md:h-8 bg-oled-surface border-oled-border text-foreground text-base md:text-xs">
-              <Filter size={12} className="mr-1 text-muted-foreground" />
-              <SelectValue placeholder="Trạng thái" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả trạng thái</SelectItem>
-              <SelectItem value="pending">🟡 Chờ duyệt</SelectItem>
-              <SelectItem value="approved">🟢 Đã duyệt</SelectItem>
-              <SelectItem value="rejected">🔴 Từ chối</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+              <SelectTrigger className="w-[calc(50%-0.25rem)] sm:w-36 h-10 md:h-8 bg-oled-surface border-oled-border text-foreground text-base md:text-xs">
+                <Filter size={12} className="mr-1 text-muted-foreground" />
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="pending">🟡 Chờ duyệt</SelectItem>
+                <SelectItem value="approved">🟢 Đã duyệt</SelectItem>
+                <SelectItem value="rejected">🔴 Từ chối</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
-            <SelectTrigger className="w-full sm:w-36 h-10 md:h-8 bg-oled-surface border-oled-border text-foreground text-base md:text-xs">
-              <FileText size={12} className="mr-1 text-muted-foreground" />
-              <SelectValue placeholder="Loại" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả loại</SelectItem>
-              <SelectItem value="card_create">Tạo nhân vật</SelectItem>
-              <SelectItem value="card_edit">Sửa nhân vật</SelectItem>
-              <SelectItem value="admin_edit">Sửa cài đặt</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <div className="flex-1" />
+            <Select value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
+              <SelectTrigger className="w-[calc(50%-0.25rem)] sm:w-36 h-10 md:h-8 bg-oled-surface border-oled-border text-foreground text-base md:text-xs">
+                <FileText size={12} className="mr-1 text-muted-foreground" />
+                <SelectValue placeholder="Loại" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả loại</SelectItem>
+                <SelectItem value="card_create">Tạo nhân vật</SelectItem>
+                <SelectItem value="card_edit">Sửa nhân vật</SelectItem>
+                <SelectItem value="admin_edit">Sửa cài đặt</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="flex gap-1.5 text-xs text-muted-foreground items-center">
             <span>{filtered.length} kết quả</span>

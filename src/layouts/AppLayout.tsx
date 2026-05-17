@@ -14,12 +14,15 @@ const AppLayout = () => {
   const location = useLocation();
 
   return (
-    <div className="h-[100dvh] flex bg-oled-base overflow-hidden overscroll-none [-webkit-tap-highlight-color:transparent]">
+    <div className="h-[100dvh] flex bg-oled-base overflow-clip overscroll-none [-webkit-tap-highlight-color:transparent]">
       {/* Desktop Navigation Rail */}
       <NavigationRail />
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
+      <div
+        className="flex-1 flex flex-col min-w-0 md:!pb-0"
+        style={{ paddingBottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <AnimatePresence mode="wait">
           <motion.main
             key={location.pathname}

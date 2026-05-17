@@ -498,7 +498,7 @@ const AdminRoadmapPage = () => {
                 </Badge>
                 <span className="text-sm font-semibold text-foreground truncate">{phase.label}</span>
               </div>
-              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+              <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))" }}>
                 {phase.items.map((item) => {
                   const { icon: StatusIcon, color } = statusConfig[item.status];
                   return (
@@ -539,7 +539,7 @@ const AdminRoadmapPage = () => {
 
         {/* Edit/Add Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="bg-oled-surface border-oled-border max-w-md">
+          <DialogContent className="bg-oled-surface border-oled-border max-w-md w-[95vw] max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">
                 {editingItem.id ? "Chỉnh sửa mục" : "Thêm mục mới"}
@@ -624,7 +624,7 @@ const AdminRoadmapPage = () => {
 
         {/* Delete Confirm Dialog */}
         <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-          <DialogContent className="bg-oled-surface border-oled-border max-w-sm">
+          <DialogContent className="bg-oled-surface border-oled-border max-w-sm w-[95vw]">
             <DialogHeader>
               <DialogTitle className="text-foreground">Xác nhận xoá</DialogTitle>
             </DialogHeader>
