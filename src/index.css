@@ -129,16 +129,16 @@ html, body, #root {
     justify-content: center;
   }
   .safe-header-pt {
-    padding-top: max(1rem, env(safe-area-inset-top, 0px), var(--ios-pwa-pad, 0px)) !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
   }
 
   .safe-header-h {
     height: auto !important;
-    min-height: calc(3.5rem + max(0px, env(safe-area-inset-top, 0px), var(--ios-pwa-pad, 0px))) !important;
+    min-height: calc(3.5rem + env(safe-area-inset-top, 0px)) !important;
   }
 
   .safe-content-mt {
-    margin-top: calc(3.5rem + max(0px, env(safe-area-inset-top, 0px), var(--ios-pwa-pad, 0px))) !important;
+    margin-top: calc(3.5rem + env(safe-area-inset-top, 0px)) !important;
   }
 
   /* CLASS DÙNG ĐỂ DEBUG (Kiểm tra xem đt có nhận env() không) */
