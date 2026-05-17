@@ -16,7 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
