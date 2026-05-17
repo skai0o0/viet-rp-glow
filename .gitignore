@@ -24,3 +24,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rust build artifacts
+**/target/
+chat-proxy-rust/Cargo.lock
+wasm-lib/Cargo.lock
