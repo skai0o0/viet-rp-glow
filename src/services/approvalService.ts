@@ -155,8 +155,10 @@ export async function applyApprovalPayload(
     }
     case "chargen_publish":
     case "card_create": {
-      const card = normalizeToTavernCard(data.card as Record<string, unknown>);
-      const ownerId = data.owner_id as string;
+      console.log("[applyApproval] card_create payload data:", JSON.stringify(data, null, 2).slice(0, 500));
+      const cardRaw = data.card ?? data;
+      const card = normalizeToTavernCard(cardRaw);
+      const ownerId = (data.owner_id as string) || (payload as any).owner_id;
       const isPublic = data.is_public as boolean;
       const avatarUrl = (data.avatar_url as string) || null;
       await createCharacter(card, ownerId, isPublic, undefined, avatarUrl);
@@ -164,7 +166,9 @@ export async function applyApprovalPayload(
     }
     case "card_edit": {
       if (!target_id) throw new Error("Thiếu target_id");
-      const card = normalizeToTavernCard(data.card as Record<string, unknown>);
+      console.log("[applyApproval] card_edit payload data:", JSON.stringify(data, null, 2).slice(0, 500));
+      const cardRaw = data.card ?? data;
+      const card = normalizeToTavernCard(cardRaw);
       const isPublic = data.is_public as boolean;
       const avatarUrl = data.avatar_url as string | null | undefined;
       await updateCharacter(target_id, card, isPublic, undefined, avatarUrl);
@@ -177,41 +181,64 @@ export async function applyApprovalPayload(
 
 /**
  * Normalize card data to TavernCardV2 format.
- * CreatePage sends flat card data (no .data wrapper),
- * while EditCharacterPage sends full TavernCardV2 { spec, spec_version, data }.
- * This function handles both cases.
+ * Handles multiple possible shapes:
+ * 1. Full TavernCardV2: { spec, spec_version, data: { name, ... } }
+ * 2. Flat card data: { name, description, ... }
+ * 3. null/undefined → throws descriptive error
  */
-function normalizeToTavernCard(raw: Record<string, unknown>): TavernCardV2 {
-  // Already in TavernCardV2 format
-  if (
-    raw &&
-    typeof raw.data === "object" &&
-    raw.data !== null &&
-    "name" in (raw.data as Record<string, unknown>)
-  ) {
-    return raw as unknown as TavernCardV2;
+function normalizeToTavernCard(raw: unknown): TavernCardV2 {
+  if (!raw || typeof raw !== "object") {
+    console.error("[normalizeToTavernCard] raw is null/undefined/non-object:", raw);
+    throw new Error(
+      `Card data không hợp lệ (${typeof raw}). Vui lòng tạo lại approval.`
+    );
   }
 
-  // Flat card data — wrap into TavernCardV2
-  return {
-    spec: "chara_card_v2",
-    spec_version: "2.0",
-    data: {
-      name: (raw.name as string) || "",
-      description: (raw.description as string) || "",
-      personality: (raw.personality as string) || "",
-      scenario: (raw.scenario as string) || "",
-      first_mes: (raw.first_mes as string) || "",
-      mes_example: (raw.mes_example as string) || "",
-      creator_notes: (raw.creator_notes as string) || "",
-      system_prompt: (raw.system_prompt as string) || "",
-      post_history_instructions: (raw.post_history_instructions as string) || "",
-      alternate_greetings: (raw.alternate_greetings as string[]) || [],
-      character_book: raw.character_book as TavernCardV2["data"]["character_book"],
-      tags: (raw.tags as string[]) || [],
-      creator: (raw.creator as string) || "",
-      character_version: (raw.character_version as string) || "1.0",
-      extensions: (raw.extensions as Record<string, unknown>) || {},
-    },
-  };
+  const obj = raw as Record<string, unknown>;
+
+  // Case 1: Already in TavernCardV2 format { data: { name, ... } }
+  if (
+    typeof obj.data === "object" &&
+    obj.data !== null &&
+    "name" in (obj.data as Record<string, unknown>)
+  ) {
+    console.log("[normalizeToTavernCard] detected TavernCardV2 format");
+    return obj as unknown as TavernCardV2;
+  }
+
+  // Case 2: Flat card data { name, description, ... }
+  if ("name" in obj) {
+    console.log("[normalizeToTavernCard] detected flat card format, wrapping");
+    return {
+      spec: "chara_card_v2",
+      spec_version: "2.0",
+      data: {
+        name: (obj.name as string) || "",
+        description: (obj.description as string) || "",
+        personality: (obj.personality as string) || "",
+        scenario: (obj.scenario as string) || "",
+        first_mes: (obj.first_mes as string) || "",
+        mes_example: (obj.mes_example as string) || "",
+        creator_notes: (obj.creator_notes as string) || "",
+        system_prompt: (obj.system_prompt as string) || "",
+        post_history_instructions: (obj.post_history_instructions as string) || "",
+        alternate_greetings: (obj.alternate_greetings as string[]) || [],
+        character_book: obj.character_book as TavernCardV2["data"]["character_book"],
+        tags: (obj.tags as string[]) || [],
+        creator: (obj.creator as string) || "",
+        character_version: (obj.character_version as string) || "1.0",
+        extensions: (obj.extensions as Record<string, unknown>) || {},
+      },
+    };
+  }
+
+  // Case 3: Unknown format — log and throw
+  console.error(
+    "[normalizeToTavernCard] unrecognized card format, keys:",
+    Object.keys(obj),
+  );
+  throw new Error(
+    `Card data không nhận diện được format (keys: ${Object.keys(obj).join(", ")}). Vui lòng tạo lại approval.`
+  );
 }
+
