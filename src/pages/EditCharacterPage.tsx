@@ -46,6 +46,7 @@ const EditCharacterPage = () => {
   const [greetingDraft, setGreetingDraft] = useState("");
   const [bookOpen, setBookOpen] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
+  const [charOwnerId, setCharOwnerId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -79,6 +80,7 @@ const EditCharacterPage = () => {
           },
         });
         setIsPublic(char.is_public);
+        setCharOwnerId(char.user_id);
         setExistingAvatarUrl(char.avatar_url);
         if (char.avatar_url) setAvatarPreview(char.avatar_url);
       })
@@ -185,8 +187,10 @@ const EditCharacterPage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      if (isAdmin || !isPublic) {
-        // Admin hoặc private card: cập nhật trực tiếp
+      const isOwner = !!user && charOwnerId === user.id;
+
+      if (isAdmin || isOwner || !isPublic) {
+        // Admin, owner hoặc private card: cập nhật trực tiếp, không cần duyệt
         await updateCharacter(characterId, card, isPublic, undefined, avatarUrl);
         toast({ title: "Thành công!", description: "Đã cập nhật nhân vật." });
         navigate("/profile");
