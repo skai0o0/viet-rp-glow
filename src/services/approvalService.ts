@@ -160,7 +160,8 @@ export async function applyApprovalPayload(
       const card = normalizeToTavernCard(cardRaw);
       const ownerId = (data.owner_id as string) || (payload as any).owner_id;
       const isPublic = data.is_public as boolean;
-      const avatarUrl = (data.avatar_url as string) || null;
+      // avatar_url can be at data.avatar_url (CharGen pages) or data.card.avatar (CreatePage)
+      const avatarUrl = (data.avatar_url as string) || (cardRaw?.avatar as string) || null;
       await createCharacter(card, ownerId, isPublic, undefined, avatarUrl);
       break;
     }
