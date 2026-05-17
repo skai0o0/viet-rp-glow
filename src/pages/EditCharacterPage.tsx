@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getCharacterById, updateCharacter } from "@/services/characterDb";
-import { createApproval, type ApprovalPayload } from "@/services/approvalService";
+
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/contexts/AuthContext";
 import { compressAvatar } from "@/utils/imageOptimization";
@@ -189,35 +189,10 @@ const EditCharacterPage = () => {
 
       const isOwner = !!user && charOwnerId === user.id;
 
-      if (isAdmin || isOwner || !isPublic) {
-        // Admin, owner hoặc private card: cập nhật trực tiếp, không cần duyệt
-        await updateCharacter(characterId, card, isPublic, undefined, avatarUrl);
-        toast({ title: "Thành công!", description: "Đã cập nhật nhân vật." });
-        navigate("/profile");
-      } else {
-        // Public card từ user thường: gửi duyệt
-        const payload: ApprovalPayload = {
-          action: "card_edit",
-          target_table: "characters",
-          target_id: characterId,
-          data: {
-            card: card as unknown as Record<string, unknown>,
-            is_public: isPublic,
-            ...(avatarUrl !== undefined && { avatar_url: avatarUrl }),
-          },
-        };
-        await createApproval(
-          user.id,
-          `Chỉnh sửa nhân vật "${data.name}"`,
-          payload,
-          "card_edit",
-        );
-        toast({
-          title: "Đã gửi yêu cầu duyệt",
-          description: "Bản chỉnh sửa sẽ được áp dụng sau khi Admin duyệt.",
-        });
-        navigate("/profile");
-      }
+      // Admin, owner hoặc private card: cập nhật trực tiếp, không cần duyệt
+      await updateCharacter(characterId, card, isPublic, undefined, avatarUrl);
+      toast({ title: "Thành công!", description: "Đã cập nhật nhân vật." });
+      navigate("/profile");
     } catch (err: any) {
       toast({ title: "Lỗi", description: err.message || "Không thể cập nhật.", variant: "destructive" });
     } finally {

@@ -49,7 +49,7 @@ import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKeyForProvider, getModel, getActiveProvider, type Provider } from "@/services/openRouter";
 import { runCharGenPipeline, type CharGenPhase } from "@/services/charGenService";
 import { TavernCardV2, TavernCardV2Data } from "@/types/taverncard";
-import { createApproval } from "@/services/approvalService";
+
 import CharGenAssistant from "@/components/CharGenAssistant";
 import { getCharGenBrainstorm, getCharGenClone, getCharGenFormat } from "@/services/globalSettingsDb";
 

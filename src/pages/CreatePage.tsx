@@ -37,9 +37,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { CharacterBookEntry } from "@/types/tavern";
+import { CharacterBookEntry } from "@/types/taverncard";
 import { createCharacter } from "@/services/characterDb";
-import { createApproval } from "@/services/approvalService";
+
 
 // --- Import gate: only admins see the JSON import button ---
 const SHOW_IMPORT_FOR_ALL = false;
@@ -262,7 +262,6 @@ const CreatePage = () => {
       priority: 10,
       id: Date.now(),
       selective: false,
-      selective_logic: 0,
       position: "before_char",
       constant: false,
     };
@@ -307,37 +306,42 @@ const CreatePage = () => {
       }
 
       const cardData = {
-        name: data.name.trim(),
-        description: data.description,
-        personality: data.personality,
-        scenario: data.scenario,
-        first_mes: data.first_mes,
-        mes_example: data.mes_example,
-        system_prompt: data.system_prompt,
-        post_history_instructions: data.post_history_instructions,
-        creator_notes: data.creator_notes,
-        tags: data.tags,
-        avatar: avatarUrl,
-        character_version: data.character_version,
-        alternate_greetings: data.alternate_greetings,
-        creator: data.creator || user?.user_metadata?.display_name || "Ẩn danh",
-        character_book: data.character_book
-          ? {
-              name: data.character_book.name ?? "",
-              description: data.character_book.description ?? "",
-              scan_depth: data.character_book.scan_depth ?? 50,
-              token_budget: data.character_book.token_budget ?? 500,
-              recursive_scanning: data.character_book.recursive_scanning ?? false,
-              extensions: data.character_book.extensions ?? {},
-              entries: (Array.isArray(data.character_book.entries) ? data.character_book.entries : []).map((e, i) => ({
-                ...e,
-                insertion_order: i,
-                extensions: e.extensions ?? {},
-                keys: e.keys ?? [],
-                secondary_keys: e.secondary_keys ?? [],
-              })),
-            }
-          : null,
+        spec: "chara_card_v2" as const,
+        spec_version: "2.0" as const,
+        data: {
+          name: data.name.trim(),
+          description: data.description,
+          personality: data.personality,
+          scenario: data.scenario,
+          first_mes: data.first_mes,
+          mes_example: data.mes_example,
+          system_prompt: data.system_prompt,
+          post_history_instructions: data.post_history_instructions,
+          creator_notes: data.creator_notes,
+          tags: data.tags,
+          avatar: avatarUrl,
+          character_version: data.character_version,
+          alternate_greetings: data.alternate_greetings,
+          creator: data.creator || user?.user_metadata?.display_name || "Ẩn danh",
+          character_book: data.character_book
+            ? {
+                name: data.character_book.name ?? "",
+                description: data.character_book.description ?? "",
+                scan_depth: data.character_book.scan_depth ?? 50,
+                token_budget: data.character_book.token_budget ?? 500,
+                recursive_scanning: data.character_book.recursive_scanning ?? false,
+                extensions: data.character_book.extensions ?? {},
+                entries: (Array.isArray(data.character_book.entries) ? data.character_book.entries : []).map((e, i) => ({
+                  ...e,
+                  insertion_order: i,
+                  extensions: e.extensions ?? {},
+                  keys: e.keys ?? [],
+                  secondary_keys: e.secondary_keys ?? [],
+                })),
+              }
+            : null,
+          extensions: data.extensions ?? {},
+        },
       };
 
       // Người tạo luôn là owner → cho phép tạo trực tiếp (cả public lẫn private)
