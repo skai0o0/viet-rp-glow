@@ -30,6 +30,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -500,6 +501,12 @@ const AdminApprovalsPage = () => {
               )}
             </DialogTitle>
           </DialogHeader>
+
+          <DialogDescription className="sr-only">
+            {reviewDialog?.action === "approved"
+              ? "Xác nhận duyệt yêu cầu chỉnh sửa"
+              : "Xác nhận từ chối yêu cầu chỉnh sửa"}
+          </DialogDescription>
 
           <div className="space-y-3">
             {/* Item info */}
