@@ -148,7 +148,7 @@ interface RoleplayMessageProps {
   userName?: string;
 }
 
-const RoleplayMessage = ({ text, charName, userName }: RoleplayMessageProps) => {
+const RoleplayMessage = React.memo(({ text, charName, userName }: RoleplayMessageProps) => {
   // Replace {{user}} and {{char}} macros before rendering
   const resolvedText = charName ? replaceMacros(text, charName, userName || "User") : text;
   const segments = extractRichSegments(resolvedText);
@@ -252,6 +252,8 @@ const RoleplayMessage = ({ text, charName, userName }: RoleplayMessageProps) => 
       })}
     </>
   );
-};
+});
+
+RoleplayMessage.displayName = "RoleplayMessage";
 
 export default RoleplayMessage;
