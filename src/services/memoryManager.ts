@@ -293,23 +293,37 @@ async function callSummarizeAPI(userPrompt: string): Promise<string | null> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
-  const response = await fetch(`${supabaseUrl}/functions/v1/summarize`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: supabaseAnonKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      prompt: userPrompt,
-      systemPrompt: getMemoryArchivist(),
-    }),
-  });
+  // Timeout after 8s to prevent UI lag if edge function is unreachable / CORS blocked
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-  if (!response.ok) return null;
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/summarize`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: supabaseAnonKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: userPrompt,
+        systemPrompt: getMemoryArchivist(),
+      }),
+      signal: controller.signal,
+    });
 
-  const json = await response.json();
-  return (json.content as string) ?? null;
+    clearTimeout(timeoutId);
+
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    return (json.content as string) ?? null;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    // CORS block, network error, or timeout — all expected failures
+    console.warn("[memoryManager] summarize API unavailable:", (err as Error).message);
+    return null;
+  }
 }
 
 /**

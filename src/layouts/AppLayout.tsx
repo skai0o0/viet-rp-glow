@@ -3,13 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import NavigationRail from "@/components/NavigationRail";
 import BottomNavBar from "@/components/BottomNavBar";
 
-const pageTransition = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -10 },
-  transition: { duration: 0.2, ease: "easeOut" as const },
-};
-
 const AppLayout = () => {
   const location = useLocation();
 
@@ -23,13 +16,13 @@ const AppLayout = () => {
         className="flex-1 flex flex-col min-w-0 md:!pb-0"
         style={{ paddingBottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           <motion.main
             key={location.pathname}
-            initial={pageTransition.initial}
-            animate={pageTransition.animate}
-            exit={pageTransition.exit}
-            transition={pageTransition.transition}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
             className="flex-1 flex flex-col min-h-0"
           >
             <Outlet />
