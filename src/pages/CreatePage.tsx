@@ -340,20 +340,9 @@ const CreatePage = () => {
           : null,
       };
 
-      if (isAdmin || !isPublic) {
-        // Admin hoặc private card: tạo trực tiếp, không cần duyệt
-        await createCharacter(cardData, user!.id, isPublic);
-        toast.success(isPublic ? "Nhân vật đã được tạo!" : "Đã lưu nhân vật riêng tư!");
-      } else {
-        // Public card từ user thường: gửi duyệt
-        await createApproval(
-          user!.id,
-          `Tạo nhân vật: ${cardData.name}`,
-          { action: "card_create", target_table: "characters", data: { card: cardData, owner_id: user!.id, is_public: isPublic } },
-          "card_create",
-        );
-        toast.success("Nhân vật sẽ được công khai sau khi được duyệt.");
-      }
+      // Người tạo luôn là owner → cho phép tạo trực tiếp (cả public lẫn private)
+      await createCharacter(cardData, user!.id, isPublic);
+      toast.success(isPublic ? "Nhân vật đã được tạo!" : "Đã lưu nhân vật riêng tư!");
       setCard(makeDefaultCard());
       setAvatarFile(null);
       setAvatarPreview(null);

@@ -293,32 +293,10 @@ const UserCharGenPage = () => {
         avatarUrl = urlData.publicUrl;
       }
 
-      if (isAdmin || !isPublic) {
-        // Admin hoặc private card: publish trực tiếp
-        const saved = await createCharacter(generatedCard, user.id, isPublic, undefined, avatarUrl);
-        toast.success(isPublic ? `Đã xuất bản: ${saved.name}` : `Đã lưu: ${saved.name}`);
-        navigate(`/character/${saved.id}`);
-      } else {
-        // Public card từ user thường: gửi duyệt
-        await createApproval(
-          user.id,
-          `Tạo nhân vật AI: ${generatedCard.data.name}`,
-          {
-            action: "card_create",
-            target_table: "characters",
-            data: {
-              card: generatedCard as unknown as Record<string, unknown>,
-              owner_id: user.id,
-              is_public: isPublic,
-              avatar_url: avatarUrl,
-            },
-          },
-        );
-        toast.success("Đã gửi duyệt!", {
-          description: `"${generatedCard.data.name}" đang chờ admin phê duyệt.`,
-        });
-        navigate("/");
-      }
+      // Người tạo luôn là owner → publish trực tiếp (cả public lẫn private)
+      const saved = await createCharacter(generatedCard, user.id, isPublic, undefined, avatarUrl);
+      toast.success(isPublic ? `Đã xuất bản: ${saved.name}` : `Đã lưu: ${saved.name}`);
+      navigate(`/character/${saved.id}`);
     } catch (err: any) {
       toast.error(err.message || "Xuất bản thất bại!");
     } finally {
