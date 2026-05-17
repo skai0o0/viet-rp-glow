@@ -61,6 +61,12 @@ const ChatPage = () => {
   const { track } = useAnalytics();
   const viewportHeight = useVisualViewportHeight();
   const isOnline = useOnlineStatus();
+
+  // These must be declared BEFORE useScrollToBottom which uses them as deps
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   const { containerRef: scrollContainerRef, showButton: showScrollBtn, scrollToBottom } = useScrollToBottom({
     threshold: 150,
     deps: [messages, isStreaming],
@@ -74,9 +80,7 @@ const ChatPage = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeCharacter, setActiveCharacter] = useState<CharacterCard | null>(null);
   const [activeCharId, setActiveCharId] = useState<string | null>(characterId || null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  useEffect(() => { messagesRef.current = messages; }, [messages]);
-  const [isStreaming, setIsStreaming] = useState(false);
+  // (messages and isStreaming declared above, before useScrollToBottom)
   const [sessions, setSessions] = useState<DbChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [charMap, setCharMap] = useState<Map<string, CharacterSummary>>(new Map());
@@ -89,7 +93,6 @@ const ChatPage = () => {
   const abortRef = useRef<AbortController | null>(null);
   const usedCreditRef = useRef(false);
   const customFirstMesRef = useRef("");
-  const messagesRef = useRef<ChatMessage[]>([]);
   const lastStreamRef = useRef<{ apiMessages: any[]; assistantId: string } | null>(null);
   const prefillRef = useRef<string | undefined>(undefined);
   const [streamError, setStreamError] = useState<string | null>(null);

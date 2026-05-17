@@ -1,6 +1,5 @@
 import { ReactNode, ElementType } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,10 +30,7 @@ const AdminPageShell = ({
 }: AdminPageShellProps) => {
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
+      <div
         className={cn(
           "p-4 md:p-8 mx-auto w-full space-y-6 pb-24",
           maxWidth,
@@ -84,7 +80,7 @@ const AdminPageShell = ({
 
         {/* Page content */}
         {children}
-      </motion.div>
+      </div>
     </div>
   );
 };
