@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e  # Dừng ngay nếu có lệnh nào fail — tránh deploy bản cũ
 
 # ══════════════════════════════════════════════════════════════
 #  VietRP Deploy Script — React/Vite + Rust WASM + Axum Proxy
@@ -18,6 +19,9 @@ echo -e "${YELLOW}========================================${NC}"
 
 # ─── Kiểm tra thư mục project ─────────────────────────────────
 cd "$PROJECT_DIR" || { echo -e "${RED}Không tìm thấy thư mục $PROJECT_DIR, toang!${NC}"; exit 1; }
+
+# Fix "dubious ownership" khi chạy bằng root nhưng repo thuộc user khác
+git config --global --add safe.directory "$PROJECT_DIR" 2>/dev/null || true
 
 # ─── Kiểm tra toolchain ───────────────────────────────────────
 check_tool() {
@@ -43,13 +47,16 @@ fi
 #  BƯỚC 1: Kéo code mới
 # ══════════════════════════════════════════════════════════════
 echo -e "\n${YELLOW}[1/6] Đang kéo code mới từ GitHub...${NC}"
-git pull origin main
+# Dọn build artifacts để tránh conflict khi pull
+git clean -fd chat-proxy-rust/target/ wasm-lib/target/ 2>/dev/null || true
+git checkout -- . 2>/dev/null || true
+git pull origin main || { echo -e "${RED}git pull THẤT BẠI! Kiểm tra conflict.${NC}"; exit 1; }
 
 # ══════════════════════════════════════════════════════════════
 #  BƯỚC 2: Cài thư viện Node
 # ══════════════════════════════════════════════════════════════
 echo -e "\n${YELLOW}[2/6] Đang cài đặt thư viện (npm install)...${NC}"
-npm install
+npm install --unsafe-perm || { echo -e "${RED}npm install THẤT BẠI!${NC}"; exit 1; }
 
 # ══════════════════════════════════════════════════════════════
 #  BƯỚC 3: Build WASM module (tokenizer + NSFW filter)
@@ -68,8 +75,15 @@ fi
 # ══════════════════════════════════════════════════════════════
 echo -e "\n${YELLOW}[4/6] Đang build Frontend (npm run build)...${NC}"
 cd "$PROJECT_DIR"
-npm run build
+npm run build || { echo -e "${RED}Frontend build THẤT BẠI! Kiểm tra lỗi ở trên.${NC}"; exit 1; }
 echo -e "${GREEN}  ✓ Frontend build xong${NC}"
+
+# Verify dist/ actually has new files
+if [ ! -d "$PROJECT_DIR/dist" ] || [ -z "$(ls -A $PROJECT_DIR/dist/assets/*.js 2>/dev/null)" ]; then
+  echo -e "${RED}  ✗ dist/ trống hoặc thiếu JS bundle! Build có vấn đề.${NC}"
+  exit 1
+fi
+echo -e "${GREEN}  ✓ dist/ verified: $(ls $PROJECT_DIR/dist/assets/*.js | wc -l) JS files${NC}"
 
 # ══════════════════════════════════════════════════════════════
 #  BƯỚC 5: Build Axum Chat Proxy (Rust backend)
