@@ -43,8 +43,9 @@ const AdminPageShell = ({
       >
         {/* Sticky header */}
         <div
-          className="sticky top-0 z-30 bg-oled-base/80 backdrop-blur-xl -mx-4 md:-mx-8 px-4 md:px-8 pb-2 space-y-3"
+          className="sticky z-30 bg-oled-base/80 backdrop-blur-xl -mx-4 md:-mx-8 px-4 md:px-8 pb-2 space-y-3"
           style={{
+            top: 0,
             paddingTop: 'max(1rem, env(safe-area-inset-top, 0px), var(--ios-pwa-pad, 0px))',
             minHeight: 'calc(3.5rem + max(0px, env(safe-area-inset-top, 0px), var(--ios-pwa-pad, 0px)))',
           }}
