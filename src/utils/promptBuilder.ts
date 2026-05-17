@@ -105,15 +105,27 @@ export function truncateMessages(
   modelId?: string,
 ): OpenRouterMessage[] {
   const budget = maxTokens ?? (modelId ? getModelTokenBudget(modelId) : DEFAULT_MAX_CONTEXT_TOKENS);
-  // Count total tokens
+
+  // Cache token counts to avoid calling expensive WASM countTokens multiple times per message
+  const tokenCache = new Map<string, number>();
+  const getTokens = (content: string): number => {
+    let cached = tokenCache.get(content);
+    if (cached === undefined) {
+      cached = estimateTokens(content) + 4; // +4 for role overhead
+      tokenCache.set(content, cached);
+    }
+    return cached;
+  };
+
+  // Count total tokens (single pass)
   let totalTokens = 0;
   for (const msg of messages) {
-    totalTokens += estimateTokens(msg.content) + 4; // +4 for role overhead
+    totalTokens += getTokens(msg.content);
   }
 
   if (totalTokens <= budget) return messages;
 
-  // Separate system messages (preserving order) from chat messages
+  // Separate system messages from chat messages
   const systemMessages: OpenRouterMessage[] = [];
   const chatMessages: OpenRouterMessage[] = [];
 
@@ -131,12 +143,12 @@ export function truncateMessages(
 
   // Truncate system messages if they exceed budget — drop from the middle
   // (keep Layer 1 at top and Layer 5 at bottom for primacy/recency)
-  let systemTokens = systemMessages.reduce((sum, m) => sum + estimateTokens(m.content) + 4, 0);
+  let systemTokens = systemMessages.reduce((sum, m) => sum + getTokens(m.content), 0);
   if (systemTokens > systemBudget) {
     while (systemMessages.length > 2 && systemTokens > systemBudget) {
       // Remove the second-to-last system message (middle of the prompt)
       const removed = systemMessages.splice(systemMessages.length - 2, 1)[0];
-      systemTokens -= estimateTokens(removed.content) + 4;
+      systemTokens -= getTokens(removed.content);
     }
     // If still over budget, truncate the first system message
     if (systemTokens > systemBudget && systemMessages[0]) {
@@ -152,7 +164,7 @@ export function truncateMessages(
   let usedTokens = 0;
   const kept: OpenRouterMessage[] = [];
   for (let i = chatMessages.length - 1; i >= 0; i--) {
-    const msgTokens = estimateTokens(chatMessages[i].content) + 4;
+    const msgTokens = getTokens(chatMessages[i].content);
     if (usedTokens + msgTokens > chatBudget) break;
     kept.unshift(chatMessages[i]);
     usedTokens += msgTokens;
