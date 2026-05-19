@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import {
@@ -39,6 +38,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { CharacterBookEntry } from "@/types/taverncard";
 import { createCharacter } from "@/services/characterDb";
+import CreatePageHeader from "@/components/CreatePageHeader";
+import AiCharGenContent from "@/components/AiCharGenContent";
 
 
 // --- Import gate: only admins see the JSON import button ---
@@ -119,8 +120,9 @@ const slideVariants = {
 };
 
 const CreatePage = () => {
-  const location = useLocation();
   const { isAdmin } = useUserRole();
+  const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual");
+  const [aiHeaderActions, setAiHeaderActions] = useState<ReactNode>(null);
   const { user } = useAuth();
 
   // ─── Step state ─────────────────────────────────────────────
@@ -404,113 +406,135 @@ const CreatePage = () => {
   return (
     <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 safe-header-pt safe-header-h pb-2 px-4 border-b border-gray-border bg-oled-surface/60 backdrop-blur-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
-            <PlusCircle className="text-neon-purple" size={18} />
-          </div>
-          <div>
-            <h1 className="text-base font-bold text-foreground">Tạo Nhân Vật</h1>
-            <p className="text-xs text-muted-foreground">TavernCard V2 Spec</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {SHOW_IMPORT_FOR_ALL && (
+      <CreatePageHeader
+        icon={<PlusCircle className="text-white" size={15} />}
+        title="Tạo Nhân Vật"
+        subtitle="TavernCard V2 Spec"
+        rightActions={
+          activeTab === "ai" ? aiHeaderActions : (
             <>
-              <input ref={jsonInputRef} type="file" accept=".json" className="hidden" onChange={handleImportJson} />
-              <Button variant="outline" size="sm" onClick={() => jsonInputRef.current?.click()} className="border-gray-border text-muted-foreground hover:text-foreground hover:border-neon-blue">
-                <Upload size={14} />
-                <span className="hidden sm:inline ml-1">Import JSON</span>
+              {SHOW_IMPORT_FOR_ALL && (
+                <>
+                  <input ref={jsonInputRef} type="file" accept=".json" className="hidden" onChange={handleImportJson} />
+                  <Button variant="outline" size="sm" onClick={() => jsonInputRef.current?.click()} className="border-gray-border text-muted-foreground hover:text-foreground hover:border-neon-blue">
+                    <Upload size={14} />
+                    <span className="hidden sm:inline ml-1">Import JSON</span>
+                  </Button>
+                </>
+              )}
+              <Button variant="outline" size="sm" onClick={handlePreview} className="border-gray-border text-muted-foreground hover:text-foreground hover:border-neon-blue">
+                <Eye size={14} />
+                <span className="hidden sm:inline ml-1">Xem trước</span>
               </Button>
             </>
-          )}
-          <Button variant="outline" size="sm" onClick={handlePreview} className="border-gray-border text-muted-foreground hover:text-foreground hover:border-neon-blue">
-            <Eye size={14} />
-            <span className="hidden sm:inline ml-1">Xem trước</span>
-          </Button>
-        </div>
-      </div>
+          )
+        }
+      />
 
-      {/* Manual / AI Tab Switcher */}
+      {/* Tab Switcher */}
       <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/30">
-        <Tabs value={location.pathname === "/create-ai" ? "ai" : "manual"} className="w-full max-w-md">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "manual" | "ai")} className="w-full max-w-md">
           <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
-            <TabsTrigger value="manual" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-              <Link to="/create">Tạo Card</Link>
+            <TabsTrigger value="manual" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+              Tạo Card
             </TabsTrigger>
-            <TabsTrigger value="ai" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-              <Link to="/create-ai">AI Charagen</Link>
+            <TabsTrigger value="ai" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+              AI Charagen
             </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {/* Stepper Indicator */}
-      <div className="shrink-0 border-b border-gray-border bg-oled-surface/20">
-        <StepIndicator current={currentStep} labels={STEPS.map((s) => s.label)} />
-      </div>
-
-      {/* Step Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-36 md:pb-24">
-        <div className="max-w-2xl mx-auto">
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={currentStep}
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="space-y-6"
-            >
-              {renderStepContent()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* Sticky Bottom Navigation */}
-      <div className="fixed bottom-16 md:bottom-0 inset-x-0 z-30 border-t border-gray-border bg-oled-surface/90 backdrop-blur-xl">
-        <div className="max-w-2xl mx-auto flex items-center justify-between p-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={goBack}
-            disabled={currentStep === 0}
-            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+      <AnimatePresence mode="wait">
+        {activeTab === "manual" ? (
+          <motion.div
+            key="manual"
+            initial={{ opacity: 0, x: -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="flex-1 flex flex-col min-h-0"
           >
-            <ArrowLeft size={14} className="mr-1" /> Quay lại
-          </Button>
+            {/* Stepper Indicator */}
+            <div className="shrink-0 border-b border-gray-border bg-oled-surface/20">
+              <StepIndicator current={currentStep} labels={STEPS.map((s) => s.label)} />
+            </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">
-              Bước {currentStep + 1}/{STEPS.length}
-            </span>
-          </div>
+            {/* Step Content */}
+            <div className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-36 md:pb-24">
+              <div className="max-w-2xl mx-auto">
+                <AnimatePresence mode="wait" custom={direction}>
+                  <motion.div
+                    key={currentStep}
+                    custom={direction}
+                    variants={slideVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="space-y-6"
+                  >
+                    {renderStepContent()}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
 
-          {currentStep < STEPS.length - 1 ? (
-            <Button
-              size="sm"
-              onClick={goNext}
-              disabled={!canNext()}
-              className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple disabled:opacity-40"
-            >
-              Tiếp theo <ArrowRight size={14} className="ml-1" />
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple"
-            >
-              {isSaving ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
-              {isSaving ? "Đang lưu..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
-            </Button>
-          )}
-        </div>
-      </div>
+            {/* Sticky Bottom Navigation */}
+            <div className="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-16 md:w-[calc(100%-4rem)] z-30 border-t border-gray-border bg-oled-surface/90 backdrop-blur-xl">
+              <div className="max-w-2xl mx-auto flex items-center justify-between p-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBack}
+                  disabled={currentStep === 0}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                >
+                  <ArrowLeft size={14} className="mr-1" /> Quay lại
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">
+                    Bước {currentStep + 1}/{STEPS.length}
+                  </span>
+                </div>
+
+                {currentStep < STEPS.length - 1 ? (
+                  <Button
+                    size="sm"
+                    onClick={goNext}
+                    disabled={!canNext()}
+                    className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple disabled:opacity-40"
+                  >
+                    Tiếp theo <ArrowRight size={14} className="ml-1" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple"
+                  >
+                    {isSaving ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
+                    {isSaving ? "Đang lưu..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="ai"
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 40 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="flex-1 flex flex-col min-h-0"
+          >
+            <AiCharGenContent onActionsChange={setAiHeaderActions} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Fullscreen Preview Dialog */}
       {showPreview && createPortal(

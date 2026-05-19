@@ -96,7 +96,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
         </motion.div>
       )}
       <div
-        className={`flex items-end gap-2 bg-oled-surface rounded-2xl px-4 py-2 border transition-all duration-300 ${
+        className={`flex items-center gap-2 bg-oled-surface rounded-2xl px-4 py-2 border transition-all duration-300 ${
           focused
             ? "border-neon-purple shadow-neon-purple"
             : "border-gray-border"
@@ -113,15 +113,15 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           rows={1}
           disabled={disabled}
           enterKeyHint="send"
-          className="flex-1 bg-transparent text-foreground text-base md:text-sm resize-none outline-none placeholder:text-muted-foreground py-1.5 scrollbar-thin"
-          style={{ minHeight: "48px", maxHeight: "160px" }}
+          className="flex-1 bg-transparent text-foreground text-base md:text-sm resize-none outline-none placeholder:text-muted-foreground py-1 scrollbar-thin"
+          style={{ minHeight: "40px", maxHeight: "160px" }}
         />
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleSend}
           disabled={!value.trim() || disabled}
-          className="p-2.5 rounded-xl text-neon-purple transition-all duration-200 hover:shadow-neon-purple hover:bg-neon-purple/10 disabled:opacity-30 disabled:hover:shadow-none flex-shrink-0 active:scale-90"
+          className="p-2.5 rounded-xl text-neon-purple transition-all duration-200 hover:shadow-neon-purple hover:bg-neon-purple/10 disabled:opacity-30 disabled:hover:shadow-none flex-shrink-0 active:scale-90 flex items-center justify-center"
         >
           <Send size={20} />
         </motion.button>
@@ -135,7 +135,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
             }
           }}
           disabled={disabled}
-          className={`p-2 rounded-lg transition-all duration-200 flex-shrink-0 ${
+          className={`p-2 rounded-lg transition-all duration-200 flex-shrink-0 flex items-center gap-0.5 ${
             prefillActive
               ? "text-neon-purple bg-neon-purple/15 shadow-[0_0_8px_rgba(176,38,255,0.2)]"
               : "text-muted-foreground hover:text-neon-purple/60 hover:bg-neon-purple/5"

@@ -29,7 +29,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 const topItems = [
   { icon: Home, label: "Khám phá", path: "/" },
   { icon: MessageSquare, label: "Cuộc trò chuyện", path: "/chat" },
-  { icon: PlusCircle, label: "Tạo Card", path: "/create", aliases: ["/admin/chargen", "/create-ai"] },
+  { icon: PlusCircle, label: "Tạo Card", path: "/create", aliases: ["/admin/chargen"] },
 ];
 
 const NavItem = ({
