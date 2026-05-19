@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Navigate, Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +18,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
   Loader2,
-  ArrowLeft,
   Wand2,
   Send,
   ImagePlus,
@@ -30,7 +29,6 @@ import {
   Sparkles,
   User,
   Bot,
-  Upload,
   History,
   Clock,
   ExternalLink,
@@ -55,12 +53,13 @@ import { getCharGenBrainstorm, getCharGenClone, getCharGenFormat } from "@/servi
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
-const UserCharGenPage = () => {
-  const { user, isLoading } = useAuth();
-  const { isAdmin, checking } = useUserRole();
+interface AiCharGenContentProps {
+  onActionsChange?: (actions: ReactNode) => void;
+}
+
+const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
+  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -328,15 +327,99 @@ const UserCharGenPage = () => {
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  /* ---------- Guards ---------- */
-  if (isLoading || checking) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-oled-base">
-        <Loader2 size={24} className="animate-spin text-neon-purple" />
-      </div>
+  /* ---------- Sync header actions to parent ---------- */
+  useEffect(() => {
+    if (!onActionsChange) return;
+    onActionsChange(
+      <>
+        {/* Review panel toggle */}
+        {generatedCard && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setReviewOpen(!reviewOpen)}
+                className={`p-2 transition-colors ${reviewOpen ? "text-green-400" : "text-muted-foreground hover:text-green-400"}`}
+              >
+                {reviewOpen ? <PanelRightClose size={18} /> : <Eye size={18} />}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
+              {reviewOpen ? "Đóng panel duyệt" : "Duyệt & Chỉnh sửa"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {/* Clone mode toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => {
+                const next = !cloneMode;
+                setCloneMode(next);
+                if (next && messages.length === 0) {
+                  toast.info("Clone Mode bật!", { description: "Dán mô tả nhân vật từ bất kỳ nguồn nào, AI sẽ tạo card." });
+                } else if (!next) {
+                  toast.info("Clone Mode tắt");
+                }
+              }}
+              disabled={phase !== "idle"}
+              className={`p-2 transition-all ${
+                cloneMode
+                  ? "text-neon-rose drop-shadow-[0_0_6px_rgba(255,38,100,0.4)]"
+                  : "text-muted-foreground hover:text-neon-rose"
+              }`}
+            >
+              <ClipboardPaste size={18} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
+            {cloneMode ? "Tắt Clone Mode" : "Clone Mode — Dán text từ web"}
+          </TooltipContent>
+        </Tooltip>
+        {/* Skip Brainstorm toggle — only visible in clone mode */}
+        {cloneMode && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setSkipBrainstorm(!skipBrainstorm)}
+                disabled={phase !== "idle"}
+                className={`px-2 py-1 text-[11px] rounded-lg font-medium transition-all border ${
+                  skipBrainstorm
+                    ? "bg-neon-blue/15 border-neon-blue/40 text-neon-blue"
+                    : "bg-oled-elevated border-gray-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {skipBrainstorm ? "Skip Brainstorm" : "Brainstorm"}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
+              {skipBrainstorm ? "Bỏ brainstorm → chuyển thẳng sang JSON" : "Brainstorm trước khi tạo JSON"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {/* History */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setHistoryOpen(true)}
+              className="p-2 text-muted-foreground hover:text-neon-blue transition-colors"
+            >
+              <History size={18} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">Lịch sử card</TooltipContent>
+        </Tooltip>
+        {/* Reset */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button onClick={handleReset} className="p-2 text-muted-foreground hover:text-neon-rose transition-colors">
+              <RotateCcw size={18} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">Làm mới</TooltipContent>
+        </Tooltip>
+      </>
     );
-  }
-  if (!user) return <Navigate to="/" replace />;
+  }, [onActionsChange, generatedCard, reviewOpen, cloneMode, skipBrainstorm, phase, messages.length]);
 
   const cardFieldLabel = "text-xs font-medium text-muted-foreground uppercase tracking-wider";
   const cardTextarea =
@@ -582,139 +665,7 @@ const UserCharGenPage = () => {
 
   /* ---------- Render ---------- */
   return (
-    <div className="flex-1 flex flex-col bg-oled-base overflow-hidden">
-      {/* ═══════ Header ═══════ */}
-      <div className="shrink-0 safe-header-pt safe-header-h pb-2 flex items-center bg-oled-base border-b border-gray-border">
-        <Link to="/create" className="p-3 text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft size={20} />
-        </Link>
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-            cloneMode
-              ? "bg-gradient-to-br from-neon-rose to-orange-500"
-              : "bg-gradient-to-br from-neon-purple to-neon-rose"
-          }`}>
-            {cloneMode ? <ClipboardPaste className="text-white" size={15} /> : <Wand2 className="text-white" size={15} />}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold text-foreground truncate">
-                {cloneMode ? "Clone Mode" : "Tạo nhân vật AI"}
-              </h1>
-              {generatedCard && (
-                <Badge className="bg-green-500/15 text-green-400 border-green-500/30 text-[10px] px-1.5 py-0 shrink-0">
-                  Card sẵn sàng
-                </Badge>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {cloneMode ? "Dán mô tả → AI chuyển thành card" : "Mô tả ý tưởng → AI tạo Character Card"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-0.5 pr-2 shrink-0">
-          {/* Review panel toggle */}
-          {generatedCard && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setReviewOpen(!reviewOpen)}
-                  className={`p-2 transition-colors ${reviewOpen ? "text-green-400" : "text-muted-foreground hover:text-green-400"}`}
-                >
-                  {reviewOpen ? <PanelRightClose size={18} /> : <Eye size={18} />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
-                {reviewOpen ? "Đóng panel duyệt" : "Duyệt & Chỉnh sửa"}
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {/* Clone mode toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => {
-                  const next = !cloneMode;
-                  setCloneMode(next);
-                  if (next && messages.length === 0) {
-                    toast.info("Clone Mode bật!", { description: "Dán mô tả nhân vật từ bất kỳ nguồn nào, AI sẽ tạo card." });
-                  } else if (!next) {
-                    toast.info("Clone Mode tắt");
-                  }
-                }}
-                disabled={phase !== "idle"}
-                className={`p-2 transition-all ${
-                  cloneMode
-                    ? "text-neon-rose drop-shadow-[0_0_6px_rgba(255,38,100,0.4)]"
-                    : "text-muted-foreground hover:text-neon-rose"
-                }`}
-              >
-                <ClipboardPaste size={18} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
-              {cloneMode ? "Tắt Clone Mode" : "Clone Mode — Dán text từ web"}
-            </TooltipContent>
-          </Tooltip>
-          {/* Skip Brainstorm toggle — only visible in clone mode */}
-          {cloneMode && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setSkipBrainstorm(!skipBrainstorm)}
-                  disabled={phase !== "idle"}
-                  className={`px-2 py-1 text-[11px] rounded-lg font-medium transition-all border ${
-                    skipBrainstorm
-                      ? "bg-neon-blue/15 border-neon-blue/40 text-neon-blue"
-                      : "bg-oled-elevated border-gray-border text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {skipBrainstorm ? "Skip Brainstorm" : "Brainstorm"}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">
-                {skipBrainstorm ? "Bỏ brainstorm → chuyển thẳng sang JSON" : "Brainstorm trước khi tạo JSON"}
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {/* History */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setHistoryOpen(true)}
-                className="p-2 text-muted-foreground hover:text-neon-blue transition-colors"
-              >
-                <History size={18} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">Lịch sử card</TooltipContent>
-          </Tooltip>
-          {/* Reset */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button onClick={handleReset} className="p-2 text-muted-foreground hover:text-neon-rose transition-colors">
-                <RotateCcw size={18} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="bg-oled-surface border-gray-border text-foreground">Làm mới</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
-      {/* Tab bar */}
-      <div className="shrink-0 px-3 py-2 border-b border-gray-border bg-oled-surface/30">
-        <Tabs value="ai" className="w-full max-w-md">
-          <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
-            <TabsTrigger value="manual" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-              <Link to="/create">Tạo Card</Link>
-            </TabsTrigger>
-            <TabsTrigger value="ai" asChild className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-              <Link to="/create-ai">AI Charagen</Link>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
+    <>
       {/* ═══════ Main content area ═══════ */}
       <div className="flex-1 flex overflow-hidden">
         {/* ─── Chat column ─── */}
@@ -1052,8 +1003,8 @@ const UserCharGenPage = () => {
         visible={messages.length === 0 && phase === "idle"}
         onSelectSuggestion={(prompt) => setInput(prompt)}
       />
-    </div>
+    </>
   );
 };
 
-export default UserCharGenPage;
+export default AiCharGenContent;
