@@ -13,9 +13,15 @@ export interface CharacterCard {
   mes_example?: string;
 }
 
+export interface ActiveNPC {
+  name: string;
+  description?: string;
+  personality?: string;
+}
+
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: Date;
 }

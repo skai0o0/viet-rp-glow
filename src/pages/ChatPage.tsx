@@ -3,8 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getCachedUserPersona, isProfileIncomplete } from "@/services/profileDb";
 import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, ChevronRight, Plus, AlertTriangle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChatMessage, CharacterCard } from "@/types/character";
-import { buildMessages, replaceMacros, truncateMessages } from "@/utils/promptBuilder";
+import { ChatMessage, CharacterCard, ActiveNPC } from "@/types/character";
+import { buildMessages, replaceMacros, replaceMacroKeywords, truncateMessages } from "@/utils/promptBuilder";
 import { streamChat, streamChatViaProxy, getModel } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -88,6 +88,37 @@ const ChatPage = () => {
   const [previewChar, setPreviewChar] = useState<CharacterSummary | null>(null);
   const [customFirstMes, setCustomFirstMes] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [activeNPCs, setActiveNPCs] = useState<ActiveNPC[]>([]);
+  const [cmdInstructions, setCmdInstructions] = useState<string[]>([]);
+
+  // Load activeNPCs from localStorage when character changes
+  useEffect(() => {
+    if (!activeCharId) {
+      setActiveNPCs([]);
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(`vietrp_active_npcs_${activeCharId}`);
+      if (stored) {
+        setActiveNPCs(JSON.parse(stored));
+      } else {
+        setActiveNPCs([]);
+      }
+    } catch {
+      setActiveNPCs([]);
+    }
+  }, [activeCharId]);
+
+  // Persist activeNPCs to localStorage when they change
+  useEffect(() => {
+    if (!activeCharId) return;
+    const key = `vietrp_active_npcs_${activeCharId}`;
+    if (activeNPCs.length === 0) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, JSON.stringify(activeNPCs));
+    }
+  }, [activeNPCs, activeCharId]);
 
   const scrollRef = scrollContainerRef;
   const abortRef = useRef<AbortController | null>(null);
@@ -413,6 +444,144 @@ const ChatPage = () => {
         return;
       }
 
+      // ─── Chat Commands (không trigger AI reply) ───────────────
+      const trimmed = content.trim();
+      if (trimmed.startsWith("/addnpc")) {
+        const args = trimmed.slice(7).trim();
+        if (!args) {
+          toast.error("Cú pháp: /addnpc Tên nhân vật [- mô tả]");
+          return;
+        }
+        const parts = args.split(/\s*-\s*/, 2);
+        const name = parts[0].trim();
+        const desc = parts[1]?.trim();
+        if (!name) {
+          toast.error("Cú pháp: /addnpc Tên nhân vật [- mô tả]");
+          return;
+        }
+        setActiveNPCs((prev) => {
+          if (prev.some((n) => n.name.toLowerCase() === name.toLowerCase())) {
+            toast(`${name} đã có trong danh sách NPC.`);
+            return prev;
+          }
+          toast.success(`Đã thêm NPC: ${name}`);
+          return [...prev, { name, description: desc }];
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "cmd-" + Date.now(),
+            role: "system",
+            content: desc ? `Đã thêm NPC: ${name} — ${desc}` : `Đã thêm NPC: ${name}`,
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      if (trimmed.startsWith("/removenpc")) {
+        const name = trimmed.slice(10).trim();
+        if (!name) {
+          toast.error("Cú pháp: /removenpc Tên nhân vật");
+          return;
+        }
+        setActiveNPCs((prev) => {
+          const found = prev.some((n) => n.name.toLowerCase() === name.toLowerCase());
+          if (!found) {
+            toast(`${name} không có trong danh sách NPC.`);
+            return prev;
+          }
+          toast.success(`Đã xóa NPC: ${name}`);
+          return prev.filter((n) => n.name.toLowerCase() !== name.toLowerCase());
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "cmd-" + Date.now(),
+            role: "system",
+            content: `Đã xóa NPC: ${name}`,
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      if (trimmed === "/listnpc") {
+        // Read current NPCs via functional updater to avoid stale closure
+        let npcList = "(trống)";
+        setActiveNPCs((current) => {
+          if (current.length === 0) {
+            toast("Không có NPC nào đang active.");
+          } else {
+            const list = current.map((n) => `• ${n.name}`).join("\n");
+            toast(`NPC đang active:\n${list}`, { duration: 5000 });
+            npcList = current.map((n) => n.name).join(", ");
+          }
+          return current;
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "cmd-" + Date.now(),
+            role: "system",
+            content: `Danh sách NPC: ${npcList}`,
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      if (trimmed === "/clearnpc") {
+        setActiveNPCs([]);
+        toast.success("Đã xóa tất cả NPC.");
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "cmd-" + Date.now(),
+            role: "system",
+            content: "Đã xóa tất cả NPC.",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      if (trimmed.startsWith("/cmd")) {
+        const raw = trimmed.slice(4).trim();
+        if (!raw) {
+          toast.error("Cú pháp: /cmd nội dung instruct");
+          return;
+        }
+        const processed = replaceMacroKeywords(raw);
+        setCmdInstructions((prev) => [...prev, processed]);
+        toast.success("Đã thêm instruct.");
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "cmd-" + Date.now(),
+            role: "system",
+            content: `[Instruct] ${processed}`,
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      if (trimmed === "/clearcmd") {
+        setCmdInstructions([]);
+        toast.success("Đã xóa tất cả instruct.");
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "cmd-" + Date.now(),
+            role: "system",
+            content: "Đã xóa tất cả instruct.",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
       usedCreditRef.current = false;
       if (isSubscriptionUser && effectiveQuota.remaining <= 0) {
         // Hết daily quota → thử dùng credit
@@ -458,12 +627,14 @@ const ChatPage = () => {
       prefillRef.current = prefillText;
       const rawMessages = buildMessages(
         activeCharacter,
-        allMessages.map((m) => ({ role: m.role, content: m.content })),
+        allMessages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         undefined,
         scenarioOverride,
         summary,
         facts,
         prefillText,
+        activeNPCs,
+        cmdInstructions,
       );
       const modelForBudget = isSubscriptionUser ? undefined : getModel();
       const apiMessages = truncateMessages(rawMessages, undefined, modelForBudget);
@@ -566,6 +737,8 @@ const ChatPage = () => {
       isSubscriptionUser,
       summary,
       facts,
+      activeNPCs,
+      cmdInstructions,
     ]
   );
 
@@ -595,12 +768,14 @@ const ChatPage = () => {
 
     const apiMessages = truncateMessages(buildMessages(
       activeCharacter,
-      withoutLast.map((m) => ({ role: m.role, content: m.content })),
+      withoutLast.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       undefined,
       scenarioOverride,
       summary,
       facts,
       prefillRef.current,
+      activeNPCs,
+      cmdInstructions,
     ), undefined, isSubscriptionUser ? undefined : getModel());
 
     const controller = new AbortController();
@@ -679,7 +854,7 @@ const ChatPage = () => {
       },
       controller.signal
     );
-  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, refreshCredits, isSubscriptionUser, summary, facts]);
+  }, [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, refreshCredits, isSubscriptionUser, summary, facts, activeNPCs, cmdInstructions]);
 
   // ── Force Summarize (admin/op/mod BYOK manual trigger) ──
   const canForceSummarize = (role === "admin" || role === "op" || role === "moderator") && !isSubscriptionUser;
@@ -723,6 +898,11 @@ const ChatPage = () => {
 
   const handleDeleteMessage = useCallback(
     async (msgId: string) => {
+      // System messages (commands) are local-only, skip DB delete
+      if (msgId.startsWith("cmd-")) {
+        setMessages((prev) => prev.filter((m) => m.id !== msgId));
+        return;
+      }
       try {
         await deleteMessage(msgId);
         setMessages((prev) => prev.filter((m) => m.id !== msgId));
@@ -776,12 +956,14 @@ const ChatPage = () => {
 
       const apiMessages = truncateMessages(buildMessages(
         activeCharacter,
-        updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+        updatedMessages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         undefined,
         scenarioOverride,
         summary,
         facts,
         prefillRef.current,
+        activeNPCs,
+        cmdInstructions,
       ), undefined, isSubscriptionUser ? undefined : getModel());
 
       const controller = new AbortController();
@@ -861,7 +1043,7 @@ const ChatPage = () => {
         controller.signal
       );
     },
-    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, refreshCredits, isSubscriptionUser, summary, facts]
+    [messages, activeCharacter, activeSessionId, isStreaming, scenarioOverride, refreshQuota, refreshCredits, isSubscriptionUser, summary, facts, activeNPCs, cmdInstructions]
   );
 
   const handleRetry = useCallback(async () => {

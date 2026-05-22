@@ -1,4 +1,4 @@
-import { CharacterCard } from "@/types/character";
+import { CharacterCard, ActiveNPC } from "@/types/character";
 import { CharacterBook } from "@/types/taverncard";
 import { getCachedUserPersona, buildIdentityString } from "@/services/profileDb";
 import {
@@ -185,6 +185,21 @@ export function replaceMacros(text: string, charName: string, userName: string =
 }
 
 /**
+ * Auto-replace Vietnamese/English keywords with {{user}} and {{char}} macros.
+ * Uses word-boundary matching to avoid partial replacements.
+ */
+export function replaceMacroKeywords(text: string): string {
+  // Keywords → {{user}} (case-insensitive, word boundary)
+  const userPattern = /\b(tôi|tao|mình|tớ|bạn|user|người dùng)\b/gi;
+  // Keywords → {{char}}
+  const charPattern = /\b(char|nhân vật|cô ấy|anh ấy|cậu ấy|hắn|nàng|chàng)\b/gi;
+
+  return text
+    .replace(userPattern, "{{user}}")
+    .replace(charPattern, "{{char}}");
+}
+
+/**
  * Resolve lorebook entries: scan chat history for trigger keywords,
  * return matched content grouped by position (before_char / after_char).
  */
@@ -274,12 +289,14 @@ export function buildLayeredPrompt(
   chatHistory: { role: string; content: string }[] = [],
   summary?: string,
   facts?: string[],
+  activeNPCs?: ActiveNPC[],
 ): PromptSection[] {
   const sections: PromptSection[] = [];
   let order = 0;
 
   // 1. Main Prompt (type-specific global system prompt from admin config)
-  const cardType = detectCardType(character);
+  const hasActiveNPCs = activeNPCs && activeNPCs.length > 0;
+  const cardType = hasActiveNPCs ? "type_b" : detectCardType(character);
   const typeSpecificPrompt = cardType === "type_b"
     ? getGlobalPromptTypeB()
     : getGlobalPromptTypeA();
@@ -340,6 +357,21 @@ export function buildLayeredPrompt(
     });
   }
 
+  // 6b. Active NPCs
+  if (hasActiveNPCs) {
+    const npcLines = activeNPCs!.map((npc) => {
+      let line = `--- [${npc.name}] ---`;
+      if (npc.description) line += `\n${npc.description}`;
+      if (npc.personality) line += `\nPersonality: ${npc.personality}`;
+      return line;
+    });
+    sections.push({
+      id: "active_npcs",
+      content: "--- ACTIVE NPCs ---\n" + npcLines.join("\n\n"),
+      order: order++,
+    });
+  }
+
   // 7. World Info (after_char)
   if (lorebook.afterChar.length > 0) {
     sections.push({
@@ -380,8 +412,9 @@ export function buildSystemPrompt(
   chatHistory: { role: string; content: string }[] = [],
   summary?: string,
   facts?: string[],
+  activeNPCs?: ActiveNPC[],
 ): string {
-  const sections = buildLayeredPrompt(character, userName, chatHistory, summary, facts);
+  const sections = buildLayeredPrompt(character, userName, chatHistory, summary, facts, activeNPCs);
   return sections.map((s) => s.content).join("\n\n");
 }
 
@@ -451,6 +484,8 @@ export function buildMessages(
   summary?: string,
   facts?: string[],
   prefillText?: string,
+  activeNPCs?: ActiveNPC[],
+  cmdInstructions?: string[],
 ): OpenRouterMessage[] {
   const persona = getCachedUserPersona();
   const resolvedUserName = userName || persona.displayName || "User";
@@ -463,7 +498,9 @@ export function buildMessages(
   // ═══ LAYER 1: SYSTEM CORE ═══
 
   // 1a. Global System Prompt (type-specific)
-  const cardType = detectCardType(effectiveCharacter);
+  // Dynamic Type B promotion: active NPCs override Type A → Type B
+  const hasActiveNPCs = activeNPCs && activeNPCs.length > 0;
+  const cardType = hasActiveNPCs ? "type_b" : detectCardType(effectiveCharacter);
   const typePrompt = cardType === "type_b"
     ? getGlobalPromptTypeB()
     : getGlobalPromptTypeA();
@@ -512,6 +549,24 @@ export function buildMessages(
   charParts.push(`</relationship_with_user>`);
 
   messages.push({ role: "system", content: charParts.join("\n\n"), cache_control: { type: "ephemeral" } });
+
+  // 2a-2. Active NPCs (dynamic multi-character support)
+  if (hasActiveNPCs) {
+    const npcParts: string[] = [];
+    npcParts.push(`<active_npcs>`);
+    npcParts.push(`Các nhân vật phụ (NPC) đang xuất hiện trong cuộc trò chuyện cùng ${charName} và ${resolvedUserName}.`);
+    npcParts.push(`Bạn PHẢI roleplay tất cả NPC này — cho họ thoại, hành động, suy nghĩ riêng khi họ xuất hiện.`);
+    npcParts.push(`${charName} VẪN LÀ nhân vật chính. NPC là phụ.`);
+    npcParts.push(``);
+    for (const npc of activeNPCs!) {
+      npcParts.push(`--- [${npc.name}] ---`);
+      if (npc.description) npcParts.push(npc.description);
+      if (npc.personality) npcParts.push(`Personality: ${npc.personality}`);
+      npcParts.push(``);
+    }
+    npcParts.push(`</active_npcs>`);
+    messages.push({ role: "system", content: npcParts.join("\n"), cache_control: { type: "ephemeral" } });
+  }
 
   // 2b. User Persona
   const userInfoParts: string[] = [];
@@ -582,6 +637,13 @@ export function buildMessages(
   if (!nsfwEnabled) {
     const nsfwGate = getNsfwGatePrompt();
     if (nsfwGate) postParts.push(nsfwGate);
+  }
+
+  // User /cmd instructions (injected into anchor for recency bias)
+  if (cmdInstructions?.length) {
+    for (const instruction of cmdInstructions) {
+      postParts.push(`[User Instruction: ${instruction}]`);
+    }
   }
 
   if (postParts.length > 0) {
