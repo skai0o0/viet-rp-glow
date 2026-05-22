@@ -4,7 +4,7 @@ import { getCachedUserPersona, isProfileIncomplete } from "@/services/profileDb"
 import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, ChevronRight, Plus, AlertTriangle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard, ActiveNPC } from "@/types/character";
-import { buildMessages, replaceMacros, replaceMacroKeywords, truncateMessages } from "@/utils/promptBuilder";
+import { buildMessages, replaceMacros, replaceMacroKeywords, truncateMessages, detectCardType } from "@/utils/promptBuilder";
 import { streamChat, streamChatViaProxy, getModel } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -25,7 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ChatHeader from "@/components/ChatHeader";
 import ChatSidebar from "@/components/ChatSidebar";
-import ChatInput from "@/components/ChatInput";
+import ChatInput, { saveCmdToHistory } from "@/components/ChatInput";
 import MessageBubble from "@/components/MessageBubble";
 import TypingIndicator from "@/components/TypingIndicator";
 import GenerationSettings from "@/components/GenerationSettings";
@@ -57,6 +57,8 @@ const ChatPage = () => {
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [creditExceeded, setCreditExceeded] = useState(false);
   const { role } = useUserRole();
+  const roleRef = useRef(role);
+  useEffect(() => { roleRef.current = role; }, [role]);
   const { summary, facts, loadMemory, clearMemory, triggerSummarize } = useChatMemory();
   const { track } = useAnalytics();
   const viewportHeight = useVisualViewportHeight();
@@ -476,6 +478,7 @@ const ChatPage = () => {
             timestamp: new Date(),
           },
         ]);
+        saveCmdToHistory(trimmed);
         return;
       }
 
@@ -503,6 +506,7 @@ const ChatPage = () => {
             timestamp: new Date(),
           },
         ]);
+        saveCmdToHistory(trimmed);
         return;
       }
 
@@ -528,6 +532,7 @@ const ChatPage = () => {
             timestamp: new Date(),
           },
         ]);
+        saveCmdToHistory(trimmed);
         return;
       }
 
@@ -543,43 +548,94 @@ const ChatPage = () => {
             timestamp: new Date(),
           },
         ]);
+        saveCmdToHistory(trimmed);
         return;
       }
 
-      if (trimmed.startsWith("/cmd")) {
-        const raw = trimmed.slice(4).trim();
-        if (!raw) {
-          toast.error("Cú pháp: /cmd nội dung instruct");
+      // ─── Inline /cmd: instruction + message, có hiệu lực 1 lượt ───
+      let pendingInstruction: string | undefined;
+      let messageToSend = trimmed;
+
+      if (trimmed.startsWith("/cmd ")) {
+        const afterCmd = trimmed.slice(5).trim();
+        // Tìm vị trí cách nhau bởi >=2 space hoặc tab để tách instruction và message
+        const sepMatch = afterCmd.match(/^(.{1,}?)(?:\s{2,}|\t)(.+)$/s);
+        if (sepMatch) {
+          pendingInstruction = replaceMacroKeywords(sepMatch[1].trim());
+          messageToSend = sepMatch[2].trim();
+        } else {
+          // Không có separator → instruction = message
+          pendingInstruction = replaceMacroKeywords(afterCmd);
+          messageToSend = afterCmd;
+        }
+        saveCmdToHistory(trimmed);
+      }
+
+      // ─── /debug: admin-only, đính kèm debug parse vào reply kế tiếp ───
+      if (trimmed.startsWith("/debug")) {
+        if (roleRef.current !== "admin") {
+          toast.error("Chỉ admin mới dùng được lệnh này.");
           return;
         }
-        const processed = replaceMacroKeywords(raw);
-        setCmdInstructions((prev) => [...prev, processed]);
-        toast.success("Đã thêm instruct.");
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: "cmd-" + Date.now(),
-            role: "system",
-            content: `[Instruct] ${processed}`,
-            timestamp: new Date(),
-          },
-        ]);
+        const afterDebug = trimmed.slice(6).trim();
+
+        const charName = activeCharacter?.name || "N/A";
+        const npcList = activeNPCs.length > 0
+          ? activeNPCs.map((n) => n.name).join(", ")
+          : "không có";
+        const currentCmd = pendingInstruction || "không có";
+        const currentCardType = activeNPCs.length > 0
+          ? "Type B (multi-char)"
+          : (activeCharacter ? (detectCardType(activeCharacter) === "type_b" ? "Type B (multi-char)" : "Type A (single-char)") : "N/A");
+
+        if (!afterDebug) {
+          // Không có message → show debug info locally
+          const debugLines = [
+            `CardType: ${currentCardType}`,
+            `Char: ${charName}`,
+            `NPC: ${npcList}`,
+            `Cmd: ${currentCmd}`,
+          ].join(" | ");
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: "cmd-" + Date.now(),
+              role: "system",
+              content: `[DEBUG] ${debugLines}`,
+              timestamp: new Date(),
+            },
+          ]);
+          saveCmdToHistory(trimmed);
+          return;
+        }
+
+        // Có message → đính kèm debug instruction vào reply kế tiếp
+        messageToSend = afterDebug;
+
+        const debugInstruction =
+          `[DEBUG MODE] Bắt buộc trả lời BẮT ĐẦU bằng một block debug dạng:\n` +
+          `---\n` +
+          `**DEBUG**\n` +
+          `CardType: ${currentCardType}\n` +
+          `Char: ${charName}\n` +
+          `NPC: ${npcList}\n` +
+          `Cmd: ${currentCmd}\n` +
+          `Tình huống hiện tại: [tóm tắt ngắn gọn char, user${activeNPCs.length > 0 ? " và NPC" : ""} đang làm gì]\n` +
+          `---\n` +
+          `Sau block debug, tiếp tục roleplay bình thường.`;
+
+        setCmdInstructions((prev) => [...prev, debugInstruction]);
+        saveCmdToHistory(trimmed);
+      }
+
+      if (!messageToSend) {
+        toast.error("Nội dung tin nhắn trống.");
         return;
       }
 
-      if (trimmed === "/clearcmd") {
-        setCmdInstructions([]);
-        toast.success("Đã xóa tất cả instruct.");
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: "cmd-" + Date.now(),
-            role: "system",
-            content: "Đã xóa tất cả instruct.",
-            timestamp: new Date(),
-          },
-        ]);
-        return;
+      // Set instruction cho lượt kế tiếp (1 lần)
+      if (pendingInstruction) {
+        setCmdInstructions([pendingInstruction]);
       }
 
       usedCreditRef.current = false;
@@ -606,14 +662,18 @@ const ChatPage = () => {
       }
 
       let savedUserMsg;
+      // Lưu full text (kèm prefix /cmd, /debug) vào DB để hiển thị badge
+      const textToSave = trimmed.startsWith("/cmd ") || trimmed.startsWith("/debug ")
+        ? trimmed
+        : messageToSend;
       try {
-        savedUserMsg = await addMessage(sessionId, "user", content);
+        savedUserMsg = await addMessage(sessionId, "user", textToSave);
       } catch {
         toast.error("Không thể gửi tin nhắn");
         return;
       }
       const userMsg: ChatMessage = {
-        id: savedUserMsg.id, role: "user", content, timestamp: new Date(savedUserMsg.created_at),
+        id: savedUserMsg.id, role: "user", content: textToSave, timestamp: new Date(savedUserMsg.created_at),
       };
 
       setMessages((prev) => [...prev, userMsg]);
@@ -625,9 +685,14 @@ const ChatPage = () => {
 
       const allMessages = [...messagesRef.current, userMsg];
       prefillRef.current = prefillText;
+      // Gửi messageToSend (đã strip prefix) cho AI, không phải full text
+      const aiMessages = allMessages.filter((m) => m.role !== "system").map((m, i, arr) => ({
+        role: m.role as "user" | "assistant",
+        content: i === arr.length - 1 && m.role === "user" ? messageToSend : m.content,
+      }));
       const rawMessages = buildMessages(
         activeCharacter,
-        allMessages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        aiMessages,
         undefined,
         scenarioOverride,
         summary,
@@ -685,6 +750,7 @@ const ChatPage = () => {
             abortRef.current = null;
             lastStreamRef.current = null;
             prefillRef.current = undefined;
+            setCmdInstructions([]); // /cmd chỉ có hiệu lực 1 lượt
             if (assistantContent) {
               const saved = await addMessage(sessionId, "assistant", assistantContent);
               setMessages((prev) =>

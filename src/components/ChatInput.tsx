@@ -12,13 +12,33 @@ interface CommandDef {
 }
 
 const COMMANDS: CommandDef[] = [
-  { name: "/cmd", usage: "/cmd nội dung instruct", description: "Instruct cho AI (tôi → {{user}}, cô ấy → {{char}})" },
+  { name: "/cmd", usage: "/cmd ", description: "Instruct AI 1 lượt (tôi → {{user}}, cô ấy → {{char}})" },
+  { name: "/debug", usage: "/debug ", description: "Admin: đính kèm debug parse vào reply kế tiếp" },
   { name: "/addnpc", usage: "/addnpc Tên [- mô tả]", description: "Thêm NPC vào cuộc trò chuyện" },
   { name: "/removenpc", usage: "/removenpc Tên", description: "Xóa NPC khỏi cuộc trò chuyện" },
   { name: "/listnpc", usage: "/listnpc", description: "Xem danh sách NPC đang active" },
   { name: "/clearnpc", usage: "/clearnpc", description: "Xóa tất cả NPC" },
-  { name: "/clearcmd", usage: "/clearcmd", description: "Xóa tất cả instruct" },
 ];
+
+// ─── Command History ─────────────────────────────────────────
+const CMD_HISTORY_KEY = "vietrp_cmd_history";
+const CMD_HISTORY_MAX = 20;
+
+function loadCmdHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(CMD_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCmdToHistory(cmd: string) {
+  const history = loadCmdHistory().filter((h) => h !== cmd);
+  history.unshift(cmd);
+  if (history.length > CMD_HISTORY_MAX) history.length = CMD_HISTORY_MAX;
+  localStorage.setItem(CMD_HISTORY_KEY, JSON.stringify(history));
+}
 
 interface ChatInputProps {
   onSend: (message: string, prefillText?: string) => void;
@@ -38,19 +58,33 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   // Command popup state
   const [showCommands, setShowCommands] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const commandListRef = useRef<HTMLDivElement>(null);
 
-  // Filtered commands based on current input
+  // Load history on mount
+  useEffect(() => {
+    setCmdHistory(loadCmdHistory());
+  }, []);
+
+  // Filtered history & commands based on current input
+  const query = value.trim().toLowerCase();
+  const filteredHistory = cmdHistory.filter((h) => {
+    if (query.length <= 1) return true;
+    return h.toLowerCase().startsWith(query);
+  });
   const filteredCommands = COMMANDS.filter((cmd) => {
-    const query = value.toLowerCase();
-    if (query.length <= 1) return true; // chỉ "/" → hiện tất cả
+    if (query.length <= 1) return true;
     return cmd.name.toLowerCase().startsWith(query) || cmd.usage.toLowerCase().includes(query);
   });
 
-  // Show/hide command popup
+  // Total items for navigation
+  const totalItems = filteredHistory.length + filteredCommands.length;
+
+  // Show/hide command popup & refresh history when user types /
   useEffect(() => {
     const trimmed = value.trim();
     if (trimmed.startsWith("/") && !trimmed.includes(" ") && focused) {
+      setCmdHistory(loadCmdHistory());
       setShowCommands(true);
       setSelectedIdx(0);
     } else {
@@ -99,9 +133,15 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
     });
   };
 
-  const handleSelectCommand = (cmd: CommandDef) => {
-    // Autocomplete: điền usage vào input, con trỏ ở cuối
-    setValue(cmd.usage + " ");
+  const handleSelectItem = (idx: number) => {
+    if (idx < filteredHistory.length) {
+      // Selected a history entry — fill input with full text
+      setValue(filteredHistory[idx]);
+    } else {
+      // Selected a command — autocomplete usage
+      const cmd = filteredCommands[idx - filteredHistory.length];
+      if (cmd) setValue(cmd.usage);
+    }
     setShowCommands(false);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
@@ -110,20 +150,20 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Command popup navigation
-    if (showCommands && filteredCommands.length > 0) {
+    if (showCommands && totalItems > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIdx((prev) => (prev + 1) % filteredCommands.length);
+        setSelectedIdx((prev) => (prev + 1) % totalItems);
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIdx((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+        setSelectedIdx((prev) => (prev - 1 + totalItems) % totalItems);
         return;
       }
       if (e.key === "Tab") {
         e.preventDefault();
-        handleSelectCommand(filteredCommands[selectedIdx]);
+        handleSelectItem(selectedIdx);
         return;
       }
       if (e.key === "Escape") {
@@ -160,37 +200,74 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
     <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
       {/* Command popup */}
       <AnimatePresence>
-        {showCommands && filteredCommands.length > 0 && (
+        {showCommands && totalItems > 0 && (
           <motion.div
             ref={commandListRef}
             initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="mb-2 rounded-xl border border-gray-border bg-oled-elevated shadow-lg overflow-hidden max-h-48 overflow-y-auto scrollbar-thin"
+            className="mb-2 rounded-xl border border-gray-border bg-oled-elevated shadow-lg overflow-hidden max-h-56 overflow-y-auto scrollbar-thin"
           >
-            {filteredCommands.map((cmd, idx) => (
-              <button
-                key={cmd.name}
-                data-cmd-idx={idx}
-                onClick={() => handleSelectCommand(cmd)}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
-                  idx === selectedIdx
-                    ? "bg-neon-purple/15 text-neon-purple"
-                    : "text-foreground/80 hover:bg-oled-surface"
-                }`}
-              >
-                <span className="font-mono text-sm font-semibold text-neon-blue min-w-[90px]">
-                  {cmd.name}
-                </span>
-                <span className="text-xs text-muted-foreground truncate">
-                  {cmd.description}
-                </span>
-                <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono hidden sm:block">
-                  {cmd.usage}
-                </span>
-              </button>
-            ))}
+            {/* Recent history */}
+            {filteredHistory.length > 0 && (
+              <>
+                <div className="px-3 py-1.5 text-[10px] text-muted-foreground/40 uppercase tracking-wider">
+                  Gần đây
+                </div>
+                {filteredHistory.map((entry, idx) => (
+                  <button
+                    key={"h-" + idx}
+                    data-cmd-idx={idx}
+                    onMouseDown={(e) => { e.preventDefault(); handleSelectItem(idx); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
+                      idx === selectedIdx
+                        ? "bg-neon-purple/15 text-neon-purple"
+                        : "text-foreground/80 hover:bg-oled-surface"
+                    }`}
+                  >
+                    <span className="font-mono text-xs text-foreground/60 truncate">
+                      {entry}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* Commands */}
+            {filteredCommands.length > 0 && (
+              <>
+                <div className="px-3 py-1.5 text-[10px] text-muted-foreground/40 uppercase tracking-wider border-t border-gray-border/20">
+                  Lệnh
+                </div>
+                {filteredCommands.map((cmd, i) => {
+                  const idx = filteredHistory.length + i;
+                  return (
+                    <button
+                      key={cmd.name}
+                      data-cmd-idx={idx}
+                      onMouseDown={(e) => { e.preventDefault(); handleSelectItem(idx); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
+                        idx === selectedIdx
+                          ? "bg-neon-purple/15 text-neon-purple"
+                          : "text-foreground/80 hover:bg-oled-surface"
+                      }`}
+                    >
+                      <span className="font-mono text-sm font-semibold text-neon-blue min-w-[90px]">
+                        {cmd.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {cmd.description}
+                      </span>
+                      <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono hidden sm:block">
+                        {cmd.usage}
+                      </span>
+                    </button>
+                  );
+                })}
+              </>
+            )}
+
             {/* Hint bar */}
             <div className="flex items-center gap-3 px-3 py-1.5 border-t border-gray-border/30 bg-oled-surface/30">
               <span className="text-[10px] text-muted-foreground/50">
@@ -280,3 +357,5 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
 };
 
 export default ChatInput;
+
+export { saveCmdToHistory };
