@@ -21,6 +21,23 @@ interface MessageBubbleProps {
   onEdit?: (newContent: string) => void;
 }
 
+/** Parse /cmd and /debug prefixes for badge rendering */
+function parseCommandPrefix(content: string): { badge: string; badgeColor: string; rest: string } | null {
+  if (content.startsWith("/cmd ")) {
+    const afterCmd = content.slice(5).trim();
+    const sepMatch = afterCmd.match(/^(.{1,}?)(?:\s{2,}|\t)(.+)$/s);
+    if (sepMatch) {
+      return { badge: "/cmd", badgeColor: "bg-neon-purple/20 text-neon-purple border-neon-purple/30", rest: sepMatch[2].trim() };
+    }
+    return { badge: "/cmd", badgeColor: "bg-neon-purple/20 text-neon-purple border-neon-purple/30", rest: afterCmd };
+  }
+  if (content.startsWith("/debug ")) {
+    const afterDebug = content.slice(7).trim();
+    return { badge: "/debug", badgeColor: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", rest: afterDebug };
+  }
+  return null;
+}
+
 const MessageBubble = ({
   message,
   characterAvatar,
@@ -178,9 +195,27 @@ const MessageBubble = ({
             </div>
           ) : (
             <>
-              <span className="whitespace-pre-wrap"><RoleplayMessage text={message.content} charName={characterName} userName={userName} /></span>
-              {isStreaming && !isUser && (
-                <span className="text-neon-purple animate-blink font-mono ml-0.5">|</span>
+              {isUser && parseCommandPrefix(message.content) ? (
+                <div className="space-y-1">
+                  {(() => {
+                    const parsed = parseCommandPrefix(message.content)!;
+                    return (
+                      <>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold border ${parsed.badgeColor}`}>
+                          {parsed.badge}
+                        </span>{" "}
+                        <span className="whitespace-pre-wrap"><RoleplayMessage text={parsed.rest} charName={characterName} userName={userName} /></span>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <>
+                  <span className="whitespace-pre-wrap"><RoleplayMessage text={message.content} charName={characterName} userName={userName} /></span>
+                  {isStreaming && !isUser && (
+                    <span className="text-neon-purple animate-blink font-mono ml-0.5">|</span>
+                  )}
+                </>
               )}
             </>
           )}
