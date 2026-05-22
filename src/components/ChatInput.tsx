@@ -1,8 +1,24 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, LogIn, Quote } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+
+// ─── Command Definitions ─────────────────────────────────────
+interface CommandDef {
+  name: string;
+  usage: string;
+  description: string;
+}
+
+const COMMANDS: CommandDef[] = [
+  { name: "/cmd", usage: "/cmd nội dung instruct", description: "Instruct cho AI (tôi → {{user}}, cô ấy → {{char}})" },
+  { name: "/addnpc", usage: "/addnpc Tên [- mô tả]", description: "Thêm NPC vào cuộc trò chuyện" },
+  { name: "/removenpc", usage: "/removenpc Tên", description: "Xóa NPC khỏi cuộc trò chuyện" },
+  { name: "/listnpc", usage: "/listnpc", description: "Xem danh sách NPC đang active" },
+  { name: "/clearnpc", usage: "/clearnpc", description: "Xóa tất cả NPC" },
+  { name: "/clearcmd", usage: "/clearcmd", description: "Xóa tất cả instruct" },
+];
 
 interface ChatInputProps {
   onSend: (message: string, prefillText?: string) => void;
@@ -19,6 +35,38 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prefillInputRef = useRef<HTMLInputElement>(null);
 
+  // Command popup state
+  const [showCommands, setShowCommands] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const commandListRef = useRef<HTMLDivElement>(null);
+
+  // Filtered commands based on current input
+  const filteredCommands = COMMANDS.filter((cmd) => {
+    const query = value.toLowerCase();
+    if (query.length <= 1) return true; // chỉ "/" → hiện tất cả
+    return cmd.name.toLowerCase().startsWith(query) || cmd.usage.toLowerCase().includes(query);
+  });
+
+  // Show/hide command popup
+  useEffect(() => {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("/") && !trimmed.includes(" ") && focused) {
+      setShowCommands(true);
+      setSelectedIdx(0);
+    } else {
+      setShowCommands(false);
+    }
+  }, [value, focused]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (!commandListRef.current) return;
+    const selected = commandListRef.current.querySelector(`[data-cmd-idx="${selectedIdx}"]`);
+    if (selected) {
+      selected.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIdx]);
+
   // Auto-resize textarea height based on content
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -34,7 +82,6 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   // Focus textarea on mount & after streaming finishes
   useEffect(() => {
     if (!disabled) {
-      // Small delay to let the DOM settle (e.g. after streaming ends)
       const t = setTimeout(() => textareaRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
@@ -46,13 +93,47 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
     onSend(value.trim(), prefill);
     setValue("");
     setPrefillText("");
-    // Re-focus immediately after sending
+    setShowCommands(false);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  };
+
+  const handleSelectCommand = (cmd: CommandDef) => {
+    // Autocomplete: điền usage vào input, con trỏ ở cuối
+    setValue(cmd.usage + " ");
+    setShowCommands(false);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
     });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Command popup navigation
+    if (showCommands && filteredCommands.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIdx((prev) => (prev + 1) % filteredCommands.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIdx((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        handleSelectCommand(filteredCommands[selectedIdx]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowCommands(false);
+        return;
+      }
+    }
+
+    // Normal send
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -77,6 +158,51 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
 
   return (
     <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
+      {/* Command popup */}
+      <AnimatePresence>
+        {showCommands && filteredCommands.length > 0 && (
+          <motion.div
+            ref={commandListRef}
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="mb-2 rounded-xl border border-gray-border bg-oled-elevated shadow-lg overflow-hidden max-h-48 overflow-y-auto scrollbar-thin"
+          >
+            {filteredCommands.map((cmd, idx) => (
+              <button
+                key={cmd.name}
+                data-cmd-idx={idx}
+                onClick={() => handleSelectCommand(cmd)}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
+                  idx === selectedIdx
+                    ? "bg-neon-purple/15 text-neon-purple"
+                    : "text-foreground/80 hover:bg-oled-surface"
+                }`}
+              >
+                <span className="font-mono text-sm font-semibold text-neon-blue min-w-[90px]">
+                  {cmd.name}
+                </span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {cmd.description}
+                </span>
+                <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono hidden sm:block">
+                  {cmd.usage}
+                </span>
+              </button>
+            ))}
+            {/* Hint bar */}
+            <div className="flex items-center gap-3 px-3 py-1.5 border-t border-gray-border/30 bg-oled-surface/30">
+              <span className="text-[10px] text-muted-foreground/50">
+                <kbd className="px-1 py-0.5 rounded bg-oled-surface text-[9px] font-mono">↑↓</kbd> điều hướng
+                <kbd className="px-1 py-0.5 rounded bg-oled-surface text-[9px] font-mono ml-2">Tab</kbd> chọn
+                <kbd className="px-1 py-0.5 rounded bg-oled-surface text-[9px] font-mono ml-2">Esc</kbd> đóng
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Prefill input bar */}
       {prefillActive && (
         <motion.div

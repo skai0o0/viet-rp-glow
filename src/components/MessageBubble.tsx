@@ -35,10 +35,28 @@ const MessageBubble = ({
   onEdit,
 }: MessageBubbleProps) => {
   const isUser = message.role === "user";
+  const isSystem = message.role === "system";
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // System messages (chat commands) — render as centered info text
+  if (isSystem) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, overflow: "hidden" }}
+        transition={{ duration: 0.2 }}
+        className="flex justify-center px-4 md:px-6 my-1"
+      >
+        <span className="text-[11px] text-muted-foreground/70 bg-oled-surface/50 rounded-full px-3 py-1 border border-gray-border/30">
+          {message.content}
+        </span>
+      </motion.div>
+    );
+  }
 
   useEffect(() => {
     if (editing && textareaRef.current) {

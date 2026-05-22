@@ -460,4 +460,54 @@ describe("buildMessages", () => {
     ], undefined, undefined, undefined, undefined, "  *waves* ");
     expect(messages[messages.length - 1].content).toBe("  *waves*");
   });
+
+  // ─── Dynamic NPC Tests ─────────────────────────────────────────
+
+  it("uses Type B system prompt when activeNPCs is provided", () => {
+    const messages = buildMessages(baseChar, [], undefined, undefined, undefined, undefined, undefined, [
+      { name: "Michael Jackson" },
+    ]);
+    const firstSystem = messages.find((m) => m.role === "system");
+    expect(firstSystem?.content).toContain("Type B system prompt");
+  });
+
+  it("uses Type A system prompt when activeNPCs is empty", () => {
+    const messages = buildMessages(baseChar, [], undefined, undefined, undefined, undefined, undefined, []);
+    const firstSystem = messages.find((m) => m.role === "system");
+    expect(firstSystem?.content).toContain("Type A system prompt");
+  });
+
+  it("uses Type A system prompt when activeNPCs is undefined", () => {
+    const messages = buildMessages(baseChar, [], undefined, undefined, undefined, undefined, undefined, undefined);
+    const firstSystem = messages.find((m) => m.role === "system");
+    expect(firstSystem?.content).toContain("Type A system prompt");
+  });
+
+  it("injects active_npcs block with NPC names", () => {
+    const messages = buildMessages(baseChar, [], undefined, undefined, undefined, undefined, undefined, [
+      { name: "Michael Jackson", description: "Vua nhạc pop" },
+      { name: "Sơn Tùng MTP" },
+    ]);
+    const npcBlock = messages.find((m) => m.role === "system" && m.content.includes("<active_npcs>"));
+    expect(npcBlock).toBeTruthy();
+    expect(npcBlock!.content).toContain("Michael Jackson");
+    expect(npcBlock!.content).toContain("Vua nhạc pop");
+    expect(npcBlock!.content).toContain("Sơn Tùng MTP");
+  });
+
+  it("does NOT inject active_npcs block when no NPCs", () => {
+    const messages = buildMessages(baseChar, [], undefined, undefined, undefined, undefined, undefined, []);
+    const npcBlock = messages.find((m) => m.role === "system" && m.content.includes("<active_npcs>"));
+    expect(npcBlock).toBeUndefined();
+  });
+
+  it("includes Type B post-history when activeNPCs present", () => {
+    const messages = buildMessages(baseChar, [
+      { role: "user", content: "Hello" },
+    ], undefined, undefined, undefined, undefined, undefined, [
+      { name: "Michael Jackson" },
+    ]);
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    expect(lastUser?.content).toContain("Type B post-history");
+  });
 });
