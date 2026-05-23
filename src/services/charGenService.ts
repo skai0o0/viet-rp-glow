@@ -50,7 +50,7 @@ export async function nonStreamChat(
     model?: string;
   },
 ): Promise<string> {
-  const { provider, signal, maxTokens = 16384, temperature, model: modelOverride } = options;
+  const { provider, signal, maxTokens = 8192, temperature, model: modelOverride } = options;
   const apiKey = getApiKeyForProvider(provider);
   if (!apiKey) throw new Error("Chưa nhập API Key. Vào Cài đặt để thêm.");
 
@@ -97,8 +97,18 @@ export async function nonStreamChat(
   }
 
   const json = await response.json();
-  const content: string = json.choices?.[0]?.message?.content ?? "";
+  const choice = json.choices?.[0];
+  const content: string = choice?.message?.content ?? "";
   if (!content) throw new Error("AI trả về phản hồi trống.");
+
+  const finishReason = choice?.finish_reason;
+  if (finishReason === "length") {
+    throw new Error(
+      "AI đã dừng giữa chừng vì hết token output. " +
+      "Hãy rút gọn mô tả nhân vật hoặc chọn model có giới hạn output cao hơn.",
+    );
+  }
+
   return content;
 }
 
@@ -133,7 +143,7 @@ export async function runCharGenPipeline(
       draftProfile = await nonStreamChat(brainstormMessages, {
         provider,
         signal,
-        maxTokens: 16384,
+        maxTokens: 8192,
       });
       console.log("[CharGen Step 1] Draft Profile:", draftProfile);
     } else {
