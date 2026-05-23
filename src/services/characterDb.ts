@@ -3,6 +3,7 @@ import { TavernCardV2, TavernCardV2Data } from "@/types/taverncard";
 import { CharacterCard } from "@/types/character";
 import { normalizeCard, NormalizeOptions } from "@/lib/cardNormalizer";
 import { validateCard, ValidationResult } from "@/lib/cardValidator";
+import { sanitizeUserInput } from "@/lib/inputSanitizer";
 
 export type DbCharacter = {
   id: string;
@@ -361,6 +362,21 @@ export async function saveCharacterWithValidation(
 
   // Step 1: Normalize (safe, deterministic, no AI)
   const normalized = normalizeCard(rawCard.data, normalizeOptions);
+
+  // Step 1.5: Sanitize text fields for injection
+  const textFields: (keyof TavernCardV2Data)[] = [
+    "description", "personality", "scenario", "first_mes", "mes_example", "system_prompt",
+  ];
+  for (const field of textFields) {
+    const value = normalized[field];
+    if (typeof value === "string" && value) {
+      const result = sanitizeUserInput(value, "card_field");
+      if (result.flagged) {
+        console.warn("[Guard] Card field flagged:", field, result.reason);
+        (normalized as any)[field] = result.clean;
+      }
+    }
+  }
 
   // Step 2: Validate
   const validation = validateCard(normalized);
