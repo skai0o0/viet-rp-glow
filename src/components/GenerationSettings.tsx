@@ -44,7 +44,7 @@ export function getResponseStylePrompt(): string {
   return getCachedResponseStyles().find((s) => s.value === style)?.prompt || "";
 }
 
-interface GenerationSettingsProps {
+export interface GenerationSettingsProps {
   scenario: string;
   onScenarioChange: (val: string) => void;
   onClose?: () => void;

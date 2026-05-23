@@ -17,7 +17,7 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-interface CharacterPreviewDialogProps {
+export interface CharacterPreviewDialogProps {
   character: CharacterSummary | null;
   onClose: () => void;
   isFavorited?: boolean;

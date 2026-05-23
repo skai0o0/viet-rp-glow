@@ -4,7 +4,7 @@ import { getCachedUserPersona, isProfileIncomplete } from "@/services/profileDb"
 import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, ChevronRight, Plus, AlertTriangle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard, ActiveNPC } from "@/types/character";
-import { buildMessages, replaceMacros, replaceMacroKeywords, truncateMessages, detectCardType } from "@/utils/promptBuilder";
+import { buildMessages, replaceMacros, replaceMacroKeywords, truncateMessages, detectCardType, trimHistory } from "@/utils/promptBuilder";
 import { streamChat, streamChatViaProxy, getModel } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -25,7 +25,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ChatHeader from "@/components/ChatHeader";
 import ChatSidebar from "@/components/ChatSidebar";
-import ChatInput, { saveCmdToHistory } from "@/components/ChatInput";
+import ChatInput from "@/components/ChatInput";
+import { saveCmdToHistory } from "@/hooks/useChatCommands";
 import MessageBubble from "@/components/MessageBubble";
 import TypingIndicator from "@/components/TypingIndicator";
 import GenerationSettings from "@/components/GenerationSettings";
@@ -554,6 +555,7 @@ const ChatPage = () => {
 
       // ─── Inline /cmd: instruction + message, có hiệu lực 1 lượt ───
       let pendingInstruction: string | undefined;
+      const pendingInstructions: string[] = [];
       let messageToSend = trimmed;
 
       if (trimmed.startsWith("/cmd ")) {
@@ -569,6 +571,7 @@ const ChatPage = () => {
           messageToSend = afterCmd;
         }
         saveCmdToHistory(trimmed);
+        if (pendingInstruction) pendingInstructions.push(pendingInstruction);
       }
 
       // ─── /debug: admin-only, đính kèm debug parse vào reply kế tiếp ───
@@ -625,6 +628,7 @@ const ChatPage = () => {
           `Sau block debug, tiếp tục roleplay bình thường.`;
 
         setCmdInstructions((prev) => [...prev, debugInstruction]);
+        pendingInstructions.push(debugInstruction);
         saveCmdToHistory(trimmed);
       }
 
@@ -634,7 +638,7 @@ const ChatPage = () => {
       }
 
       // Set instruction cho lượt kế tiếp (1 lần)
-      if (pendingInstruction) {
+      if (pendingInstruction && pendingInstructions.length === 0) {
         setCmdInstructions([pendingInstruction]);
       }
 
@@ -690,18 +694,19 @@ const ChatPage = () => {
         role: m.role as "user" | "assistant",
         content: i === arr.length - 1 && m.role === "user" ? messageToSend : m.content,
       }));
+      const modelForBudget = isSubscriptionUser ? undefined : getModel();
+      const trimmedHistory = trimHistory(aiMessages, undefined, modelForBudget);
       const rawMessages = buildMessages(
         activeCharacter,
-        aiMessages,
+        trimmedHistory,
         undefined,
         scenarioOverride,
         summary,
         facts,
         prefillText,
         activeNPCs,
-        cmdInstructions,
+        pendingInstructions.length > 0 ? pendingInstructions : cmdInstructions,
       );
-      const modelForBudget = isSubscriptionUser ? undefined : getModel();
       const apiMessages = truncateMessages(rawMessages, undefined, modelForBudget);
 
       const controller = new AbortController();
@@ -832,9 +837,12 @@ const ChatPage = () => {
     const assistantId = "streaming-" + Date.now();
     let assistantContent = "";
 
+    const regenHistory = withoutLast.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    const regenModel = isSubscriptionUser ? undefined : getModel();
+    const trimmedRegenHistory = trimHistory(regenHistory, undefined, regenModel);
     const apiMessages = truncateMessages(buildMessages(
       activeCharacter,
-      withoutLast.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      trimmedRegenHistory,
       undefined,
       scenarioOverride,
       summary,
@@ -842,7 +850,7 @@ const ChatPage = () => {
       prefillRef.current,
       activeNPCs,
       cmdInstructions,
-    ), undefined, isSubscriptionUser ? undefined : getModel());
+    ), undefined, regenModel);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -1020,9 +1028,12 @@ const ChatPage = () => {
       const assistantId = "streaming-" + Date.now();
       let assistantContent = "";
 
+      const editHistory = updatedMessages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+      const editModel = isSubscriptionUser ? undefined : getModel();
+      const trimmedEditHistory = trimHistory(editHistory, undefined, editModel);
       const apiMessages = truncateMessages(buildMessages(
         activeCharacter,
-        updatedMessages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        trimmedEditHistory,
         undefined,
         scenarioOverride,
         summary,
@@ -1030,7 +1041,7 @@ const ChatPage = () => {
         prefillRef.current,
         activeNPCs,
         cmdInstructions,
-      ), undefined, isSubscriptionUser ? undefined : getModel());
+      ), undefined, editModel);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -1606,7 +1617,9 @@ const ChatPage = () => {
                 ))}
               </AnimatePresence>
 
-              {isStreaming && messages[messages.length - 1]?.content === "" && <TypingIndicator />}
+              {isStreaming && messages[messages.length - 1]?.content === "" && (
+                <TypingIndicator avatarChar={activeCharacter?.name?.charAt(0) || "AI"} />
+              )}
             </div>
 
             {/* Scroll-to-bottom button */}
@@ -1676,7 +1689,12 @@ const ChatPage = () => {
               </motion.div>
             )}
 
-            <ChatInput onSend={handleSend} disabled={isStreaming || (isSubscriptionUser && quotaExceeded)} />
+            <ChatInput
+              onSend={handleSend}
+              disabled={isStreaming || (isSubscriptionUser && quotaExceeded)}
+              isAuthenticated={!!user}
+              onAuthRequired={() => navigate("/auth", { state: { from: "/chat" } })}
+            />
           </div>
 
           {/* Desktop/Tablet right sidebar with animation */}

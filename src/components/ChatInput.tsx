@@ -1,107 +1,45 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, LogIn, Quote } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useChatCommands } from "@/hooks/useChatCommands";
 
-// ─── Command Definitions ─────────────────────────────────────
-interface CommandDef {
-  name: string;
-  usage: string;
-  description: string;
-}
-
-const COMMANDS: CommandDef[] = [
-  { name: "/cmd", usage: "/cmd ", description: "Instruct AI 1 lượt (tôi → {{user}}, cô ấy → {{char}})" },
-  { name: "/debug", usage: "/debug ", description: "Admin: đính kèm debug parse vào reply kế tiếp" },
-  { name: "/addnpc", usage: "/addnpc Tên [- mô tả]", description: "Thêm NPC vào cuộc trò chuyện" },
-  { name: "/removenpc", usage: "/removenpc Tên", description: "Xóa NPC khỏi cuộc trò chuyện" },
-  { name: "/listnpc", usage: "/listnpc", description: "Xem danh sách NPC đang active" },
-  { name: "/clearnpc", usage: "/clearnpc", description: "Xóa tất cả NPC" },
-];
-
-// ─── Command History ─────────────────────────────────────────
-const CMD_HISTORY_KEY = "vietrp_cmd_history";
-const CMD_HISTORY_MAX = 20;
-
-function loadCmdHistory(): string[] {
-  try {
-    const raw = localStorage.getItem(CMD_HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCmdToHistory(cmd: string) {
-  const history = loadCmdHistory().filter((h) => h !== cmd);
-  history.unshift(cmd);
-  if (history.length > CMD_HISTORY_MAX) history.length = CMD_HISTORY_MAX;
-  localStorage.setItem(CMD_HISTORY_KEY, JSON.stringify(history));
-}
-
-interface ChatInputProps {
+export interface ChatInputProps {
   onSend: (message: string, prefillText?: string) => void;
   disabled?: boolean;
+  isAuthenticated?: boolean;
+  onAuthRequired?: () => void;
 }
 
-const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
+const ChatInput = ({ onSend, disabled, isAuthenticated = true, onAuthRequired }: ChatInputProps) => {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [prefillActive, setPrefillActive] = useState(false);
   const [prefillText, setPrefillText] = useState("");
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prefillInputRef = useRef<HTMLInputElement>(null);
 
-  // Command popup state
-  const [showCommands, setShowCommands] = useState(false);
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const [cmdHistory, setCmdHistory] = useState<string[]>([]);
-  const commandListRef = useRef<HTMLDivElement>(null);
-
-  // Load history on mount
-  useEffect(() => {
-    setCmdHistory(loadCmdHistory());
-  }, []);
-
-  // Filtered history & commands based on current input
-  const query = value.trim().toLowerCase();
-  const filteredHistory = cmdHistory.filter((h) => {
-    if (query.length <= 1) return true;
-    return h.toLowerCase().startsWith(query);
+  const {
+    showCommands,
+    selectedIdx,
+    filteredHistory,
+    filteredCommands,
+    totalItems,
+    commandListRef,
+    handleCommandKeyDown,
+    handleSelectItem,
+  } = useChatCommands({
+    inputValue: value,
+    focused,
+    onSelectCommand: (usage) => {
+      setValue(usage);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
+    onSelectHistory: (entry) => {
+      setValue(entry);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
   });
-  const filteredCommands = COMMANDS.filter((cmd) => {
-    if (query.length <= 1) return true;
-    return cmd.name.toLowerCase().startsWith(query) || cmd.usage.toLowerCase().includes(query);
-  });
 
-  // Total items for navigation
-  const totalItems = filteredHistory.length + filteredCommands.length;
-
-  // Show/hide command popup & refresh history when user types /
-  useEffect(() => {
-    const trimmed = value.trim();
-    if (trimmed.startsWith("/") && !trimmed.includes(" ") && focused) {
-      setCmdHistory(loadCmdHistory());
-      setShowCommands(true);
-      setSelectedIdx(0);
-    } else {
-      setShowCommands(false);
-    }
-  }, [value, focused]);
-
-  // Scroll selected item into view
-  useEffect(() => {
-    if (!commandListRef.current) return;
-    const selected = commandListRef.current.querySelector(`[data-cmd-idx="${selectedIdx}"]`);
-    if (selected) {
-      selected.scrollIntoView({ block: "nearest" });
-    }
-  }, [selectedIdx]);
-
-  // Auto-resize textarea height based on content
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -113,7 +51,6 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
     adjustHeight();
   }, [value, adjustHeight]);
 
-  // Focus textarea on mount & after streaming finishes
   useEffect(() => {
     if (!disabled) {
       const t = setTimeout(() => textareaRef.current?.focus(), 50);
@@ -127,66 +64,26 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
     onSend(value.trim(), prefill);
     setValue("");
     setPrefillText("");
-    setShowCommands(false);
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-    });
-  };
-
-  const handleSelectItem = (idx: number) => {
-    if (idx < filteredHistory.length) {
-      // Selected a history entry — fill input with full text
-      setValue(filteredHistory[idx]);
-    } else {
-      // Selected a command — autocomplete usage
-      const cmd = filteredCommands[idx - filteredHistory.length];
-      if (cmd) setValue(cmd.usage);
-    }
-    setShowCommands(false);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
     });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Command popup navigation
-    if (showCommands && totalItems > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIdx((prev) => (prev + 1) % totalItems);
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIdx((prev) => (prev - 1 + totalItems) % totalItems);
-        return;
-      }
-      if (e.key === "Tab") {
-        e.preventDefault();
-        handleSelectItem(selectedIdx);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setShowCommands(false);
-        return;
-      }
-    }
-
-    // Normal send
+    if (handleCommandKeyDown(e)) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigate("/auth", { state: { from: "/chat" } })}
+          onClick={onAuthRequired}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-neon-blue/10 border border-neon-blue/30 text-neon-blue font-medium text-sm shadow-[0_0_12px_rgba(0,240,255,0.15)] hover:shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all duration-300"
         >
           <LogIn size={18} />
@@ -357,5 +254,3 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
 };
 
 export default ChatInput;
-
-export { saveCmdToHistory };

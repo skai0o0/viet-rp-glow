@@ -1,13 +1,15 @@
-import { useState, useRef, useEffect, memo } from "react";
+import React, { useState, useRef, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Copy, Check, GitBranch, Trash2, Edit2 } from "lucide-react";
 import { ChatMessage } from "@/types/character";
 import { toast } from "sonner";
 import { copyToClipboard } from "@/utils/clipboard";
+import { parseCommandPrefix } from "@/utils/messageParser";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import RoleplayMessage from "@/components/RoleplayMessage";
+import { cn } from "@/lib/utils";
 
-interface MessageBubbleProps {
+export interface MessageBubbleProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onClick"> {
   message: ChatMessage;
   characterAvatar?: string;
   characterName?: string;
@@ -21,36 +23,22 @@ interface MessageBubbleProps {
   onEdit?: (newContent: string) => void;
 }
 
-/** Parse /cmd and /debug prefixes for badge rendering */
-function parseCommandPrefix(content: string): { badge: string; badgeColor: string; rest: string } | null {
-  if (content.startsWith("/cmd ")) {
-    const afterCmd = content.slice(5).trim();
-    const sepMatch = afterCmd.match(/^(.{1,}?)(?:\s{2,}|\t)(.+)$/s);
-    if (sepMatch) {
-      return { badge: "/cmd", badgeColor: "bg-neon-purple/20 text-neon-purple border-neon-purple/30", rest: sepMatch[2].trim() };
-    }
-    return { badge: "/cmd", badgeColor: "bg-neon-purple/20 text-neon-purple border-neon-purple/30", rest: afterCmd };
-  }
-  if (content.startsWith("/debug ")) {
-    const afterDebug = content.slice(7).trim();
-    return { badge: "/debug", badgeColor: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", rest: afterDebug };
-  }
-  return null;
-}
-
-const MessageBubble = ({
-  message,
-  characterAvatar,
-  characterName,
-  userName,
-  isStreaming,
-  isLastAssistant,
-  isLastUser,
-  onRegenerate,
-  onBranch,
-  onDelete,
-  onEdit,
-}: MessageBubbleProps) => {
+const MessageBubble = React.forwardRef<HTMLDivElement, MessageBubbleProps>(
+  ({
+    message,
+    characterAvatar,
+    characterName,
+    userName,
+    isStreaming,
+    isLastAssistant,
+    isLastUser,
+    onRegenerate,
+    onBranch,
+    onDelete,
+    onEdit,
+    className,
+    ...props
+  }, ref) => {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
   const [copied, setCopied] = useState(false);
@@ -62,11 +50,13 @@ const MessageBubble = ({
   if (isSystem) {
     return (
       <motion.div
+        ref={ref}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, overflow: "hidden" }}
         transition={{ duration: 0.2 }}
-        className="flex justify-center px-4 md:px-6 my-1"
+        className={cn("flex justify-center px-4 md:px-6 my-1", className)}
+        {...props}
       >
         <span className="text-[11px] text-muted-foreground/70 bg-oled-surface/50 rounded-full px-3 py-1 border border-gray-border/30">
           {message.content}
@@ -115,11 +105,13 @@ const MessageBubble = ({
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, overflow: "hidden" }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className={`group flex gap-3 px-4 md:px-6 ${isUser ? "justify-end" : "justify-start"}`}
+      className={cn(`group flex gap-3 px-4 md:px-6 ${isUser ? "justify-end" : "justify-start"}`, className)}
+      {...props}
     >
       {/* AI Avatar */}
       {!isUser && (
@@ -317,6 +309,9 @@ const MessageBubble = ({
       </div>
     </motion.div>
   );
-};
+  }
+);
+
+MessageBubble.displayName = "MessageBubble";
 
 export default memo(MessageBubble);

@@ -7,10 +7,7 @@ import {
   getGlobalPromptTypeB,
   getGlobalPostHistoryTypeA,
   getGlobalPostHistoryTypeB,
-  getNsfwGatePrompt,
-  getNsfwJailbreakPrompt,
 } from "@/services/globalSettingsDb";
-import { getResponseStylePrompt } from "@/components/GenerationSettings";
 import { countTokens } from "@/utils/tokenizer";
 
 export interface OpenRouterMessage {
@@ -402,9 +399,11 @@ export function buildLayeredPrompt(
   return sections;
 }
 
+// ─── SillyTavern-Style Assembly ──────────────────────────────
+
 /**
- * Build the system prompt string from layered sections.
- * Backward-compatible wrapper around buildLayeredPrompt().
+ * Build a single consolidated system prompt (~900 tokens).
+ * Flowing prose, no XML tags, no headers. Vietnamese format rules.
  */
 export function buildSystemPrompt(
   character: CharacterCard,
@@ -413,9 +412,135 @@ export function buildSystemPrompt(
   summary?: string,
   facts?: string[],
   activeNPCs?: ActiveNPC[],
+  settings?: { nsfw?: boolean },
 ): string {
-  const sections = buildLayeredPrompt(character, userName, chatHistory, summary, facts, activeNPCs);
-  return sections.map((s) => s.content).join("\n\n");
+  const charName = character.name;
+  const nsfw = settings?.nsfw ?? (localStorage.getItem("vietrp_nsfw_mode") === "true");
+  const parts: string[] = [];
+
+  // Global admin prompt (if configured in Supabase)
+  const hasActiveNPCs = activeNPCs && activeNPCs.length > 0;
+  const cardType = hasActiveNPCs ? "type_b" : detectCardType(character);
+  const typePrompt = cardType === "type_b" ? getGlobalPromptTypeB() : getGlobalPromptTypeA();
+  const globalPrompt = typePrompt || getGlobalSystemPrompt();
+  if (globalPrompt) {
+    parts.push(globalPrompt);
+  }
+
+  // Character prose (description + personality merged)
+  const charProse: string[] = [];
+  charProse.push(`${charName}: ${replaceMacros(character.description || "No description.", charName, userName)}`);
+  if (character.personality) {
+    charProse.push(`Tính cách: ${replaceMacros(character.personality, charName, userName)}`);
+  }
+  parts.push(charProse.join(" "));
+
+  // Relationship
+  parts.push(`Người ${charName} đang nói chuyện là ${userName}. Mối quan hệ giữa họ được định nghĩa bởi bối cảnh và tính cách của ${charName}.`);
+
+  // Scenario
+  if (character.scenario) {
+    parts.push(`Bối cảnh hiện tại: ${replaceMacros(character.scenario, charName, userName)}`);
+  }
+
+  // World lore (lorebook entries)
+  const lorebook = resolveLorebookEntries(character.character_book, chatHistory);
+  const allLore = [...lorebook.beforeChar, ...lorebook.afterChar];
+  if (allLore.length > 0) {
+    parts.push(`Thông tin thế giới:\n${allLore.join("\n")}`);
+  }
+
+  // Active NPCs
+  if (hasActiveNPCs) {
+    const npcLines = activeNPCs!.map((npc) => {
+      let line = `- ${npc.name}`;
+      if (npc.description) line += `: ${npc.description}`;
+      if (npc.personality) line += ` (Tính cách: ${npc.personality})`;
+      return line;
+    });
+    parts.push(`NPC đang có mặt:\n${npcLines.join("\n")}`);
+  }
+
+  // User persona (1 sentence, merged)
+  const persona = getCachedUserPersona();
+  const userInfoParts: string[] = [];
+  const identityStr = buildIdentityString(persona.gender, persona.sexuality);
+  if (identityStr) userInfoParts.push(identityStr);
+  if (persona.userDescription) userInfoParts.push(persona.userDescription);
+  if (userInfoParts.length > 0) {
+    parts.push(`Thông tin về ${userName}: ${userInfoParts.join(". ")}.`);
+  }
+
+  // Character system_prompt override
+  if (character.system_prompt?.trim()) {
+    parts.push(replaceMacros(character.system_prompt.trim(), charName, userName));
+  }
+
+  // Dialogue examples (condensed, placeholders replaced)
+  if (character.mes_example?.trim()) {
+    parts.push(`Ví dụ hội thoại:\n${replaceMacros(character.mes_example.trim(), charName, userName)}`);
+  }
+
+  // Memory (summary + facts)
+  if (summary) {
+    parts.push(`Tóm tắt cuộc trò chuyện trước: ${summary}`);
+  }
+  if (facts?.length) {
+    parts.push(`Thông tin quan trọng: ${facts.join("; ")}.`);
+  }
+
+  // Format rules
+  const nsfwRule = nsfw
+    ? "- Cho phép nội dung 18+, bạo lực, ngôn ngữ mạnh khi phù hợp với bối cảnh."
+    : "- Giữ nội dung phù hợp, không quá bạo lực hoặc tình dục.";
+  parts.push(
+    `- Xưng hô: dùng "${userName}" để gọi người chơi.\n` +
+    `- Format: (Suy nghĩ) *Hành động* "Lời thoại"\n` +
+    `- Không bao giờ nói, suy nghĩ, hoặc hành động thay ${userName}.\n` +
+    `- Tối đa 1-3 thành phần mỗi phản hồi.\n` +
+    `- Ngôn ngữ: tiếng Việt, giọng văn tự nhiên, không cliché.\n` +
+    nsfwRule
+  );
+
+  return parts.join("\n\n");
+}
+
+/**
+ * Trim chat history to fit within token budget.
+ * Always keeps first 2 messages (persona trick pair).
+ * Removes oldest messages from the middle (keeps most recent).
+ */
+export function trimHistory(
+  messages: { role: "user" | "assistant"; content: string }[],
+  maxTokens?: number,
+  modelId?: string,
+): { role: "user" | "assistant"; content: string }[] {
+  const budget = maxTokens ?? 4000;
+  const estimate = (text: string) => Math.ceil(text.length / 4);
+
+  let total = 0;
+  for (const msg of messages) total += estimate(msg.content) + 4;
+  if (total <= budget) return messages;
+
+  // Always keep first 2 messages (persona trick pair)
+  const fixed: typeof messages = [];
+  const rest: typeof messages = [];
+  for (let i = 0; i < messages.length; i++) {
+    if (i < 2) fixed.push(messages[i]);
+    else rest.push(messages[i]);
+  }
+
+  // Keep most recent messages that fit
+  const kept: typeof messages = [];
+  let used = 0;
+  for (let i = rest.length - 1; i >= 0; i--) {
+    const cost = estimate(rest[i].content) + 4;
+    if (used + cost > budget) break;
+    kept.unshift(rest[i]);
+    used += cost;
+  }
+
+  return [...fixed, ...kept];
 }
 
 /**
@@ -469,12 +594,14 @@ export function parseMesExample(mesExample: string, charName: string, userName: 
 /**
  * Build the full messages array for OpenRouter API.
  *
- * SillyTavern-style 5-layer architecture combating "Lost in the Middle":
- *   Layer 1: System Core (global prompt + NSFW jailbreak if ON)
- *   Layer 2: Character & User Context (character sheet, user persona, world info)
- *   Layer 3: Dialogue Examples (mes_example as single system block)
- *   Layer 4: Memory & Chat History (memory archive + chat history)
- *   Layer 5: The Anchor (post-history + response style + NSFW gate if OFF + prefill)
+ * SillyTavern-style 5-block assembly:
+ *   [0]  System: single consolidated prompt (~900 tokens)
+ *   [1]  User:   "[Bắt đầu roleplay]"  (persona trick)
+ *   [2]  Asst:   character.first_mes
+ *   [3+] User/Asst: trimmed chat history
+ *   [-4] System: mid-conversation reminder (if > 10 msgs)
+ *   Last: current user message (clean, no injection)
+ *   Last: assistant prefill (optional)
  */
 export function buildMessages(
   character: CharacterCard,
@@ -486,6 +613,7 @@ export function buildMessages(
   prefillText?: string,
   activeNPCs?: ActiveNPC[],
   cmdInstructions?: string[],
+  modelId?: string,
 ): OpenRouterMessage[] {
   const persona = getCachedUserPersona();
   const resolvedUserName = userName || persona.displayName || "User";
@@ -495,177 +623,54 @@ export function buildMessages(
 
   const messages: OpenRouterMessage[] = [];
 
-  // ═══ LAYER 1: SYSTEM CORE ═══
+  // ── BLOCK 1: Single consolidated system message ──
+  const systemContent = buildSystemPrompt(
+    effectiveCharacter, resolvedUserName, chatHistory, summary, facts, activeNPCs,
+  );
+  const isAnthropic = modelId?.startsWith("anthropic/") ?? false;
+  messages.push({
+    role: "system",
+    content: systemContent,
+    ...(isAnthropic ? { cache_control: { type: "ephemeral" } } : {}),
+  });
 
-  // 1a. Global System Prompt (type-specific)
-  // Dynamic Type B promotion: active NPCs override Type A → Type B
-  const hasActiveNPCs = activeNPCs && activeNPCs.length > 0;
-  const cardType = hasActiveNPCs ? "type_b" : detectCardType(effectiveCharacter);
-  const typePrompt = cardType === "type_b"
-    ? getGlobalPromptTypeB()
-    : getGlobalPromptTypeA();
-  const globalPrompt = typePrompt || getGlobalSystemPrompt();
-  if (globalPrompt) {
-    messages.push({ role: "system", content: globalPrompt, cache_control: { type: "ephemeral" } });
-  }
+  // ── BLOCK 2: Persona trick ──
+  const rawFirstMes = effectiveCharacter.first_mes?.trim();
+  const firstMesContent = rawFirstMes ? replaceMacros(rawFirstMes, effectiveCharacter.name, resolvedUserName) : `*${effectiveCharacter.name} xuất hiện.*`;
+  messages.push({ role: "user", content: "[Bắt đầu roleplay]" });
+  messages.push({ role: "assistant", content: firstMesContent });
 
-  // 1b. NSFW Jailbreak (injected at TOP when NSFW is ENABLED)
-  const nsfwEnabled = localStorage.getItem("vietrp_nsfw_mode") === "true";
-  if (nsfwEnabled) {
-    const jailbreak = getNsfwJailbreakPrompt();
-    if (jailbreak) messages.push({ role: "system", content: jailbreak, cache_control: { type: "ephemeral" } });
-  }
+  // ── BLOCK 3: Trimmed chat history ──
+  const hasFirstMesInHistory = rawFirstMes
+    && chatHistory.length > 0
+    && chatHistory[0].role === "assistant"
+    && chatHistory[0].content.trim() === rawFirstMes;
 
-  // ═══ LAYER 2: CHARACTER & USER CONTEXT ═══
-
-  // 2a. Character Sheet (XML-tagged for better LLM attention)
-  const charName = effectiveCharacter.name;
-  const charParts: string[] = [];
-
-  charParts.push(`<character_identity>`);
-  charParts.push(`Name: ${charName}`);
-  if (effectiveCharacter.description) {
-    charParts.push(replaceMacros(effectiveCharacter.description, charName, resolvedUserName));
-  }
-  charParts.push(`</character_identity>`);
-
-  if (effectiveCharacter.personality) {
-    charParts.push(`<personality_traits>`);
-    charParts.push(replaceMacros(effectiveCharacter.personality, charName, resolvedUserName));
-    charParts.push(`</personality_traits>`);
-  }
-
-  if (effectiveCharacter.scenario) {
-    charParts.push(`<current_scenario>`);
-    charParts.push(replaceMacros(effectiveCharacter.scenario, charName, resolvedUserName));
-    charParts.push(`</current_scenario>`);
-  }
-
-  // Relationship anchor — forces AI to remember the relationship throughout the chat
-  charParts.push(`<relationship_with_user>`);
-  charParts.push(`Người ${charName} đang nói chuyện là: ${resolvedUserName}`);
-  charParts.push(`Mối quan hệ giữa ${charName} và ${resolvedUserName} được định nghĩa trong character_identity và current_scenario ở trên.`);
-  charParts.push(`${charName} phải nhớ và thể hiện mối quan hệ này nhất quán trong mọi response — không được hành xử như người lạ nếu lore định nghĩa mối quan hệ thân mật.`);
-  charParts.push(`</relationship_with_user>`);
-
-  messages.push({ role: "system", content: charParts.join("\n\n"), cache_control: { type: "ephemeral" } });
-
-  // 2a-2. Active NPCs (dynamic multi-character support)
-  if (hasActiveNPCs) {
-    const npcParts: string[] = [];
-    npcParts.push(`<active_npcs>`);
-    npcParts.push(`Các nhân vật phụ (NPC) đang xuất hiện trong cuộc trò chuyện cùng ${charName} và ${resolvedUserName}.`);
-    npcParts.push(`Bạn PHẢI roleplay tất cả NPC này — cho họ thoại, hành động, suy nghĩ riêng khi họ xuất hiện.`);
-    npcParts.push(`${charName} VẪN LÀ nhân vật chính. NPC là phụ.`);
-    npcParts.push(``);
-    for (const npc of activeNPCs!) {
-      npcParts.push(`--- [${npc.name}] ---`);
-      if (npc.description) npcParts.push(npc.description);
-      if (npc.personality) npcParts.push(`Personality: ${npc.personality}`);
-      npcParts.push(``);
-    }
-    npcParts.push(`</active_npcs>`);
-    messages.push({ role: "system", content: npcParts.join("\n"), cache_control: { type: "ephemeral" } });
-  }
-
-  // 2b. User Persona
-  const userInfoParts: string[] = [];
-  const identityStr = buildIdentityString(persona.gender, persona.sexuality);
-  if (identityStr) userInfoParts.push(identityStr);
-  if (persona.userDescription) userInfoParts.push(persona.userDescription);
-  if (userInfoParts.length > 0) {
-    messages.push({
-      role: "system",
-      content: `<user_persona>\n${resolvedUserName}: ${userInfoParts.join(". ")}\n</user_persona>`,
-    });
-  }
-
-  // 2c. World Info (all lorebook entries combined)
-  const lorebook = resolveLorebookEntries(effectiveCharacter.character_book, chatHistory);
-  const allWorldInfo = [...lorebook.beforeChar, ...lorebook.afterChar];
-  if (allWorldInfo.length > 0) {
-    messages.push({
-      role: "system",
-      content: `<world_lore>\n${allWorldInfo.join("\n\n")}\n</world_lore>`,
-    });
-  }
-
-  // ═══ LAYER 3: DIALOGUE EXAMPLES ═══
-  if (effectiveCharacter.mes_example?.trim()) {
-    messages.push({
-      role: "system",
-      content: `[EXAMPLE DIALOGUE]\n${effectiveCharacter.mes_example}`,
-      cache_control: { type: "ephemeral" },
-    });
-  }
-
-  // ═══ LAYER 4: MEMORY & CHAT HISTORY ═══
-
-  // 4a. Memory Archive (summary + facts)
-  const memoryParts: string[] = [];
-  if (summary) memoryParts.push(`Rolling Summary:\n${summary}`);
-  if (facts?.length) memoryParts.push(`Key Facts:\n${facts.map(f => `- ${f}`).join("\n")}`);
-  if (memoryParts.length > 0) {
-    messages.push({ role: "system", content: `[MEMORY ARCHIVE]\n${memoryParts.join("\n\n")}` });
-  }
-
-  // 4b. Chat History (sliding window — already truncated by caller)
-  for (const msg of chatHistory) {
-    messages.push({ role: msg.role, content: msg.content });
-  }
-
-  // ═══ LAYER 5: THE ANCHOR (RECENCY BIAS) ═══
-  //
-  // CRITICAL: Post-history instructions are NOT injected as a separate
-  // {"role":"system"} message.  Strict ChatML/Instruct models (Llama 3,
-  // Mistral, Qwen) expect the turn sequence to end with User -> Assistant.
-  // A dangling system message between the last user turn and the assistant
-  // prefill causes token stuttering / overlapping output.
-  //
-  // Fix: append the anchor text to the LAST user message's content,
-  // wrapped in a [System Note: ...] pseudo-tag.
-
-  const postParts: string[] = [];
-  const postHistoryInstructions = cardType === "type_b"
-    ? getGlobalPostHistoryTypeB()
-    : getGlobalPostHistoryTypeA();
-  if (postHistoryInstructions) postParts.push(postHistoryInstructions);
-
-  const stylePrompt = getResponseStylePrompt();
-  if (stylePrompt) postParts.push(stylePrompt);
-
-  if (!nsfwEnabled) {
-    const nsfwGate = getNsfwGatePrompt();
-    if (nsfwGate) postParts.push(nsfwGate);
-  }
-
-  // User /cmd instructions (injected into anchor for recency bias)
-  if (cmdInstructions?.length) {
-    for (const instruction of cmdInstructions) {
-      postParts.push(`[User Instruction: ${instruction}]`);
+  if (chatHistory.length > 0) {
+    const historyToAdd = hasFirstMesInHistory ? chatHistory.slice(1) : chatHistory;
+    for (const msg of historyToAdd) {
+      messages.push({ role: msg.role, content: msg.content });
     }
   }
 
-  if (postParts.length > 0) {
-    const anchorText = `\n\n[System Note: ${postParts.join("\n")}]`;
-    // Find the last user message in the messages array (search backwards)
-    let lastUserIdx = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") { lastUserIdx = i; break; }
-    }
-    if (lastUserIdx !== -1) {
-      messages[lastUserIdx] = {
-        ...messages[lastUserIdx],
-        content: messages[lastUserIdx].content + anchorText,
-      };
-    } else {
-      // Fallback: no user message exists (e.g. empty chat with first_mes only)
-      messages.push({ role: "system", content: postParts.join("\n") });
-    }
+  // ── BLOCK 4: Reminder (inject before last user message if history > 6) ──
+  if (chatHistory.length > 6) {
+    const pronounReminder = effectiveCharacter.personality?.split(/[.\n]/)[0]?.trim() || "";
+    const reminderParts = [`Nhớ: mày là ${effectiveCharacter.name}.`];
+    if (pronounReminder) reminderParts.push(`${pronounReminder}.`);
+    reminderParts.push(`Format: (Suy nghĩ) *Hành động* "Lời thoại". Không nói thay người chơi.`);
+    const reminder = reminderParts.join(" ");
+    // Insert before the last user message
+    const insertIdx = Math.max(2, messages.length - 1);
+    messages.splice(insertIdx, 0, { role: "system", content: reminder });
   }
 
-  // 5b. Assistant Prefill — MUST be the absolute last object in the array.
-  // Trim trailing whitespace to avoid confusing the model's token prediction.
+  // ── BLOCK 5: Current user message (clean, no injection) ──
+  // The last message in chatHistory is the current user message.
+  // It's already added in BLOCK 3, so no extra handling needed.
+  // cmdInstructions are NOT injected — they were handled in the caller.
+
+  // Assistant prefill — MUST be the absolute last object in the array.
   if (prefillText) {
     messages.push({ role: "assistant", content: prefillText.trimEnd() });
   }

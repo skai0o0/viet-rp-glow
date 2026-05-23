@@ -12,7 +12,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
-interface ChatHeaderProps {
+export interface ChatHeaderProps {
   character: CharacterCard;
   onToggleSidebar: () => void;
   onNewChat?: () => void;
