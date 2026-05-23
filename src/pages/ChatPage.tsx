@@ -5,6 +5,7 @@ import { Menu, Settings2, Trash2, PenLine, Search, X, ChevronUp, ChevronDown, Ch
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatMessage, CharacterCard, ActiveNPC } from "@/types/character";
 import { buildMessages, replaceMacros, replaceMacroKeywords, truncateMessages, detectCardType, trimHistory } from "@/utils/promptBuilder";
+import { guardAssembly } from "@/lib/assemblyGuard";
 import { streamChat, streamChatViaProxy, getModel } from "@/services/openRouter";
 import { useChatQuota } from "@/hooks/useChatQuota";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -689,15 +690,26 @@ const ChatPage = () => {
 
       const allMessages = [...messagesRef.current, userMsg];
       prefillRef.current = prefillText;
-      // Gửi messageToSend (đã strip prefix) cho AI, không phải full text
+
+      // ── Assembly Guard: sanitize message + trim character to budget ──
+      const guard = guardAssembly(activeCharacter, messageToSend);
+      if (guard.blocked) {
+        toast.error("Tin nhắn chứa nội dung không hợp lệ. Vui lòng thử lại.");
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        setIsStreaming(false);
+        return;
+      }
+
+      // Gửi safeMessage (đã sanitize) cho AI
       const aiMessages = allMessages.filter((m) => m.role !== "system").map((m, i, arr) => ({
         role: m.role as "user" | "assistant",
-        content: i === arr.length - 1 && m.role === "user" ? messageToSend : m.content,
+        content: i === arr.length - 1 && m.role === "user" ? guard.safeMessage : m.content,
       }));
       const modelForBudget = isSubscriptionUser ? undefined : getModel();
       const trimmedHistory = trimHistory(aiMessages, undefined, modelForBudget);
+
       const rawMessages = buildMessages(
-        activeCharacter,
+        guard.safeCharacter,
         trimmedHistory,
         undefined,
         scenarioOverride,
@@ -840,8 +852,18 @@ const ChatPage = () => {
     const regenHistory = withoutLast.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
     const regenModel = isSubscriptionUser ? undefined : getModel();
     const trimmedRegenHistory = trimHistory(regenHistory, undefined, regenModel);
+
+    // ── Assembly Guard for regenerate ──
+    const lastUserMsg = [...trimmedRegenHistory].reverse().find((m) => m.role === "user");
+    const regenGuard = guardAssembly(activeCharacter, lastUserMsg?.content || "");
+    if (regenGuard.blocked) {
+      toast.error("Tin nhắn chứa nội dung không hợp lệ. Vui lòng thử lại.");
+      setIsStreaming(false);
+      return;
+    }
+
     const apiMessages = truncateMessages(buildMessages(
-      activeCharacter,
+      regenGuard.safeCharacter,
       trimmedRegenHistory,
       undefined,
       scenarioOverride,
@@ -1031,8 +1053,18 @@ const ChatPage = () => {
       const editHistory = updatedMessages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
       const editModel = isSubscriptionUser ? undefined : getModel();
       const trimmedEditHistory = trimHistory(editHistory, undefined, editModel);
+
+      // ── Assembly Guard for editAndResend ──
+      const lastEditMsg = [...trimmedEditHistory].reverse().find((m) => m.role === "user");
+      const editGuard = guardAssembly(activeCharacter, lastEditMsg?.content || "");
+      if (editGuard.blocked) {
+        toast.error("Tin nhắn chứa nội dung không hợp lệ. Vui lòng thử lại.");
+        setIsStreaming(false);
+        return;
+      }
+
       const apiMessages = truncateMessages(buildMessages(
-        activeCharacter,
+        editGuard.safeCharacter,
         trimmedEditHistory,
         undefined,
         scenarioOverride,

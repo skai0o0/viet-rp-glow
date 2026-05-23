@@ -3,9 +3,6 @@ import { nonStreamChat } from "@/services/charGenService";
 import { getActiveProvider } from "@/services/openRouter";
 import type { Issue } from "./cardValidator";
 
-/** Cheapest available model for repair calls */
-const REPAIR_MODEL = "google/gemini-2.0-flash-001";
-
 function buildRepairPrompt(card: TavernCardV2Data, issue: Issue): string | null {
   const startCount = (card.mes_example?.match(/<START>/gi) || []).length;
 
@@ -120,7 +117,7 @@ export async function repairCardField(
   const provider = getActiveProvider();
   const result = await nonStreamChat(
     [{ role: "user", content: prompt }],
-    { provider, model: REPAIR_MODEL, maxTokens: 4096, signal },
+    { provider, maxTokens: 4096, signal },
   );
 
   if (!result?.trim()) return {};

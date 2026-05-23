@@ -40,6 +40,7 @@ import { CharacterBookEntry } from "@/types/taverncard";
 import { createCharacter } from "@/services/characterDb";
 import CreatePageHeader from "@/components/CreatePageHeader";
 import AiCharGenContent from "@/components/AiCharGenContent";
+import { sanitizeUserInput } from "@/lib/inputSanitizer";
 
 
 // --- Import gate: only admins see the JSON import button ---
@@ -1064,6 +1065,22 @@ const LoreEntryCard = ({
 }) => {
   const [open, setOpen] = useState(true);
   const [keyInput, setKeyInput] = useState("");
+  const [sanitizeWarning, setSanitizeWarning] = useState<string | null>(null);
+
+  // Debounced sanitize check on lore content
+  useEffect(() => {
+    if (!entry.content) { setSanitizeWarning(null); return; }
+    const timer = setTimeout(() => {
+      const result = sanitizeUserInput(entry.content, "lore");
+      if (result.flagged) {
+        setSanitizeWarning(result.reason);
+        console.warn("[Guard] Lore entry flagged:", result.reason, entry.name);
+      } else {
+        setSanitizeWarning(null);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [entry.content]);
 
   const addKey = (field: "keys" | "secondary_keys") => {
     const k = keyInput.trim();
@@ -1133,6 +1150,11 @@ const LoreEntryCard = ({
               <div>
                 <Label className="text-xs text-muted-foreground">Nội dung</Label>
                 <Textarea value={entry.content} onChange={(e) => onUpdate({ content: e.target.value })} placeholder="VD: Kiến thức AI sẽ nhớ khi gặp từ khóa..." className="bg-oled-surface border-gray-border text-foreground text-xs min-h-[80px] font-mono" />
+                {sanitizeWarning && (
+                  <p className="text-[10px] text-yellow-400/80 mt-1 leading-relaxed">
+                    ⚠ Phát hiện ký tự bất thường trong lore ({sanitizeWarning}). Nội dung này có thể ảnh hưởng đến chất lượng card.
+                  </p>
+                )}
               </div>
 
               {/* Toggles */}
