@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getMyProfile, upsertProfile, setCachedUserPersona, type UserGender, type UserSexuality } from "@/services/profileDb";
 import { getMyCharacters, CharacterSummary } from "@/services/characterDb";
 import { getMyFavorites, toggleFavorite } from "@/services/favoriteDb";
+import { isCharacterNsfw } from "@/utils/nsfwFilter";
 import { supabase } from "@/integrations/supabase/client";
 import CharacterCard from "@/components/CharacterCard";
 import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
@@ -292,6 +293,7 @@ const ProfilePage = () => {
                         character={char}
                         onClick={() => navigate(`/chat/${char.id}`)}
                         isFavorited={true}
+                        isNsfw={isCharacterNsfw(char)}
                         onFavoriteToggle={async (id) => {
                           await toggleFavorite(id);
                           setFavorites((prev) => prev.filter((c) => c.id !== id));
@@ -323,7 +325,7 @@ const ProfilePage = () => {
                 <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
                   {characters.map((char) => (
                     <div key={char.id} className="relative group">
-                      <CharacterCard character={char} onClick={() => setPreviewCharacter(char)} />
+                      <CharacterCard character={char} onClick={() => setPreviewCharacter(char)} isNsfw={isCharacterNsfw(char)} />
                         <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {

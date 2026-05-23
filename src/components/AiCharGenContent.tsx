@@ -47,13 +47,17 @@ import { compressAvatar } from "@/utils/imageOptimization";
 import { getApiKeyForProvider, getModel, getActiveProvider, type Provider } from "@/services/openRouter";
 import { runCharGenPipeline, type CharGenPhase } from "@/services/charGenService";
 import { TavernCardV2, TavernCardV2Data } from "@/types/taverncard";
+import { normalizeCard } from "@/lib/cardNormalizer";
+import { validateCard, type ValidationResult, type Issue } from "@/lib/cardValidator";
+import { repairCardField } from "@/lib/cardRepair";
+import CardQualityScore from "@/components/CardQualityScore";
 
 import CharGenAssistant from "@/components/CharGenAssistant";
 import { getCharGenBrainstorm, getCharGenClone, getCharGenFormat } from "@/services/globalSettingsDb";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
-interface AiCharGenContentProps {
+export interface AiCharGenContentProps {
   onActionsChange?: (actions: ReactNode) => void;
 }
 
@@ -137,6 +141,10 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
   const [isPublic, setIsPublic] = useState(true);
   const [publishing, setPublishing] = useState(false);
 
+  // Card validation
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const [repairingFields, setRepairingFields] = useState<Set<string>>(new Set());
+
   // Model settings (use default, no picker for users)
   const [activeProvider] = useState<Provider>(() => getActiveProvider());
   const selectedModel = getModel();
@@ -183,10 +191,14 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
           setMessages((prev) => [...prev, { role: "assistant", content: draft }]);
         },
         onSuccess: (card) => {
-          setGeneratedCard(card);
-          setRenameFrom(card.data.name);
+          // Normalize + validate before showing review
+          const normalized = normalizeCard(card.data);
+          const result = validateCard(normalized);
+          setValidation(result);
+          setGeneratedCard({ ...card, data: normalized });
+          setRenameFrom(normalized.name);
           setReviewOpen(true);
-          toast.success(`Đã tạo card: ${card.data.name}`, { description: "Đang mở panel duyệt card." });
+          toast.success(`Đã tạo card: ${normalized.name}`, { description: "Đang mở panel duyệt card." });
           fetchHistory();
         },
         onError: (error, failedStep) => {
@@ -238,7 +250,45 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
   /* ---------- Edit generated card fields ---------- */
   const updateCardData = (patch: Partial<TavernCardV2Data>) => {
     if (!generatedCard) return;
-    setGeneratedCard({ ...generatedCard, data: { ...generatedCard.data, ...patch } });
+    const updated = { ...generatedCard, data: { ...generatedCard.data, ...patch } };
+    setGeneratedCard(updated);
+    // Re-validate after edits
+    setValidation(validateCard(updated.data));
+  };
+
+  /* ---------- Auto-fix (re-normalize + re-validate) ---------- */
+  const handleAutoFix = () => {
+    if (!generatedCard) return;
+    const normalized = normalizeCard(generatedCard.data);
+    const result = validateCard(normalized);
+    setGeneratedCard({ ...generatedCard, data: normalized });
+    setValidation(result);
+    toast.success("Đã tự động sửa các lỗi có thể.");
+  };
+
+  /* ---------- AI repair single field ---------- */
+  const handleRepairField = async (issue: Issue) => {
+    if (!generatedCard) return;
+    setRepairingFields((prev) => new Set(prev).add(issue.field));
+    try {
+      const patch = await repairCardField(generatedCard.data, issue);
+      if (Object.keys(patch).length > 0) {
+        const updated = { ...generatedCard, data: { ...generatedCard.data, ...patch } };
+        setGeneratedCard(updated);
+        setValidation(validateCard(updated.data));
+        toast.success(`Đã sửa: ${issue.field}`);
+      } else {
+        toast.error("AI không thể sửa trường này.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Sửa thất bại!");
+    } finally {
+      setRepairingFields((prev) => {
+        const next = new Set(prev);
+        next.delete(issue.field);
+        return next;
+      });
+    }
   };
 
   /* ---------- Global rename ---------- */
@@ -317,6 +367,8 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
     setInput("");
     setCloneMode(false);
     setIsPublic(true);
+    setValidation(null);
+    setRepairingFields(new Set());
   };
 
   /* ---------- Copy message ---------- */
@@ -562,6 +614,18 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Card Quality Score */}
+        {validation && (
+          <div className="border-t border-gray-border pt-4">
+            <CardQualityScore
+              validation={validation}
+              onAutoFix={handleAutoFix}
+              onRepairField={handleRepairField}
+              repairingFields={repairingFields}
+            />
+          </div>
+        )}
 
         {/* Publish controls */}
         <div className="space-y-3">

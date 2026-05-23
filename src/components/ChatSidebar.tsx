@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface ChatSidebarProps {
+export interface ChatSidebarProps {
   open: boolean;
   onClose: () => void;
   sessions: DbChatSession[];

@@ -30,7 +30,7 @@ import {
 import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-interface ModelComboboxProps {
+export interface ModelComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
   userTier?: string;

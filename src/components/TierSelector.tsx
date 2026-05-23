@@ -3,7 +3,7 @@ import { Loader2, Zap, Crown, Sparkles, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchModelTiers, type ModelTier } from "@/services/openRouter";
 
-interface TierSelectorProps {
+export interface TierSelectorProps {
   value: string;
   onValueChange: (tierKey: string) => void;
   userTier?: string;

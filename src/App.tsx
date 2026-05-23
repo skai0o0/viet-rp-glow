@@ -38,6 +38,7 @@ const CreditsPage = lazyWithRetry(() => import("@/pages/CreditsPage"));
 const CharacterPage = lazyWithRetry(() => import("@/pages/CharacterPage"));
 const NotFound = lazyWithRetry(() => import("@/pages/NotFound"));
 const TermsPage = lazyWithRetry(() => import("@/pages/TermsPage"));
+const ComponentShowcase = lazyWithRetry(() => import("@/pages/ComponentShowcase"));
 
 const queryClient = new QueryClient();
 
@@ -97,6 +98,7 @@ const App = () => (
                 <Route path="/admin/approvals" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminApprovalsPage /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/admin/credits" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminCreditsPage /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/terms" element={<TermsPage />} />
+                <Route path="/components" element={<ComponentShowcase />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

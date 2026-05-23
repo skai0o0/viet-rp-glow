@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
-import { TavernCardV2 } from "@/types/taverncard";
+import { TavernCardV2, TavernCardV2Data } from "@/types/taverncard";
 import { CharacterCard } from "@/types/character";
+import { normalizeCard, NormalizeOptions } from "@/lib/cardNormalizer";
+import { validateCard, ValidationResult } from "@/lib/cardValidator";
 
 export type DbCharacter = {
   id: string;
@@ -322,4 +324,58 @@ export function dbCharToCard(char: DbCharacter) {
     post_history_instructions: char.post_history_instructions,
     character_book: char.character_book as CharacterCard["character_book"],
   };
+}
+
+// ── Card Validation + Save ────────────────────────────────────────
+
+export interface SaveWithValidationResult {
+  characterId: string | null;
+  validation: ValidationResult;
+  normalized: TavernCardV2Data;
+}
+
+/**
+ * Normalize + validate a card before saving.
+ * Returns validation results so the caller can display quality score / warnings.
+ */
+export async function saveCharacterWithValidation(
+  rawCard: TavernCardV2,
+  userId: string,
+  options: {
+    autoFix?: boolean;
+    requireValid?: boolean;
+    isPublic?: boolean;
+    shortSummary?: string;
+    avatarUrl?: string | null;
+    normalizeOptions?: NormalizeOptions;
+  } = {},
+): Promise<SaveWithValidationResult> {
+  const {
+    autoFix = true,
+    requireValid = false,
+    isPublic = false,
+    shortSummary,
+    avatarUrl,
+    normalizeOptions,
+  } = options;
+
+  // Step 1: Normalize (safe, deterministic, no AI)
+  const normalized = normalizeCard(rawCard.data, normalizeOptions);
+
+  // Step 2: Validate
+  const validation = validateCard(normalized);
+
+  // Step 3: Block if still has errors and caller requires valid
+  if (requireValid && !validation.valid) {
+    return { characterId: null, validation, normalized };
+  }
+
+  // Step 4: Save (wrap normalized data back into TavernCardV2 shape)
+  const cardToSave: TavernCardV2 = {
+    ...rawCard,
+    data: normalized,
+  };
+  const saved = await createCharacter(cardToSave, userId, isPublic, shortSummary, avatarUrl);
+
+  return { characterId: saved.id, validation, normalized };
 }

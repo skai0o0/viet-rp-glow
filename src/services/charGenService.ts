@@ -40,20 +40,21 @@ export interface CharGenOptions {
 
 // ── Non-streaming fetch helper ─────────────────────────────────────────────
 
-async function nonStreamChat(
+export async function nonStreamChat(
   messages: { role: string; content: string }[],
   options: {
     provider: Provider;
     signal?: AbortSignal;
     maxTokens?: number;
     temperature?: number;
+    model?: string;
   },
 ): Promise<string> {
-  const { provider, signal, maxTokens = 16384, temperature } = options;
+  const { provider, signal, maxTokens = 16384, temperature, model: modelOverride } = options;
   const apiKey = getApiKeyForProvider(provider);
   if (!apiKey) throw new Error("Chưa nhập API Key. Vào Cài đặt để thêm.");
 
-  const model = getModel();
+  const model = modelOverride ?? getModel();
   const samplingParams = getCachedSamplingParameters();
 
   const isOpenRouter = provider !== "mimo";

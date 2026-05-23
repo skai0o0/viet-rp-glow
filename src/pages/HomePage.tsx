@@ -15,7 +15,9 @@ import CharacterPreviewDialog from "@/components/CharacterPreviewDialog";
 import { getPublicCharactersPaginated, getTrendingCharacters, getWeeklyTrendingCharacters, getMostFavoritedCharacters, CharacterSummary } from "@/services/characterDb";
 import { useAuth } from "@/contexts/AuthContext";
 import { getActiveBanner, BannerData } from "@/services/bannerDb";
-import { getFavoritedIds } from "@/services/favoriteDb";
+import { getFavoritedIds, toggleFavorite } from "@/services/favoriteDb";
+import { isCharacterNsfw } from "@/utils/nsfwFilter";
+import { toast } from "sonner";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 function formatCount(n: number): string {
@@ -146,13 +148,29 @@ const HomePage = () => {
     setPage(Math.max(1, Math.min(p, totalPages)));
   }, [totalPages]);
 
-  const handleFavToggle = useCallback((id: string, newState: boolean) => {
+  const handleFavToggle = useCallback(async (id: string, newState: boolean) => {
     setFavIds((prev) => {
       const next = new Set(prev);
       if (newState) next.add(id);
       else next.delete(id);
       return next;
     });
+    try {
+      await toggleFavorite(id);
+    } catch (err: any) {
+      setFavIds((prev) => {
+        const next = new Set(prev);
+        if (newState) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      const msg = err?.message || "";
+      if (msg.includes("Not authenticated")) {
+        toast.error("Đăng nhập để yêu thích nhân vật");
+      } else {
+        toast.error("Không thể thực hiện. Thử lại sau.");
+      }
+    }
   }, []);
 
   const handleStartNow = () => {
@@ -609,6 +627,7 @@ const HomePage = () => {
                     onClick={() => { track("character_clicked", { characterId: char.id }); setPreviewChar(char); }}
                     isFavorited={favIds.has(char.id)}
                     onFavoriteToggle={user ? handleFavToggle : undefined}
+                    isNsfw={isCharacterNsfw(char)}
                   />
                 </motion.div>
               ))
