@@ -16,6 +16,49 @@ import {
   type Provider,
 } from "./openRouter";
 import { getCachedSamplingParameters } from "./globalSettingsDb";
+import { getCharGenBudget } from "./globalSettingsDb";
+
+// ── Budget config builder ─────────────────────────────────────────────────
+
+/**
+ * Build a config block injected into system messages so the AI knows
+ * exact field limits without hardcoding numbers in the prompt itself.
+ *
+ * mode "brainstorm" → limits for the free-form profile (Step 1)
+ * mode "format"     → limits for the JSON output (Step 2)
+ */
+function buildBudgetConfig(mode: "brainstorm" | "format"): string {
+  const B = getCharGenBudget();
+
+  if (mode === "brainstorm") {
+    return [
+      "---",
+      "FIELD TARGETS (do not output this section):",
+      `- description: ${B.description.maxTokens} tokens (~${B.description.maxChars} chars), 4 paragraphs`,
+      `- personality: ${B.personality.maxTokens} tokens (~${B.personality.maxChars} chars)`,
+      `- scenario: ${B.scenario.maxTokens} tokens (~${B.scenario.maxChars} chars)`,
+      `- first_mes: ${B.first_mes.maxTokens} tokens (~${B.first_mes.maxChars} chars)`,
+      `- mes_example: exactly ${B.mes_example.idealPairs} dialogue pairs with <START> markers`,
+      `- system_prompt: ${B.system_prompt.maxTokens} tokens (~${B.system_prompt.maxChars} chars)`,
+      `- creator_notes: ~${B.creator_notes.maxChars} chars`,
+      "---",
+    ].join("\n");
+  }
+
+  // format mode
+  return [
+    "---",
+    "FIELD LIMITS (enforce strictly):",
+    `- description: max ${B.description.maxTokens} tokens`,
+    `- personality: max ${B.personality.maxTokens} tokens`,
+    `- scenario: max ${B.scenario.maxTokens} tokens`,
+    `- first_mes: max ${B.first_mes.maxTokens} tokens`,
+    `- mes_example: ${B.mes_example.idealPairs} dialogue pairs (min ${B.mes_example.minPairs}, max ${B.mes_example.maxPairs})`,
+    `- system_prompt: max ${B.system_prompt.maxTokens} tokens`,
+    `- tags: max ${B.tags.maxItems} items, must include "tiếng-việt" and "vietrp"`,
+    "---",
+  ].join("\n");
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +181,7 @@ export async function runCharGenPipeline(
     if (!skipBrainstorm) {
       const brainstormMessages = [
         { role: "system", content: brainstormSystemPrompt },
+        { role: "system", content: buildBudgetConfig("brainstorm") },
         ...userMessages,
       ];
       draftProfile = await nonStreamChat(brainstormMessages, {
@@ -159,6 +203,7 @@ export async function runCharGenPipeline(
 
     const formatMessages = [
       { role: "system", content: formatSystemPrompt },
+      { role: "system", content: buildBudgetConfig("format") },
       {
         role: "user",
         content: `Convert the following character profile into a valid chara_card_v2 JSON object:\n\n${draftProfile}`,

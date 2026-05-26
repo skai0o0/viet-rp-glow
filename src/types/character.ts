@@ -11,6 +11,7 @@ export interface CharacterCard {
   character_book?: CharacterBook;
   system_prompt?: string;
   mes_example?: string;
+  post_history_instructions?: string;
 }
 
 export interface ActiveNPC {

@@ -28,6 +28,8 @@ import {
   Terminal,
   Wand2,
   Brain,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,10 @@ import {
   saveCharGenClone,
   fetchCharGenFormat,
   saveCharGenFormat,
+  fetchCharGenBudget,
+  saveCharGenBudget,
+  type CharGenBudget,
+  DEFAULT_CHAR_GEN_BUDGET,
   fetchMemoryArchivist,
   saveMemoryArchivist,
   fetchNsfwGatePrompt,
@@ -74,6 +80,13 @@ import {
   type ResponseStyle,
 } from "@/services/globalSettingsDb";
 import { createApproval } from "@/services/approvalService";
+import {
+  buildSystemPromptSections,
+  type SystemPromptSection,
+} from "@/utils/promptBuilder";
+import { countTokens } from "@/utils/tokenizer";
+import type { CharacterCard } from "@/types/character";
+import { getPublicCharacters, getCharacterById, dbCharToCard } from "@/services/characterDb";
 import {
   verifyApiKey,
   fetchOpenRouterModels,
@@ -199,6 +212,8 @@ const AdminAiConfigPage = () => {
   const [savingCharGenClone, setSavingCharGenClone] = useState(false);
   const [charGenFormat, setCharGenFormat] = useState("");
   const [savingCharGenFormat, setSavingCharGenFormat] = useState(false);
+  const [charGenBudget, setCharGenBudget] = useState<CharGenBudget>(DEFAULT_CHAR_GEN_BUDGET);
+  const [savingCharGenBudget, setSavingCharGenBudget] = useState(false);
 
   // Memory & NSFW Gate
   const [memoryArchivist, setMemoryArchivist] = useState("");
@@ -211,6 +226,16 @@ const AdminAiConfigPage = () => {
   // Response Styles
   const [responseStyles, setResponseStyles] = useState<ResponseStyle[]>([]);
   const [savingResponseStyles, setSavingResponseStyles] = useState(false);
+
+  // System Prompt Inspector
+  const [inspectorCharId, setInspectorCharId] = useState("");
+  const [inspectorCharList, setInspectorCharList] = useState<{ id: string; name: string }[]>([]);
+  const [inspectorSections, setInspectorSections] = useState<SystemPromptSection[]>([]);
+  const [inspectorLoading, setInspectorLoading] = useState(false);
+  const [inspectorNsfw, setInspectorNsfw] = useState(false);
+  const [inspectorUserName, setInspectorUserName] = useState("User");
+  const [inspectorCopied, setInspectorCopied] = useState(false);
+  const [inspectorTokenCounts, setInspectorTokenCounts] = useState<{ total: number; perSection: number[] }>({ total: 0, perSection: [] });
 
   useEffect(() => {
     fetchAllowedModels().then((m) => {
@@ -240,6 +265,7 @@ const AdminAiConfigPage = () => {
     fetchCharGenBrainstorm().then(setCharGenBrainstorm);
     fetchCharGenClone().then(setCharGenClone);
     fetchCharGenFormat().then(setCharGenFormat);
+    fetchCharGenBudget().then(setCharGenBudget);
     fetchMemoryArchivist().then(setMemoryArchivist);
     fetchNsfwGatePrompt().then(setNsfwGatePrompt);
     fetchNsfwJailbreakPrompt().then(setNsfwJailbreakPrompt);
@@ -261,6 +287,9 @@ const AdminAiConfigPage = () => {
           if (!error) setPlatformKeys((data ?? []) as PlatformKey[]);
           setLoadingKeys(false);
         });
+      getPublicCharacters().then((chars) => {
+        setInspectorCharList(chars.map((c) => ({ id: c.id, name: c.name })));
+      });
     }
   }, [isAdmin]);
 
@@ -526,6 +555,18 @@ const AdminAiConfigPage = () => {
     }
   };
 
+  const handleSaveCharGenBudget = async () => {
+    setSavingCharGenBudget(true);
+    try {
+      await saveCharGenBudget(charGenBudget);
+      toast.success("Đã lưu Budget Config!");
+    } catch {
+      toast.error("Lưu thất bại!");
+    } finally {
+      setSavingCharGenBudget(false);
+    }
+  };
+
   // ── Memory & NSFW Gate handlers ──
   const handleSaveMemoryArchivist = async () => {
     setSavingMemoryArchivist(true);
@@ -581,6 +622,162 @@ const AdminAiConfigPage = () => {
       prev.map((s, i) => (i === index ? { ...s, [field]: value } : s))
     );
   };
+
+  // ── Overlap Detection ──
+  const OVERLAP_PATTERNS: { id: string; label: string; keywords: RegExp[] }[] = [
+    {
+      id: "anti_puppet",
+      label: "Anti-puppeting (không nói/viết/hành động thay {{user}})",
+      keywords: [
+        /không\s+(nói|viết|hành\s*động)\s+thay/i,
+        /never\s+(write|speak|act)\s+(for|as)\s+\{\{user\}\}/i,
+        /do\s+not\s+write\s+(for|as)\s+\{\{user\}\}/i,
+        /không\s+được\s+(nói|viết)\s+thay/i,
+      ],
+    },
+    {
+      id: "format_spec",
+      label: "Format spec ((Suy nghĩ) *Hành động* \"Lời thoại\")",
+      keywords: [
+        /\(suy\s*nghĩ\).*\*hành\s*động\*.*lời\s*thoại/i,
+        /\(Thoughts?\).*\*Actions?\*.*Dialogue/i,
+        /format.*suy\s*nghĩ.*hành\s*động.*lời\s*thoại/i,
+      ],
+    },
+    {
+      id: "stay_in_char",
+      label: "Stay in character / giữ vai trò",
+      keywords: [
+        /stay\s+in\s+character/i,
+        /giữ\s+(vai\s*trò|vai\s*diễn|tính\s*cách)/i,
+        /giữ\s+vững\s+tính\s*cách/i,
+        /never\s+break\s+(character|immersion)/i,
+      ],
+    },
+    {
+      id: "pacing",
+      label: "Match energy / pacing",
+      keywords: [
+        /match\s+(năng\s*lượng|energy|pacing)/i,
+        /điều\s*chỉnh.*pacing/i,
+        /match.*{{user}}.*energy/i,
+      ],
+    },
+    {
+      id: "push_story",
+      label: "Push story forward / đẩy câu chuyện",
+      keywords: [
+        /push\s+(the\s+)?story\s+forward/i,
+        /đẩy\s+câu\s*chuyện/i,
+        /never\s+summarize\s+or\s+repeat/i,
+        /không\s+(tóm\s*tắt|lặp\s*lại)/i,
+      ],
+    },
+  ];
+
+  interface OverlapWarning {
+    patternId: string;
+    label: string;
+    sectionIds: string[];
+    sectionLabels: string[];
+  }
+
+  const detectOverlaps = (sections: SystemPromptSection[]): OverlapWarning[] => {
+    const warnings: OverlapWarning[] = [];
+    for (const pattern of OVERLAP_PATTERNS) {
+      const matched: { id: string; label: string }[] = [];
+      for (const section of sections) {
+        const text = section.content.toLowerCase();
+        if (pattern.keywords.some((kw) => kw.test(text))) {
+          matched.push({ id: section.id, label: section.label });
+        }
+      }
+      if (matched.length > 1) {
+        warnings.push({
+          patternId: pattern.id,
+          label: pattern.label,
+          sectionIds: matched.map((m) => m.id),
+          sectionLabels: matched.map((m) => m.label),
+        });
+      }
+    }
+    return warnings;
+  };
+
+  // ── System Prompt Inspector ──
+  const handleInspectPrompt = async () => {
+    if (!inspectorCharId) {
+      toast.error("Chọn một nhân vật trước!");
+      return;
+    }
+    setInspectorLoading(true);
+    try {
+      const dbChar = await getCharacterById(inspectorCharId);
+      const card = dbCharToCard(dbChar);
+      const sections = buildSystemPromptSections(
+        card as CharacterCard,
+        inspectorUserName,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        { nsfw: inspectorNsfw },
+      );
+      setInspectorSections(sections);
+      // Pre-compute token counts once (WASM tokenizer is expensive)
+      const perSection = sections.map((s) => countTokens(s.content));
+      const total = perSection.reduce((a, b) => a + b, 0);
+      setInspectorTokenCounts({ total, perSection });
+    } catch (err: any) {
+      toast.error("Lỗi: " + (err.message || "Không thể tải nhân vật"));
+    } finally {
+      setInspectorLoading(false);
+    }
+  };
+
+  const handleCopyInspectorMd = () => {
+    if (inspectorSections.length === 0) return;
+    const { total, perSection } = inspectorTokenCounts;
+    const charName = inspectorCharList.find((c) => c.id === inspectorCharId)?.name || "?";
+    const lines: string[] = [
+      `# System Prompt Inspector — ${charName}`,
+      "",
+      `**User:** ${inspectorUserName} | **NSFW:** ${inspectorNsfw ? "ON" : "OFF"} | **Sections:** ${inspectorSections.length} | **Total:** ~${total} tokens`,
+      "",
+      "---",
+      "",
+    ];
+    for (let i = 0; i < inspectorSections.length; i++) {
+      const s = inspectorSections[i];
+      lines.push(
+        `## ${i + 1}. ${s.label}`,
+        "",
+        `> ${perSection[i] ?? "?"} tokens | ${s.content.length} chars`,
+        "",
+        "```",
+        s.content,
+        "```",
+        "",
+      );
+    }
+    const md = lines.join("\n");
+    // Use textarea fallback for reliable copy (clipboard API can be slow/laggy with large text)
+    const ta = document.createElement("textarea");
+    ta.value = md;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    setInspectorCopied(true);
+    setTimeout(() => setInspectorCopied(false), 2000);
+  };
+
+  const inspectorOverlaps = useMemo(
+    () => (inspectorSections.length > 0 ? detectOverlaps(inspectorSections) : []),
+    [inspectorSections]
+  );
 
   const allowedModelIds = useMemo(
     () => new Set(allowedModels.map((m) => m.model_id)),
@@ -1234,6 +1431,9 @@ const AdminAiConfigPage = () => {
                   <Label className="text-xs text-muted-foreground">
                     Type A — Single Character
                   </Label>
+                  <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                    Chỉ ghi: vai trò AI, tone, văn phong, quy tắc sáng tạo. Không lặp: anti-puppeting (đã ở Post-History), format spec (đã ở Format Rules).
+                  </p>
                   <Textarea
                     rows={8}
                     value={promptTypeA}
@@ -1257,6 +1457,9 @@ const AdminAiConfigPage = () => {
                   <Label className="text-xs text-muted-foreground">
                     Type B — Multi-Character / RPG
                   </Label>
+                  <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                    Chỉ ghi: vai trò AI, quản lý đa nhân vật, chuyển cảnh, narrator rules. Không lặp: anti-puppeting, format spec, NPC voices (đã ở Post-History Type B).
+                  </p>
                   <Textarea
                     rows={8}
                     value={promptTypeB}
@@ -1290,6 +1493,9 @@ const AdminAiConfigPage = () => {
                   <Label className="text-xs text-muted-foreground">
                     Type A — Single Character
                   </Label>
+                  <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                    Chỉ ghi: behavioral reinforcement (stay in character, match energy, push story). Không lặp: format spec (đã ở Format Rules), platform rules (đã ở System Prompt).
+                  </p>
                   <Textarea
                     rows={6}
                     value={postHistoryTypeA}
@@ -1313,6 +1519,9 @@ const AdminAiConfigPage = () => {
                   <Label className="text-xs text-muted-foreground">
                     Type B — Multi-Character / RPG
                   </Label>
+                  <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                    Chỉ ghi: NPC voices, inter-character dynamics, multi-char pacing. Không lặp: format spec, platform rules, basic anti-puppeting (đã ở Type A base).
+                  </p>
                   <Textarea
                     rows={6}
                     value={postHistoryTypeB}
@@ -1565,6 +1774,161 @@ const AdminAiConfigPage = () => {
           </CardContent>
         </Card>
 
+        {/* ═══════ Charagen Budget Config ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-blue shadow-[0_0_6px] shadow-neon-blue" />
+              <Wand2 size={14} className="text-neon-blue" />
+              <h2 className="text-sm font-semibold text-foreground">Charagen Budget Config</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Giới hạn token/char cho từng field khi AI tạo nhân vật. Giá trị injected vào system prompt dưới dạng FIELD TARGETS / FIELD LIMITS.
+            </p>
+
+            {/* Token limits grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {([
+                { key: "description",   label: "Description",   tokenField: "maxTokens", charField: "maxChars" },
+                { key: "personality",   label: "Personality",   tokenField: "maxTokens", charField: "maxChars" },
+                { key: "scenario",      label: "Scenario",      tokenField: "maxTokens", charField: "maxChars" },
+                { key: "first_mes",     label: "First Message", tokenField: "maxTokens", charField: "maxChars" },
+                { key: "system_prompt", label: "System Prompt", tokenField: "maxTokens", charField: "maxChars" },
+              ] as const).map(({ key, label, tokenField, charField }) => (
+                <div key={key} className="bg-oled-base/50 border border-oled-border rounded-lg p-3 space-y-2">
+                  <Label className="text-xs font-medium text-foreground">{label}</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Max Tokens</Label>
+                      <Input
+                        type="number"
+                        min={50}
+                        max={2000}
+                        value={charGenBudget[key][tokenField]}
+                        onChange={(e) => setCharGenBudget({
+                          ...charGenBudget,
+                          [key]: { ...charGenBudget[key], [tokenField]: parseInt(e.target.value) || 0 },
+                        })}
+                        className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Max Chars</Label>
+                      <Input
+                        type="number"
+                        min={100}
+                        max={8000}
+                        value={charGenBudget[key][charField]}
+                        onChange={(e) => setCharGenBudget({
+                          ...charGenBudget,
+                          [key]: { ...charGenBudget[key], [charField]: parseInt(e.target.value) || 0 },
+                        })}
+                        className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Creator Notes — chars only */}
+              <div className="bg-oled-base/50 border border-oled-border rounded-lg p-3 space-y-2">
+                <Label className="text-xs font-medium text-foreground">Creator Notes</Label>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Max Chars</Label>
+                  <Input
+                    type="number"
+                    min={100}
+                    max={2000}
+                    value={charGenBudget.creator_notes.maxChars}
+                    onChange={(e) => setCharGenBudget({
+                      ...charGenBudget,
+                      creator_notes: { maxChars: parseInt(e.target.value) || 0 },
+                    })}
+                    className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Mes Example pairs */}
+            <div className="bg-oled-base/50 border border-oled-border rounded-lg p-3 space-y-2">
+              <Label className="text-xs font-medium text-foreground">Mes Example — Dialogue Pairs</Label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Min Pairs</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={charGenBudget.mes_example.minPairs}
+                    onChange={(e) => setCharGenBudget({
+                      ...charGenBudget,
+                      mes_example: { ...charGenBudget.mes_example, minPairs: parseInt(e.target.value) || 0 },
+                    })}
+                    className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Ideal Pairs</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={charGenBudget.mes_example.idealPairs}
+                    onChange={(e) => setCharGenBudget({
+                      ...charGenBudget,
+                      mes_example: { ...charGenBudget.mes_example, idealPairs: parseInt(e.target.value) || 0 },
+                    })}
+                    className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Max Pairs</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={charGenBudget.mes_example.maxPairs}
+                    onChange={(e) => setCharGenBudget({
+                      ...charGenBudget,
+                      mes_example: { ...charGenBudget.mes_example, maxPairs: parseInt(e.target.value) || 0 },
+                    })}
+                    className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div className="bg-oled-base/50 border border-oled-border rounded-lg p-3 space-y-2">
+              <Label className="text-xs font-medium text-foreground">Tags</Label>
+              <div className="w-32 space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Max Items</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={charGenBudget.tags.maxItems}
+                  onChange={(e) => setCharGenBudget({
+                    ...charGenBudget,
+                    tags: { maxItems: parseInt(e.target.value) || 0 },
+                  })}
+                  className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={handleSaveCharGenBudget}
+              disabled={savingCharGenBudget}
+              className="w-full bg-neon-blue hover:bg-neon-blue/80 text-white font-semibold"
+            >
+              {savingCharGenBudget ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+              Lưu Budget Config
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* ═══════ Memory & Content Safety Prompts ═══════ */}
         <Card className="bg-oled-surface border-oled-border">
           <CardContent className="p-5 space-y-6">
@@ -1668,6 +2032,9 @@ const AdminAiConfigPage = () => {
             <p className="text-xs text-muted-foreground">
               Tùy chọn phong cách trả lời cho user. Thay đổi ở đây cập nhật dropdown cho tất cả user.
             </p>
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              Chỉ ghi: tone, độ dài, phong cách viết (ngắn gọn / chi tiết / match style). Không lặp: format spec, anti-puppeting, platform rules.
+            </p>
 
             <div className="space-y-4">
               {responseStyles.map((style, index) => (
@@ -1711,6 +2078,128 @@ const AdminAiConfigPage = () => {
               {savingResponseStyles ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
               Lưu Response Styles
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* ═══════ System Prompt Inspector (Admin Only) ═══════ */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px] shadow-amber-400" />
+              <Eye size={14} className="text-amber-400" />
+              <h2 className="text-sm font-semibold text-foreground">System Prompt Inspector</h2>
+              <Badge variant="outline" className="text-[10px] border-amber-400/30 text-amber-400">Admin Only</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Xem system prompt được assemble theo từng tầng. Chọn nhân vật → inspect.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Nhân vật</Label>
+                <select
+                  value={inspectorCharId}
+                  onChange={(e) => setInspectorCharId(e.target.value)}
+                  className="w-full h-8 bg-oled-base border border-oled-border rounded-md px-2 text-sm text-foreground"
+                >
+                  <option value="">-- Chọn nhân vật --</option>
+                  {inspectorCharList.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">User Name</Label>
+                <Input
+                  value={inspectorUserName}
+                  onChange={(e) => setInspectorUserName(e.target.value)}
+                  className="bg-oled-base border-oled-border h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1 flex items-end gap-2">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={inspectorNsfw}
+                    onChange={(e) => setInspectorNsfw(e.target.checked)}
+                    className="accent-rose-500"
+                  />
+                  NSFW
+                </label>
+                <Button
+                  size="sm"
+                  onClick={handleInspectPrompt}
+                  disabled={inspectorLoading || !inspectorCharId}
+                  className="bg-amber-400/10 text-amber-400 border border-amber-400/30 hover:bg-amber-400/20"
+                  variant="outline"
+                >
+                  {inspectorLoading ? <Loader2 size={12} className="animate-spin mr-1" /> : <Eye size={12} className="mr-1" />}
+                  Inspect
+                </Button>
+              </div>
+            </div>
+
+            {inspectorSections.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-oled-border">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium text-foreground">
+                    {inspectorSections.length} tầng — tổng {inspectorTokenCounts.total} tokens
+                  </Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopyInspectorMd}
+                    className="h-6 px-2 text-[10px] border-oled-border text-muted-foreground hover:text-foreground"
+                  >
+                    {inspectorCopied ? <Check size={10} className="mr-1 text-emerald-400" /> : <Copy size={10} className="mr-1" />}
+                    {inspectorCopied ? "Copied!" : "Copy Markdown"}
+                  </Button>
+                </div>
+
+                {/* Overlap Warnings */}
+                {inspectorOverlaps.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-amber-400">Phát hiện trùng lặp ({inspectorOverlaps.length})</span>
+                    </div>
+                    {inspectorOverlaps.map((w) => (
+                      <div key={w.patternId} className="text-[11px] text-amber-300/90">
+                        <span className="font-medium">{w.label}</span>
+                        <span className="text-amber-400/60"> — xuất hiện ở: </span>
+                        <span className="font-mono">{w.sectionLabels.join(" + ")}</span>
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-amber-400/50">
+                      Mẹo: mỗi instruction chỉ nên nằm ở 1 tầng. Xem trách nhiệm của từng tầng ở phần mô tả bên dưới mỗi textarea.
+                    </p>
+                  </div>
+                )}
+
+                {inspectorSections.map((section, i) => (
+                  <details key={section.id} className="bg-oled-base/50 border border-oled-border rounded-lg">
+                    <summary className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-oled-base/80 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-muted-foreground w-5">{i + 1}</span>
+                        <span className="text-xs font-medium text-foreground">{section.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[9px] font-mono border-oled-border text-muted-foreground">
+                          {inspectorTokenCounts.perSection[i] ?? "?"} tok
+                        </Badge>
+                        <Badge variant="outline" className="text-[9px] font-mono border-oled-border text-muted-foreground">
+                          {section.content.length} chr
+                        </Badge>
+                      </div>
+                    </summary>
+                    <div className="px-3 pb-3">
+                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono bg-oled-base rounded p-2 max-h-[300px] overflow-y-auto">
+                        {section.content}
+                      </pre>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
     </AdminPageShell>
