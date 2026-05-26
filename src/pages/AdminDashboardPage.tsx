@@ -36,6 +36,7 @@ import {
   AdminStatCard,
   AdminSection,
   AdminIconButton,
+  ConnectedStats,
 } from "@/admin/components";
 import { supabase } from "@/integrations/supabase/client";
 import { buildMessages, buildLayeredPrompt, estimateTokens, type PromptSection } from "@/utils/promptBuilder";
@@ -411,22 +412,81 @@ const AdminDashboardPage = () => {
           className="space-y-4"
         >
           {/* ═══════════════ TAB: OVERVIEW ═══════════════ */}
-          <TabsContent value="overview" className="space-y-4">
-            {/* Primary stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <AdminStatCard size="lg" icon={Sparkles} label="Tổng nhân vật" value={formatNumber(stats.total_characters)} color="text-neon-purple" delay={0} />
-              <AdminStatCard size="lg" icon={Users} label="Người dùng" value={formatNumber(stats.total_users)} color="text-neon-blue" delay={0.05} />
-              <AdminStatCard size="lg" icon={MessageSquare} label="Phiên chat" value={formatNumber(stats.total_sessions)} color="text-neon-rose" delay={0.1} />
-              <AdminStatCard size="lg" icon={MessagesSquare} label="Tổng tin nhắn" value={formatNumber(stats.total_messages)} color="text-cyan-400" delay={0.15} />
-            </div>
-
-            {/* Secondary stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <AdminStatCard size="lg" icon={Heart} label="Lượt yêu thích" value={formatNumber(stats.total_favorites)} color="text-pink-400" delay={0.2} />
-              <AdminStatCard size="lg" icon={Star} label="Lượt đánh giá" value={formatNumber(stats.total_ratings)} sub={`TB: ${stats.avg_rating}/5`} color="text-amber-400" delay={0.25} />
-              <AdminStatCard size="lg" icon={Globe} label="Công khai" value={stats.public_characters} color="text-green-400" delay={0.3} />
-              <AdminStatCard size="lg" icon={Lock} label="Riêng tư" value={stats.private_characters} color="text-gray-400" delay={0.35} />
-            </div>
+          <TabsContent value="overview" className="space-y-6">
+            {/* Connected stat trees */}
+            <ConnectedStats
+              nodes={[
+                {
+                  id: "chars",
+                  icon: Sparkles,
+                  label: "Nhân vật",
+                  value: formatNumber(stats.total_characters),
+                  color: "text-neon-purple",
+                  children: [
+                    {
+                      id: "public",
+                      icon: Globe,
+                      label: "Công khai",
+                      value: stats.public_characters,
+                      color: "text-green-400",
+                    },
+                    {
+                      id: "private",
+                      icon: Lock,
+                      label: "Riêng tư",
+                      value: stats.private_characters,
+                      color: "text-gray-400",
+                    },
+                    {
+                      id: "ratings",
+                      icon: Star,
+                      label: `Đánh giá (TB: ${stats.avg_rating}/5)`,
+                      value: formatNumber(stats.total_ratings),
+                      color: "text-amber-400",
+                    },
+                  ],
+                },
+                {
+                  id: "users",
+                  icon: Users,
+                  label: "Người dùng",
+                  value: formatNumber(stats.total_users),
+                  color: "text-neon-blue",
+                  children: [
+                    {
+                      id: "new-users",
+                      icon: TrendingUp,
+                      label: "Mới hôm nay",
+                      value: `+${stats.new_users_today}`,
+                      color: "text-cyan-400",
+                    },
+                    {
+                      id: "sessions",
+                      icon: MessageSquare,
+                      label: "Phiên chat",
+                      value: formatNumber(stats.total_sessions),
+                      color: "text-neon-rose",
+                      children: [
+                        {
+                          id: "messages",
+                          icon: MessagesSquare,
+                          label: "Tin nhắn",
+                          value: formatNumber(stats.total_messages),
+                          color: "text-cyan-400",
+                        },
+                        {
+                          id: "favs",
+                          icon: Heart,
+                          label: "Yêu thích",
+                          value: formatNumber(stats.total_favorites),
+                          color: "text-pink-400",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ]}
+            />
 
             {/* Today's activity */}
             <AdminSection icon={Activity} title="Hoạt động hôm nay" dotColor="bg-neon-blue">

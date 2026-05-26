@@ -21,6 +21,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let resolved = false;
+
     const loadPersona = (u: User | null) => {
       if (u) {
         getMyProfile().then((p) => {
@@ -33,23 +35,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
-        loadPersona(session?.user ?? null);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const finishLoading = (session: Session | null) => {
+      if (resolved) return;
+      resolved = true;
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
       loadPersona(session?.user ?? null);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => finishLoading(session)
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      finishLoading(session);
+    }).catch((e) => {
+      console.error("[Auth] getSession failed:", e);
+      finishLoading(null);
     });
 
-    return () => subscription.unsubscribe();
+    // Safety: if neither callback fires within 5s, stop loading anyway
+    const timeout = setTimeout(() => finishLoading(null), 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

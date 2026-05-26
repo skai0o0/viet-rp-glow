@@ -50,7 +50,7 @@ const NavItem = ({
             whileTap={{ scale: 0.95 }}
             className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
               isActive
-                ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                ? "text-neon-purple bg-neon-purple/15"
                 : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
             }`}
           >
@@ -231,7 +231,7 @@ const NavigationRail = () => {
                 whileTap={{ scale: 0.95 }}
                 className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
                   location.pathname === "/settings"
-                    ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                    ? "text-neon-purple bg-neon-purple/15"
                     : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
                 }`}
               >
@@ -298,7 +298,7 @@ const NavigationRail = () => {
                       whileTap={{ scale: 0.95 }}
                       className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
                         location.pathname === "/profile" || location.pathname.startsWith("/admin")
-                          ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                          ? "text-neon-purple bg-neon-purple/15"
                           : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
                       }`}
                     >
@@ -338,7 +338,7 @@ const NavigationRail = () => {
                     whileTap={{ scale: 0.95 }}
                     className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-200 ${
                       location.pathname === "/profile"
-                        ? "text-neon-purple shadow-neon-purple bg-neon-purple/10"
+                        ? "text-neon-purple bg-neon-purple/15"
                         : "text-muted-foreground hover:text-foreground hover:bg-oled-elevated"
                     }`}
                   >
