@@ -7,7 +7,10 @@ import {
   getGlobalPromptTypeB,
   getGlobalPostHistoryTypeA,
   getGlobalPostHistoryTypeB,
+  getNsfwGatePrompt,
+  getNsfwJailbreakPrompt,
 } from "@/services/globalSettingsDb";
+import { getResponseStylePrompt } from "@/components/GenerationSettings";
 import { countTokens } from "@/utils/tokenizer";
 
 export interface OpenRouterMessage {
@@ -401,9 +404,158 @@ export function buildLayeredPrompt(
 
 // ─── SillyTavern-Style Assembly ──────────────────────────────
 
+/** A labeled section of the system prompt. */
+export interface SystemPromptSection {
+  id: string;
+  label: string;
+  content: string;
+}
+
 /**
- * Build a single consolidated system prompt (~900 tokens).
- * Flowing prose, no XML tags, no headers. Vietnamese format rules.
+ * Build system prompt as structured sections (for admin inspector).
+ * Each section has an id, label, and content.
+ */
+export function buildSystemPromptSections(
+  character: CharacterCard,
+  userName: string = "User",
+  chatHistory: { role: string; content: string }[] = [],
+  summary?: string,
+  facts?: string[],
+  activeNPCs?: ActiveNPC[],
+  settings?: { nsfw?: boolean },
+): SystemPromptSection[] {
+  const charName = character.name;
+  const nsfw = settings?.nsfw ?? (localStorage.getItem("vietrp_nsfw_mode") === "true");
+  const sections: SystemPromptSection[] = [];
+  let order = 0;
+
+  const add = (id: string, label: string, content: string) => {
+    if (content.trim()) sections.push({ id, label, content: content.trim() });
+    order++;
+  };
+
+  // ── 1. NSFW Gate (when OFF) — hard block at top ──
+  if (!nsfw) {
+    const gate = getNsfwGatePrompt();
+    if (gate) add("nsfw_gate", "NSFW Gate (OFF mode)", gate);
+  }
+
+  // ── 2. NSFW Jailbreak (when ON) — top-of-prompt override ──
+  if (nsfw) {
+    const jailbreak = getNsfwJailbreakPrompt();
+    if (jailbreak) add("nsfw_jailbreak", "NSFW Jailbreak (ON mode)", jailbreak);
+  }
+
+  // ── 3. Global admin prompt ──
+  const hasActiveNPCs = activeNPCs && activeNPCs.length > 0;
+  const cardType = hasActiveNPCs ? "type_b" : detectCardType(character);
+  const typePrompt = cardType === "type_b" ? getGlobalPromptTypeB() : getGlobalPromptTypeA();
+  const globalPrompt = typePrompt || getGlobalSystemPrompt();
+  if (globalPrompt) {
+    add("global_prompt", `Global Admin Prompt (${cardType})`, globalPrompt);
+  }
+
+  // ── 4. Character prose ──
+  const charProse: string[] = [];
+  charProse.push(`${charName}: ${replaceMacros(character.description || "No description.", charName, userName)}`);
+  if (character.personality) {
+    charProse.push(`Tính cách: ${replaceMacros(character.personality, charName, userName)}`);
+  }
+  add("character_prose", "Character Prose (description + personality)", charProse.join(" "));
+
+  // ── 5. Relationship ──
+  add("relationship", "Relationship", `Người ${charName} đang nói chuyện là ${userName}. Mối quan hệ giữa họ được định nghĩa bởi bối cảnh và tính cách của ${charName}.`);
+
+  // ── 6. Scenario ──
+  if (character.scenario) {
+    add("scenario", "Scenario", `Bối cảnh hiện tại: ${replaceMacros(character.scenario, charName, userName)}`);
+  }
+
+  // ── 7. World lore ──
+  const lorebook = resolveLorebookEntries(character.character_book, chatHistory);
+  const allLore = [...lorebook.beforeChar, ...lorebook.afterChar];
+  if (allLore.length > 0) {
+    add("world_lore", `World Lore (${allLore.length} entries)`, `Thông tin thế giới:\n${allLore.join("\n")}`);
+  }
+
+  // ── 8. Active NPCs ──
+  if (hasActiveNPCs) {
+    const npcLines = activeNPCs!.map((npc) => {
+      let line = `- ${npc.name}`;
+      if (npc.description) line += `: ${npc.description}`;
+      if (npc.personality) line += ` (Tính cách: ${npc.personality})`;
+      return line;
+    });
+    add("active_npcs", `Active NPCs (${activeNPCs!.length})`, `NPC đang có mặt:\n${npcLines.join("\n")}`);
+  }
+
+  // ── 9. User persona ──
+  const persona = getCachedUserPersona();
+  const userInfoParts: string[] = [];
+  const identityStr = buildIdentityString(persona.gender, persona.sexuality);
+  if (identityStr) userInfoParts.push(identityStr);
+  if (persona.userDescription) userInfoParts.push(persona.userDescription);
+  if (userInfoParts.length > 0) {
+    add("user_persona", "User Persona", `Thông tin về ${userName}: ${userInfoParts.join(". ")}.`);
+  }
+
+  // ── 10. Character system_prompt override ──
+  if (character.system_prompt?.trim()) {
+    add("system_prompt_override", "Character system_prompt Override", replaceMacros(character.system_prompt.trim(), charName, userName));
+  }
+
+  // ── 11. Post-history instructions (character + global) ──
+  const postHistory: string[] = [];
+  if (character.post_history_instructions?.trim()) {
+    postHistory.push(character.post_history_instructions.trim());
+  }
+  const globalPostHistory = cardType === "type_b"
+    ? getGlobalPostHistoryTypeB()
+    : getGlobalPostHistoryTypeA();
+  if (globalPostHistory) {
+    postHistory.push(globalPostHistory);
+  }
+  if (postHistory.length > 0) {
+    add("post_history", "Post-History Instructions", postHistory.join("\n"));
+  }
+
+  // ── 12. Dialogue examples ──
+  if (character.mes_example?.trim()) {
+    add("mes_example", "Dialogue Examples", `Ví dụ hội thoại:\n${replaceMacros(character.mes_example.trim(), charName, userName)}`);
+  }
+
+  // ── 13. Memory context ──
+  const memoryParts: string[] = [];
+  if (summary) memoryParts.push(`Tóm tắt cuộc trò chuyện trước: ${summary}`);
+  if (facts?.length) memoryParts.push(`Thông tin quan trọng: ${facts.join("; ")}.`);
+  if (memoryParts.length > 0) {
+    add("memory", "Memory Context", memoryParts.join("\n"));
+  }
+
+  // ── 14. Response style ──
+  const stylePrompt = getResponseStylePrompt();
+  if (stylePrompt) {
+    add("response_style", "Response Style", stylePrompt);
+  }
+
+  // ── 15. Format rules (format spec only — behavioral rules live in post-history) ──
+  const nsfwRule = nsfw
+    ? "- Cho phép nội dung 18+, bạo lực, ngôn ngữ mạnh khi phù hợp với bối cảnh."
+    : "- Giữ nội dung phù hợp, không quá bạo lực hoặc tình dục.";
+  add("format_rules", "Format Rules",
+    `- Xưng hô: dùng "${userName}" để gọi người chơi. Tự xưng là "${charName}".\n` +
+    `- Format: (Suy nghĩ) *Hành động* "Lời thoại". Sử dụng cả 3 khi cảnh cần. Không dùng ít hơn 2.\n` +
+    `- Tối đa 3 thành phần format mỗi phản hồi trừ khi ${userName} viết dài.\n` +
+    `- Ngôn ngữ: tiếng Việt, giọng văn tự nhiên, không cliché.\n` +
+    nsfwRule
+  );
+
+  return sections;
+}
+
+/**
+ * Build a single consolidated system prompt.
+ * Calls buildSystemPromptSections() and joins all sections.
  */
 export function buildSystemPrompt(
   character: CharacterCard,
@@ -414,95 +566,9 @@ export function buildSystemPrompt(
   activeNPCs?: ActiveNPC[],
   settings?: { nsfw?: boolean },
 ): string {
-  const charName = character.name;
-  const nsfw = settings?.nsfw ?? (localStorage.getItem("vietrp_nsfw_mode") === "true");
-  const parts: string[] = [];
-
-  // Global admin prompt (if configured in Supabase)
-  const hasActiveNPCs = activeNPCs && activeNPCs.length > 0;
-  const cardType = hasActiveNPCs ? "type_b" : detectCardType(character);
-  const typePrompt = cardType === "type_b" ? getGlobalPromptTypeB() : getGlobalPromptTypeA();
-  const globalPrompt = typePrompt || getGlobalSystemPrompt();
-  if (globalPrompt) {
-    parts.push(globalPrompt);
-  }
-
-  // Character prose (description + personality merged)
-  const charProse: string[] = [];
-  charProse.push(`${charName}: ${replaceMacros(character.description || "No description.", charName, userName)}`);
-  if (character.personality) {
-    charProse.push(`Tính cách: ${replaceMacros(character.personality, charName, userName)}`);
-  }
-  parts.push(charProse.join(" "));
-
-  // Relationship
-  parts.push(`Người ${charName} đang nói chuyện là ${userName}. Mối quan hệ giữa họ được định nghĩa bởi bối cảnh và tính cách của ${charName}.`);
-
-  // Scenario
-  if (character.scenario) {
-    parts.push(`Bối cảnh hiện tại: ${replaceMacros(character.scenario, charName, userName)}`);
-  }
-
-  // World lore (lorebook entries)
-  const lorebook = resolveLorebookEntries(character.character_book, chatHistory);
-  const allLore = [...lorebook.beforeChar, ...lorebook.afterChar];
-  if (allLore.length > 0) {
-    parts.push(`Thông tin thế giới:\n${allLore.join("\n")}`);
-  }
-
-  // Active NPCs
-  if (hasActiveNPCs) {
-    const npcLines = activeNPCs!.map((npc) => {
-      let line = `- ${npc.name}`;
-      if (npc.description) line += `: ${npc.description}`;
-      if (npc.personality) line += ` (Tính cách: ${npc.personality})`;
-      return line;
-    });
-    parts.push(`NPC đang có mặt:\n${npcLines.join("\n")}`);
-  }
-
-  // User persona (1 sentence, merged)
-  const persona = getCachedUserPersona();
-  const userInfoParts: string[] = [];
-  const identityStr = buildIdentityString(persona.gender, persona.sexuality);
-  if (identityStr) userInfoParts.push(identityStr);
-  if (persona.userDescription) userInfoParts.push(persona.userDescription);
-  if (userInfoParts.length > 0) {
-    parts.push(`Thông tin về ${userName}: ${userInfoParts.join(". ")}.`);
-  }
-
-  // Character system_prompt override
-  if (character.system_prompt?.trim()) {
-    parts.push(replaceMacros(character.system_prompt.trim(), charName, userName));
-  }
-
-  // Dialogue examples (condensed, placeholders replaced)
-  if (character.mes_example?.trim()) {
-    parts.push(`Ví dụ hội thoại:\n${replaceMacros(character.mes_example.trim(), charName, userName)}`);
-  }
-
-  // Memory (summary + facts)
-  if (summary) {
-    parts.push(`Tóm tắt cuộc trò chuyện trước: ${summary}`);
-  }
-  if (facts?.length) {
-    parts.push(`Thông tin quan trọng: ${facts.join("; ")}.`);
-  }
-
-  // Format rules
-  const nsfwRule = nsfw
-    ? "- Cho phép nội dung 18+, bạo lực, ngôn ngữ mạnh khi phù hợp với bối cảnh."
-    : "- Giữ nội dung phù hợp, không quá bạo lực hoặc tình dục.";
-  parts.push(
-    `- Xưng hô: dùng "${userName}" để gọi người chơi.\n` +
-    `- Format: (Suy nghĩ) *Hành động* "Lời thoại"\n` +
-    `- Không bao giờ nói, suy nghĩ, hoặc hành động thay ${userName}.\n` +
-    `- Tối đa 1-3 thành phần mỗi phản hồi.\n` +
-    `- Ngôn ngữ: tiếng Việt, giọng văn tự nhiên, không cliché.\n` +
-    nsfwRule
-  );
-
-  return parts.join("\n\n");
+  return buildSystemPromptSections(character, userName, chatHistory, summary, facts, activeNPCs, settings)
+    .map((s) => s.content)
+    .join("\n\n");
 }
 
 /**
