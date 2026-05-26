@@ -41,7 +41,9 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(timeout 5)",
       "Bash(python -c ' *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm ls *)"
     ]
   }
 }

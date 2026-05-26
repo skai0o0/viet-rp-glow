@@ -335,8 +335,8 @@ const HomePage = () => {
         >
           <p className="text-sm text-muted-foreground leading-relaxed">
             <span className="text-neon-blue font-semibold mr-1.5">📢 Sắp ra mắt:</span>
-            Hỗ trợ <span className="text-foreground font-medium">OpenAI</span> và{" "}
-            <span className="text-foreground font-medium">Google GenAI</span> đang được phát triển.{" "}
+            Hỗ trợ <span className="text-foreground font-medium">OpenAI</span> đang được phát triển.{" "}
+            <span className="text-emerald-400 font-medium">Google GenAI</span> đã sẵn sàng!{" "}
             <span className="text-foreground font-medium">LM Studio</span> &{" "}
             <span className="text-foreground font-medium">Ollama</span>{" "}
             <span className="italic text-muted-foreground/70">— đang cân nhắc 🤔</span>

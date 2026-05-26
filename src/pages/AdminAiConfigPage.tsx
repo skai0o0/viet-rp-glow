@@ -30,6 +30,8 @@ import {
   Brain,
   Copy,
   Check,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,6 +92,8 @@ import { getPublicCharacters, getCharacterById, dbCharToCard } from "@/services/
 import {
   verifyApiKey,
   fetchOpenRouterModels,
+  fetchMimoModels,
+  fetchGoogleGenaiModels,
   getApiKey,
   setApiKey,
   markKeyVerified,
@@ -99,6 +103,12 @@ import {
   markMimoKeyVerified,
   getMimoEndpoint,
   setMimoEndpoint,
+  verifyGoogleGenaiApiKey,
+  getGoogleGenaiApiKey,
+  setGoogleGenaiApiKey,
+  markGoogleGenaiKeyVerified,
+  getGoogleGenaiEndpoint,
+  setGoogleGenaiEndpoint,
   syncKeysFromSupabase,
   type OpenRouterModel,
 } from "@/services/openRouter";
@@ -155,9 +165,33 @@ const AdminAiConfigPage = () => {
   const [mimoEndpoint, setMimoEndpointState] = useState(() => getMimoEndpoint());
   const [savedMimoEndpoint, setSavedMimoEndpoint] = useState(false);
 
+  // Google GenAI key verification
+  const [testGoogleKey, setTestGoogleKey] = useState(() => getGoogleGenaiApiKey());
+  const [showGoogleKey, setShowGoogleKey] = useState(false);
+  const [verifyingGoogle, setVerifyingGoogle] = useState(false);
+  const [verifiedGoogle, setVerifiedGoogle] = useState<boolean | null>(null);
+  const [savedGoogle, setSavedGoogle] = useState(false);
+
+  // Google GenAI custom endpoint
+  const [googleEndpoint, setGoogleEndpointState] = useState(() => getGoogleGenaiEndpoint());
+  const [savedGoogleEndpoint, setSavedGoogleEndpoint] = useState(false);
+
   // OpenRouter models (full list)
   const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+
+  // Mimo models (browse only)
+  const [mimoModels, setMimoModels] = useState<OpenRouterModel[]>([]);
+  const [loadingMimoModels, setLoadingMimoModels] = useState(false);
+
+  // Google GenAI models (browse only)
+  const [googleModels, setGoogleModels] = useState<OpenRouterModel[]>([]);
+  const [loadingGoogleModels, setLoadingGoogleModels] = useState(false);
+
+  // Model browser dropdown toggles
+  const [openRouterBrowseOpen, setOpenRouterBrowseOpen] = useState(false);
+  const [mimoBrowseOpen, setMimoBrowseOpen] = useState(false);
+  const [googleBrowseOpen, setGoogleBrowseOpen] = useState(false);
 
   // Allowed models (admin-curated)
   const [allowedModels, setAllowedModels] = useState<AllowedModel[]>([]);
@@ -165,6 +199,8 @@ const AdminAiConfigPage = () => {
 
   // Search
   const [search, setSearch] = useState("");
+  const [mimoSearch, setMimoSearch] = useState("");
+  const [googleSearch, setGoogleSearch] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
 
   // Model tiers (fixed 3: free, pro, ultra)
@@ -327,6 +363,36 @@ const AdminAiConfigPage = () => {
     }
   }, []);
 
+  const handleLoadMimoModels = useCallback(async () => {
+    setLoadingMimoModels(true);
+    try {
+      const models = await fetchMimoModels();
+      setMimoModels(models);
+      if (models.length === 0) {
+        toast.error("Không thể tải danh sách model từ Mimo. Kiểm tra API Key.");
+      }
+    } catch {
+      toast.error("Lỗi khi tải danh sách model Mimo.");
+    } finally {
+      setLoadingMimoModels(false);
+    }
+  }, []);
+
+  const handleLoadGoogleModels = useCallback(async () => {
+    setLoadingGoogleModels(true);
+    try {
+      const models = await fetchGoogleGenaiModels();
+      setGoogleModels(models);
+      if (models.length === 0) {
+        toast.error("Không thể tải danh sách model từ Google GenAI. Kiểm tra API Key.");
+      }
+    } catch {
+      toast.error("Lỗi khi tải danh sách model Google GenAI.");
+    } finally {
+      setLoadingGoogleModels(false);
+    }
+  }, []);
+
   const handleVerify = async () => {
     if (!testApiKey.trim()) {
       toast.error("Vui lòng nhập API Key để verify.");
@@ -383,6 +449,40 @@ const AdminAiConfigPage = () => {
     setMimoEndpoint(url, user?.id);
     setSavedMimoEndpoint(true);
     toast.success("Đã lưu Mimo endpoint!");
+  };
+
+  // ── Google GenAI handlers ──
+  const handleVerifyGoogle = async () => {
+    if (!testGoogleKey.trim()) {
+      toast.error("Vui lòng nhập Google GenAI API Key để verify.");
+      return;
+    }
+    setVerifyingGoogle(true);
+    setVerifiedGoogle(null);
+    const result = await verifyGoogleGenaiApiKey(testGoogleKey);
+    setVerifyingGoogle(false);
+    setVerifiedGoogle(result.valid);
+    if (result.valid) {
+      toast.success("Google GenAI API Key hợp lệ!");
+    } else {
+      toast.error(result.error || "Google GenAI API Key không hợp lệ.");
+    }
+  };
+
+  const handleSaveGoogleKey = () => {
+    setGoogleGenaiApiKey(testGoogleKey.trim(), user?.id);
+    if (verifiedGoogle === true) markGoogleGenaiKeyVerified();
+    setSavedGoogle(true);
+    toast.success("Đã lưu Google GenAI API Key!");
+  };
+
+  const handleSaveGoogleEndpoint = () => {
+    const url = googleEndpoint.trim();
+    if (!url) { toast.error("Endpoint không được để trống."); return; }
+    try { new URL(url); } catch { toast.error("Endpoint không hợp lệ."); return; }
+    setGoogleGenaiEndpoint(url, user?.id);
+    setSavedGoogleEndpoint(true);
+    toast.success("Đã lưu Google GenAI endpoint!");
   };
 
   // ── Platform Keys handlers (admin-only) ──
@@ -784,6 +884,26 @@ const AdminAiConfigPage = () => {
     [allowedModels]
   );
 
+  const groupedAllowedModels = useMemo(() => {
+    const groups: Record<string, AllowedModel[]> = {};
+    for (const m of allowedModels) {
+      const key = m.provider || "other";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(m);
+    }
+    // Sort groups: mimo, google_genai, then alphabetical OpenRouter providers
+    const order = ["mimo", "google_genai"];
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const ai = order.indexOf(a);
+      const bi = order.indexOf(b);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    return sortedKeys.map((key) => ({ provider: key, models: groups[key] }));
+  }, [allowedModels]);
+
   const filteredModels = useMemo(() => {
     if (!search.trim()) return allModels;
     const q = search.toLowerCase();
@@ -794,11 +914,27 @@ const AdminAiConfigPage = () => {
     );
   }, [allModels, search]);
 
-  const handleAddModel = async (model: OpenRouterModel) => {
+  const filteredMimoModels = useMemo(() => {
+    if (!mimoSearch.trim()) return mimoModels;
+    const q = mimoSearch.toLowerCase();
+    return mimoModels.filter(
+      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+    );
+  }, [mimoModels, mimoSearch]);
+
+  const filteredGoogleModels = useMemo(() => {
+    if (!googleSearch.trim()) return googleModels;
+    const q = googleSearch.toLowerCase();
+    return googleModels.filter(
+      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+    );
+  }, [googleModels, googleSearch]);
+
+  const handleAddModel = async (model: OpenRouterModel, sourceProvider?: string) => {
     if (allowedModelIds.has(model.id)) return;
     setAdding(model.id);
     try {
-      const provider = model.id.split("/")[0] || "";
+      const provider = sourceProvider || model.id.split("/")[0] || "";
       const isFree =
         model.pricing?.prompt === "0" && model.pricing?.completion === "0";
 
@@ -961,7 +1097,7 @@ const AdminAiConfigPage = () => {
                   className={`flex-1 sm:flex-none sm:min-w-[80px] ${
                     saved
                       ? "bg-green-500/20 text-green-400 border-green-500/30"
-                      : "bg-neon-purple/10 text-neon-purple border-neon-purple/30 hover:bg-neon-purple/20"
+                      : "bg-neon-blue/10 text-neon-blue border-neon-blue/30 hover:bg-neon-blue/20"
                   }`}
                   variant="outline"
                 >
@@ -969,6 +1105,126 @@ const AdminAiConfigPage = () => {
                   {saved ? "Đã lưu" : "Lưu"}
                 </Button>
               </div>
+            </div>
+
+            {/* Collapsible: Browse & Add OpenRouter Models */}
+            <div className="pt-2 border-t border-gray-border/50">
+              <button
+                onClick={() => setOpenRouterBrowseOpen(!openRouterBrowseOpen)}
+                className="w-full flex items-center gap-1.5 px-1 py-1.5 rounded-md text-left hover:bg-oled-elevated transition-colors"
+              >
+                {openRouterBrowseOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                <Search size={12} className="text-amber-400" />
+                <span className="text-xs text-amber-400 font-semibold flex-1">Tìm & thêm model</span>
+                {allModels.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground">{allModels.length} model</span>
+                )}
+              </button>
+
+              {openRouterBrowseOpen && (
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleLoadModels}
+                      disabled={loadingModels}
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                    >
+                      {loadingModels ? (
+                        <Loader2 size={14} className="animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw size={14} className="mr-1" />
+                      )}
+                      {allModels.length > 0 ? "Tải lại" : "Tải danh sách"}
+                    </Button>
+                  </div>
+
+                  {allModels.length > 0 && (
+                    <>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder="Tìm model theo tên hoặc ID..."
+                          className="bg-oled-elevated border-gray-border text-foreground pl-9 text-xs focus:border-amber-500 focus:ring-amber-500/30"
+                        />
+                      </div>
+
+                      <p className="text-[10px] text-muted-foreground">
+                        {filteredModels.length} / {allModels.length} model. Click "+" để thêm vào danh sách cho phép.
+                      </p>
+
+                      <ScrollArea className="h-[40vh] md:h-[300px] pr-2">
+                        <div className="space-y-1">
+                          {filteredModels.map((model) => {
+                            const isAdded = allowedModelIds.has(model.id);
+                            const isFree = model.pricing?.prompt === "0" && model.pricing?.completion === "0";
+                            return (
+                              <div
+                                key={model.id}
+                                className={`flex items-center gap-2 rounded-xl px-3 py-2 transition-colors ${
+                                  isAdded
+                                    ? "bg-neon-purple/5 border border-neon-purple/20"
+                                    : "bg-oled-elevated hover:bg-oled-elevated/80"
+                                }`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-medium text-foreground truncate">
+                                      {model.name}
+                                    </span>
+                                    {isFree && (
+                                      <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full shrink-0">
+                                        FREE
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] text-muted-foreground truncate">{model.id}</span>
+                                    <span className="text-[10px] text-muted-foreground/50">·</span>
+                                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                      <DollarSign size={8} />
+                                      {formatPrice(model.pricing)}
+                                    </span>
+                                  </div>
+                                </div>
+                                {isAdded ? (
+                                  <span className="text-[10px] text-neon-purple font-medium px-2 py-1 rounded-lg bg-neon-purple/10">
+                                    Đã thêm
+                                  </span>
+                                ) : (
+                                  <Button
+                                    onClick={() => handleAddModel(model)}
+                                    disabled={adding === model.id || !canEditAdminHub}
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-10 w-10 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-neon-purple hover:bg-neon-purple/10"
+                                    title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm model" : undefined}
+                                  >
+                                    {adding === model.id ? (
+                                      <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                      <Plus size={16} />
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    </>
+                  )}
+
+                  {allModels.length === 0 && !loadingModels && (
+                    <p className="text-xs text-muted-foreground text-center py-3">
+                      Nhấn "Tải danh sách" để lấy model từ OpenRouter.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1056,6 +1312,277 @@ const AdminAiConfigPage = () => {
                   {savedMimo ? "Đã lưu" : "Lưu"}
                 </Button>
               </div>
+            </div>
+
+            {/* Collapsible: Browse Mimo Models */}
+            <div className="pt-2 border-t border-gray-border/50">
+              <button
+                onClick={() => {
+                  setMimoBrowseOpen(!mimoBrowseOpen);
+                  if (!mimoBrowseOpen && mimoModels.length === 0 && getMimoApiKey()) {
+                    handleLoadMimoModels();
+                  }
+                }}
+                className="w-full flex items-center gap-1.5 px-1 py-1.5 rounded-md text-left hover:bg-oled-elevated transition-colors"
+              >
+                {mimoBrowseOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                <Search size={12} className="text-neon-rose" />
+                <span className="text-xs text-neon-rose font-semibold flex-1">Danh sách model</span>
+                {mimoModels.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground">{mimoModels.length} model</span>
+                )}
+              </button>
+
+              {mimoBrowseOpen && (
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleLoadMimoModels}
+                      disabled={loadingMimoModels}
+                      variant="outline"
+                      size="sm"
+                      className="border-neon-rose/30 text-neon-rose hover:bg-neon-rose/10"
+                    >
+                      {loadingMimoModels ? (
+                        <Loader2 size={14} className="animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw size={14} className="mr-1" />
+                      )}
+                      {mimoModels.length > 0 ? "Tải lại" : "Tải danh sách"}
+                    </Button>
+                  </div>
+
+                  {loadingMimoModels ? (
+                    <div className="flex justify-center py-4"><Loader2 size={18} className="animate-spin text-neon-rose" /></div>
+                  ) : mimoModels.length > 0 ? (
+                    <>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={mimoSearch}
+                          onChange={(e) => setMimoSearch(e.target.value)}
+                          placeholder="Tìm model theo tên hoặc ID..."
+                          className="bg-oled-elevated border-gray-border text-foreground pl-9 text-xs focus:border-neon-rose focus:ring-neon-rose/30"
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        {filteredMimoModels.length} / {mimoModels.length} model
+                      </p>
+                      <ScrollArea className="h-[30vh] md:h-[200px] pr-2">
+                        <div className="space-y-1">
+                          {filteredMimoModels.map((model) => {
+                          const isAdded = allowedModelIds.has(model.id);
+                          return (
+                            <div key={model.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isAdded ? "bg-neon-purple/5 border border-neon-purple/20" : "bg-oled-elevated"}`}>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-xs font-medium text-foreground truncate block">{model.name}</span>
+                                <span className="text-[10px] text-muted-foreground truncate block">{model.id}</span>
+                              </div>
+                              {isAdded ? (
+                                <span className="text-[10px] text-neon-purple font-medium px-2 py-1 rounded-lg bg-neon-purple/10 shrink-0">Đã thêm</span>
+                              ) : (
+                                <Button
+                                  onClick={() => handleAddModel(model, "mimo")}
+                                  disabled={adding === model.id || !canEditAdminHub}
+                                  size="sm" variant="ghost"
+                                  className="h-10 w-10 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-neon-purple hover:bg-neon-purple/10 shrink-0"
+                                  title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm model" : undefined}
+                                >
+                                  {adding === model.id ? <Loader2 size={14} className="animate-spin" /> : <Plus size={16} />}
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-3">
+                      {getMimoApiKey() ? "Nhấn \"Tải danh sách\" để xem model." : "Nhập API Key ở trên trước."}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Google GenAI API Key */}
+        <Card className="bg-oled-surface border-oled-border">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px] shadow-emerald-400" />
+              <h2 className="text-sm font-semibold text-foreground">Google GenAI API Key</h2>
+              <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 py-0 h-5">
+                Mod/Op/Admin
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              BYOK cho Google Generative AI (Gemini). Endpoint có thể tùy chỉnh bên dưới.
+            </p>
+            {/* Google GenAI API Endpoint */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={googleEndpoint}
+                onChange={(e) => { setGoogleEndpointState(e.target.value); setSavedGoogleEndpoint(false); }}
+                placeholder="https://generativelanguage.googleapis.com/v1beta"
+                className="bg-oled-elevated border-gray-border text-foreground text-base md:text-xs font-mono focus:border-emerald-500 focus:ring-emerald-500/30"
+              />
+              <Button
+                onClick={handleSaveGoogleEndpoint}
+                disabled={savedGoogleEndpoint}
+                className={`sm:min-w-[80px] ${
+                  savedGoogleEndpoint
+                    ? "bg-green-500/20 text-green-400 border-green-500/30"
+                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                }`}
+                variant="outline"
+              >
+                <Save size={14} className="mr-1" />
+                {savedGoogleEndpoint ? "Đã lưu" : "Lưu"}
+              </Button>
+            </div>
+            {/* Google GenAI API Key */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Input
+                  type={showGoogleKey ? "text" : "password"}
+                  value={testGoogleKey}
+                  onChange={(e) => { setTestGoogleKey(e.target.value); setVerifiedGoogle(null); setSavedGoogle(false); }}
+                  placeholder="Nhập Google GenAI API Key..."
+                  className="bg-oled-elevated border-gray-border text-foreground pr-10 focus:border-emerald-500 focus:ring-emerald-500/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleKey(!showGoogleKey)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                >
+                  {showGoogleKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleVerifyGoogle}
+                  disabled={verifyingGoogle || !testGoogleKey.trim()}
+                  className={`flex-1 sm:flex-none sm:min-w-[100px] ${
+                    verifiedGoogle === true
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : verifiedGoogle === false
+                      ? "bg-destructive/20 text-destructive border-destructive/30"
+                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                  }`}
+                  variant="outline"
+                >
+                  {verifyingGoogle ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-1" />}
+                  {verifiedGoogle === true ? "Hợp lệ" : verifiedGoogle === false ? "Lỗi" : "Verify"}
+                </Button>
+                <Button
+                  onClick={handleSaveGoogleKey}
+                  disabled={verifiedGoogle !== true || savedGoogle}
+                  className={`flex-1 sm:flex-none sm:min-w-[80px] ${
+                    savedGoogle
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                  }`}
+                  variant="outline"
+                >
+                  <Save size={14} className="mr-1" />
+                  {savedGoogle ? "Đã lưu" : "Lưu"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Collapsible: Browse Google GenAI Models */}
+            <div className="pt-2 border-t border-gray-border/50">
+              <button
+                onClick={() => {
+                  setGoogleBrowseOpen(!googleBrowseOpen);
+                  if (!googleBrowseOpen && googleModels.length === 0 && getGoogleGenaiApiKey()) {
+                    handleLoadGoogleModels();
+                  }
+                }}
+                className="w-full flex items-center gap-1.5 px-1 py-1.5 rounded-md text-left hover:bg-oled-elevated transition-colors"
+              >
+                {googleBrowseOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                <Search size={12} className="text-emerald-400" />
+                <span className="text-xs text-emerald-400 font-semibold flex-1">Danh sách model</span>
+                {googleModels.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground">{googleModels.length} model</span>
+                )}
+              </button>
+
+              {googleBrowseOpen && (
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleLoadGoogleModels}
+                      disabled={loadingGoogleModels}
+                      variant="outline"
+                      size="sm"
+                      className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                    >
+                      {loadingGoogleModels ? (
+                        <Loader2 size={14} className="animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw size={14} className="mr-1" />
+                      )}
+                      {googleModels.length > 0 ? "Tải lại" : "Tải danh sách"}
+                    </Button>
+                  </div>
+
+                  {loadingGoogleModels ? (
+                    <div className="flex justify-center py-4"><Loader2 size={18} className="animate-spin text-emerald-400" /></div>
+                  ) : googleModels.length > 0 ? (
+                    <>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={googleSearch}
+                          onChange={(e) => setGoogleSearch(e.target.value)}
+                          placeholder="Tìm model theo tên hoặc ID..."
+                          className="bg-oled-elevated border-gray-border text-foreground pl-9 text-xs focus:border-emerald-500 focus:ring-emerald-500/30"
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        {filteredGoogleModels.length} / {googleModels.length} model
+                      </p>
+                      <ScrollArea className="h-[30vh] md:h-[200px] pr-2">
+                        <div className="space-y-1">
+                          {filteredGoogleModels.map((model) => {
+                          const isAdded = allowedModelIds.has(model.id);
+                          return (
+                            <div key={model.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isAdded ? "bg-neon-purple/5 border border-neon-purple/20" : "bg-oled-elevated"}`}>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-xs font-medium text-foreground truncate block">{model.name}</span>
+                                <span className="text-[10px] text-muted-foreground truncate block">{model.id}</span>
+                              </div>
+                              {isAdded ? (
+                                <span className="text-[10px] text-neon-purple font-medium px-2 py-1 rounded-lg bg-neon-purple/10 shrink-0">Đã thêm</span>
+                              ) : (
+                                <Button
+                                  onClick={() => handleAddModel(model, "google_genai")}
+                                  disabled={adding === model.id || !canEditAdminHub}
+                                  size="sm" variant="ghost"
+                                  className="h-10 w-10 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-neon-purple hover:bg-neon-purple/10 shrink-0"
+                                  title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm model" : undefined}
+                                >
+                                  {adding === model.id ? <Loader2 size={14} className="animate-spin" /> : <Plus size={16} />}
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-3">
+                      {getGoogleGenaiApiKey() ? "Nhấn \"Tải danh sách\" để xem model." : "Nhập API Key ở trên trước."}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1231,178 +1758,84 @@ const AdminAiConfigPage = () => {
               </div>
             ) : allowedModels.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-6">
-                Chưa có model nào. Tải danh sách từ OpenRouter bên dưới để thêm.
+                Chưa có model nào. Mở "Tìm & thêm model" trong mỗi card API Key ở trên.
               </p>
             ) : (
-              <div className="space-y-1.5">
-                {allowedModels.map((model) => (
-                  <motion.div
-                    key={model.id}
-                    layout
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    className="flex items-center gap-2 bg-oled-elevated rounded-xl px-3 py-2.5 group"
-                  >
-                    <GripVertical size={14} className="hidden sm:block text-muted-foreground/30 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium text-foreground truncate">{model.model_name}</span>
-                        {model.is_recommended && (
-                          <BadgeCheck size={14} className="text-yellow-500 shrink-0" />
-                        )}
-                        {model.is_free && (
-                          <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full shrink-0">
-                            FREE
-                          </span>
-                        )}
+              <div className="space-y-4">
+                {groupedAllowedModels.map((group) => {
+                  const isMimo = group.provider === "mimo";
+                  const isGoogle = group.provider === "google_genai";
+                  const color = isMimo ? "text-neon-rose" : isGoogle ? "text-emerald-400" : "text-neon-purple";
+                  const bg = isMimo ? "bg-neon-rose/10" : isGoogle ? "bg-emerald-500/10" : "bg-neon-purple/10";
+                  const label = isMimo ? "Xiaomi Mimo" : isGoogle ? "Google GenAI" : group.provider;
+
+                  return (
+                    <div key={group.provider}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${color}`}>{label}</span>
+                        <span className="text-[10px] text-muted-foreground">{group.models.length} model</span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground truncate">{model.model_id}</p>
-                    </div>
-                    <span className="hidden sm:inline-flex text-[10px] text-muted-foreground bg-oled-base px-2 py-0.5 rounded-full shrink-0">
-                      {model.provider}
-                    </span>
-                    <button
-                      onClick={() => handleToggleRecommended(model)}
-                      className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors ${
-                        model.is_recommended
-                          ? "text-yellow-500 bg-yellow-500/10"
-                          : canEditAdminHub
-                          ? "text-muted-foreground/40 hover:text-yellow-500 hover:bg-yellow-500/10"
-                          : "text-muted-foreground/20 cursor-not-allowed"
-                      }`}
-                      title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thay đổi" : model.is_recommended ? "Bỏ đề xuất" : "Đánh dấu đề xuất"}
-                      disabled={!canEditAdminHub}
-                    >
-                      <Star size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleRemoveModel(model.id)}
-                      className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors ${
-                        canEditAdminHub
-                          ? "text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10"
-                          : "text-muted-foreground/20 cursor-not-allowed"
-                      }`}
-                      title={canEditAdminHub ? "Xoá model" : "Chỉ Admin/Op mới có quyền xoá"}
-                      disabled={!canEditAdminHub}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Browse & Add Models from OpenRouter */}
-        <Card className="bg-oled-surface border-oled-border">
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-400" />
-                <h2 className="text-sm font-semibold text-foreground">
-                  Tìm & thêm model từ OpenRouter
-                </h2>
-              </div>
-              <Button
-                onClick={handleLoadModels}
-                disabled={loadingModels}
-                variant="outline"
-                size="sm"
-                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-              >
-                {loadingModels ? (
-                  <Loader2 size={14} className="animate-spin mr-1" />
-                ) : (
-                  <RefreshCw size={14} className="mr-1" />
-                )}
-                {allModels.length > 0 ? "Tải lại" : "Tải danh sách"}
-              </Button>
-            </div>
-
-            {allModels.length > 0 && (
-              <>
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Tìm model theo tên hoặc ID..."
-                    className="bg-oled-elevated border-gray-border text-foreground pl-9 focus:border-amber-500 focus:ring-amber-500/30"
-                  />
-                </div>
-
-                <p className="text-[10px] text-muted-foreground">
-                  Hiển thị {filteredModels.length} / {allModels.length} model. Click "+" để thêm vào danh sách cho phép.
-                </p>
-
-                <ScrollArea className="h-[50vh] md:h-[400px] pr-2">
-                  <div className="space-y-1">
-                    {filteredModels.map((model) => {
-                      const isAdded = allowedModelIds.has(model.id);
-                      const isFree = model.pricing?.prompt === "0" && model.pricing?.completion === "0";
-                      return (
-                        <div
-                          key={model.id}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 transition-colors ${
-                            isAdded
-                              ? "bg-neon-purple/5 border border-neon-purple/20"
-                              : "bg-oled-elevated hover:bg-oled-elevated/80"
-                          }`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-medium text-foreground truncate">
-                                {model.name}
-                              </span>
-                              {isFree && (
-                                <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full shrink-0">
-                                  FREE
-                                </span>
-                              )}
+                      <div className="space-y-1.5">
+                        {group.models.map((model) => (
+                          <motion.div
+                            key={model.id}
+                            layout
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            className="flex items-center gap-2 bg-oled-elevated rounded-xl px-3 py-2.5 group"
+                          >
+                            <GripVertical size={14} className="hidden sm:block text-muted-foreground/30 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium text-foreground truncate">{model.model_name}</span>
+                                {model.is_recommended && (
+                                  <BadgeCheck size={14} className="text-yellow-500 shrink-0" />
+                                )}
+                                {model.is_free && (
+                                  <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full shrink-0">
+                                    FREE
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-muted-foreground truncate">{model.model_id}</p>
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] text-muted-foreground truncate">{model.id}</span>
-                              <span className="text-[10px] text-muted-foreground/50">·</span>
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                <DollarSign size={8} />
-                                {formatPrice(model.pricing)}
-                              </span>
-                            </div>
-                          </div>
-                          {isAdded ? (
-                            <span className="text-[10px] text-neon-purple font-medium px-2 py-1 rounded-lg bg-neon-purple/10">
-                              Đã thêm
+                            <span className={`hidden sm:inline-flex text-[10px] ${color} ${bg} px-2 py-0.5 rounded-full shrink-0`}>
+                              {label}
                             </span>
-                          ) : (
-                            <Button
-                              onClick={() => handleAddModel(model)}
-                              disabled={adding === model.id || !canEditAdminHub}
-                              size="sm"
-                              variant="ghost"
-                              className="h-10 w-10 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-neon-purple hover:bg-neon-purple/10"
-                              title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thêm model" : undefined}
+                            <button
+                              onClick={() => handleToggleRecommended(model)}
+                              className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors ${
+                                model.is_recommended
+                                  ? "text-yellow-500 bg-yellow-500/10"
+                                  : canEditAdminHub
+                                  ? "text-muted-foreground/40 hover:text-yellow-500 hover:bg-yellow-500/10"
+                                  : "text-muted-foreground/20 cursor-not-allowed"
+                              }`}
+                              title={!canEditAdminHub ? "Chỉ Admin/Op mới có quyền thay đổi" : model.is_recommended ? "Bỏ đề xuất" : "Đánh dấu đề xuất"}
+                              disabled={!canEditAdminHub}
                             >
-                              {adding === model.id ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : (
-                                <Plus size={16} />
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
-              </>
-            )}
-
-            {allModels.length === 0 && !loadingModels && (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                Nhấn "Tải danh sách" để lấy tất cả model khả dụng từ OpenRouter.
-              </p>
+                              <Star size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveModel(model.id)}
+                              className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors ${
+                                canEditAdminHub
+                                  ? "text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10"
+                                  : "text-muted-foreground/20 cursor-not-allowed"
+                              }`}
+                              title={canEditAdminHub ? "Xoá model" : "Chỉ Admin/Op mới có quyền xoá"}
+                              disabled={!canEditAdminHub}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>

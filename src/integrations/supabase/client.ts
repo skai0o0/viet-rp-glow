@@ -24,5 +24,6 @@ export const supabase = createClient<Database>(safeSupabaseUrl, safeSupabaseKey,
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
+    lock: false,
   }
 });
