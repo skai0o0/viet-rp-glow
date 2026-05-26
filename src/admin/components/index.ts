@@ -19,4 +19,7 @@ export type { AdminFormProps, AdminFormFieldProps, AdminFormFullWidthProps } fro
 export { AdminIconButton, iconButtonVariants } from "./AdminIconButton";
 export type { AdminIconButtonProps } from "./AdminIconButton";
 
+export { ConnectedStats } from "./ConnectedStats";
+export type { ConnectedStatsProps, StatNode } from "./ConnectedStats";
+
 export { adminBtn } from "../utils/adminBtn";
