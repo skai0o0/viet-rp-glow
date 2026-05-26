@@ -71,6 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    localStorage.removeItem("vietrp_user_role");
     await supabase.auth.signOut();
   }, []);
 

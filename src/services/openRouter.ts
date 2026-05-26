@@ -17,6 +17,12 @@ const MIMO_STORAGE_KEY_VERIFIED = "vietrp_mimo_key_verified";
 const MIMO_STORAGE_KEY_ENDPOINT = "vietrp_mimo_endpoint";
 const STORAGE_KEY_PROVIDER = "vietrp_active_provider";
 
+// ─── Google GenAI provider ───
+const GOOGLE_GENAI_DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const GOOGLE_GENAI_STORAGE_KEY_API = "vietrp_google_genai_key";
+const GOOGLE_GENAI_STORAGE_KEY_VERIFIED = "vietrp_google_genai_key_verified";
+const GOOGLE_GENAI_STORAGE_KEY_ENDPOINT = "vietrp_google_genai_endpoint";
+
 export function getMimoEndpoint(): string {
   return localStorage.getItem(MIMO_STORAGE_KEY_ENDPOINT) || MIMO_DEFAULT_BASE;
 }
@@ -36,7 +42,26 @@ export function setMimoEndpoint(endpoint: string, userId?: string) {
   }
 }
 
-export type Provider = "openrouter" | "mimo";
+// ─── Google GenAI endpoint management ───
+export function getGoogleGenaiEndpoint(): string {
+  return localStorage.getItem(GOOGLE_GENAI_STORAGE_KEY_ENDPOINT) || GOOGLE_GENAI_DEFAULT_BASE;
+}
+
+export function setGoogleGenaiEndpoint(endpoint: string, userId?: string) {
+  const trimmed = endpoint.trim().replace(/\/+$/, "");
+  if (trimmed && trimmed !== GOOGLE_GENAI_DEFAULT_BASE) {
+    localStorage.setItem(GOOGLE_GENAI_STORAGE_KEY_ENDPOINT, trimmed);
+  } else {
+    localStorage.removeItem(GOOGLE_GENAI_STORAGE_KEY_ENDPOINT);
+  }
+  if (userId) {
+    saveUserApiKeys(userId, { google_genai_endpoint: trimmed }).catch((e) =>
+      console.error("[BYOK] Failed to sync Google GenAI endpoint to Supabase:", e)
+    );
+  }
+}
+
+export type Provider = "openrouter" | "mimo" | "google_genai";
 
 // ─── Secure storage helpers (localStorage + obfuscation) ───
 // Migrate old sessionStorage keys back to localStorage (revert ephemeral storage)
@@ -62,6 +87,16 @@ export type Provider = "openrouter" | "mimo";
       localStorage.setItem(MIMO_STORAGE_KEY_VERIFIED, sessionMimoVerified);
       sessionStorage.removeItem(MIMO_STORAGE_KEY_VERIFIED);
     }
+    const sessionGoogle = sessionStorage.getItem(GOOGLE_GENAI_STORAGE_KEY_API);
+    if (sessionGoogle && !localStorage.getItem(GOOGLE_GENAI_STORAGE_KEY_API)) {
+      localStorage.setItem(GOOGLE_GENAI_STORAGE_KEY_API, sessionGoogle);
+      sessionStorage.removeItem(GOOGLE_GENAI_STORAGE_KEY_API);
+    }
+    const sessionGoogleVerified = sessionStorage.getItem(GOOGLE_GENAI_STORAGE_KEY_VERIFIED);
+    if (sessionGoogleVerified && !localStorage.getItem(GOOGLE_GENAI_STORAGE_KEY_VERIFIED)) {
+      localStorage.setItem(GOOGLE_GENAI_STORAGE_KEY_VERIFIED, sessionGoogleVerified);
+      sessionStorage.removeItem(GOOGLE_GENAI_STORAGE_KEY_VERIFIED);
+    }
   } catch { /* ignore */ }
 })();
 
@@ -69,6 +104,7 @@ export type Provider = "openrouter" | "mimo";
 export function getActiveProvider(): Provider {
   const stored = localStorage.getItem(STORAGE_KEY_PROVIDER);
   if (stored === "mimo") return "mimo";
+  if (stored === "google_genai") return "google_genai";
   return "openrouter";
 }
 
@@ -182,6 +218,36 @@ export function markMimoKeyVerified() {
   localStorage.setItem(MIMO_STORAGE_KEY_VERIFIED, "true");
 }
 
+// ─── Google GenAI key management ───
+export function getGoogleGenaiApiKey(): string {
+  const stored = localStorage.getItem(GOOGLE_GENAI_STORAGE_KEY_API);
+  if (!stored) return "";
+  return deobfuscate(stored);
+}
+
+export function setGoogleGenaiApiKey(key: string, userId?: string) {
+  const old = getGoogleGenaiApiKey();
+  if (key) {
+    localStorage.setItem(GOOGLE_GENAI_STORAGE_KEY_API, obfuscate(key));
+  } else {
+    localStorage.removeItem(GOOGLE_GENAI_STORAGE_KEY_API);
+  }
+  if (key !== old) localStorage.removeItem(GOOGLE_GENAI_STORAGE_KEY_VERIFIED);
+  if (userId) {
+    saveUserApiKeys(userId, { google_genai_key: key }).catch((e) =>
+      console.error("[BYOK] Failed to save Google GenAI key to Supabase:", e)
+    );
+  }
+}
+
+export function isGoogleGenaiKeyVerified(): boolean {
+  return localStorage.getItem(GOOGLE_GENAI_STORAGE_KEY_VERIFIED) === "true";
+}
+
+export function markGoogleGenaiKeyVerified() {
+  localStorage.setItem(GOOGLE_GENAI_STORAGE_KEY_VERIFIED, "true");
+}
+
 /**
  * Sync BYOK keys from Supabase into localStorage.
  * Called on app init / login so user doesn't have to re-enter keys.
@@ -198,6 +264,12 @@ export async function syncKeysFromSupabase(userId: string): Promise<void> {
     if (keys.mimo_endpoint) {
       localStorage.setItem(MIMO_STORAGE_KEY_ENDPOINT, keys.mimo_endpoint);
     }
+    if (keys.google_genai_key && !getGoogleGenaiApiKey()) {
+      localStorage.setItem(GOOGLE_GENAI_STORAGE_KEY_API, obfuscate(keys.google_genai_key));
+    }
+    if (keys.google_genai_endpoint) {
+      localStorage.setItem(GOOGLE_GENAI_STORAGE_KEY_ENDPOINT, keys.google_genai_endpoint);
+    }
   } catch (e) {
     console.error("[BYOK] Failed to sync keys from Supabase:", e);
     throw e;
@@ -207,7 +279,9 @@ export async function syncKeysFromSupabase(userId: string): Promise<void> {
 /** Get the API key for the active provider */
 export function getApiKeyForProvider(provider?: Provider): string {
   const p = provider ?? getActiveProvider();
-  return p === "mimo" ? getMimoApiKey() : getApiKey();
+  if (p === "mimo") return getMimoApiKey();
+  if (p === "google_genai") return getGoogleGenaiApiKey();
+  return getApiKey();
 }
 
 const DEPRECATED_MODELS = [
@@ -215,11 +289,42 @@ const DEPRECATED_MODELS = [
   "google/gemini-pro",
 ];
 
+// ─── Prefixed model ID helpers ─────────────────────────────
+// Format: "provider::model_id" (e.g., "mimo::gpt-4o", "google_genai::gemini-2.0-flash")
+// Plain model_id = OpenRouter (backward compatible)
+
+export function formatPrefixedModelId(provider: Provider, modelId: string): string {
+  if (provider === "openrouter") return modelId;
+  return `${provider}::${modelId}`;
+}
+
+export function parsePrefixedModelId(prefixed: string): { provider: Provider; modelId: string } {
+  const sep = prefixed.indexOf("::");
+  if (sep === -1) return { provider: "openrouter", modelId: prefixed };
+  const provider = prefixed.slice(0, sep) as Provider;
+  if (provider === "mimo" || provider === "google_genai") {
+    return { provider, modelId: prefixed.slice(sep + 2) };
+  }
+  return { provider: "openrouter", modelId: prefixed };
+}
+
 export function getModel(): string {
   const stored = localStorage.getItem(STORAGE_KEY_MODEL);
   if (stored && !DEPRECATED_MODELS.includes(stored)) return stored;
   if (stored) localStorage.removeItem(STORAGE_KEY_MODEL);
   return AVAILABLE_MODELS[0].id;
+}
+
+/** Get the raw model ID (stripped of provider prefix) for API calls */
+export function getRawModelId(prefixed?: string): string {
+  const id = prefixed ?? getModel();
+  return parsePrefixedModelId(id).modelId;
+}
+
+/** Get the provider implied by the prefixed model ID */
+export function getModelProvider(prefixed?: string): Provider {
+  const id = prefixed ?? getModel();
+  return parsePrefixedModelId(id).provider;
 }
 
 export function setModel(model: string) {
@@ -343,6 +448,41 @@ export async function fetchMimoModels(): Promise<OpenRouterModel[]> {
   }
 }
 
+// ─── Google GenAI API functions ───
+
+/** Verify Google GenAI API key by calling /models endpoint */
+export async function verifyGoogleGenaiApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${getGoogleGenaiEndpoint()}/models?key=${key}`);
+    if (res.ok) return { valid: true };
+    if (res.status === 400 || res.status === 403) return { valid: false, error: "API Key không hợp lệ." };
+    return { valid: false, error: `Lỗi: ${res.status}` };
+  } catch {
+    return { valid: false, error: "Không thể kết nối tới Google GenAI." };
+  }
+}
+
+/** Fetch all available models from Google GenAI */
+export async function fetchGoogleGenaiModels(): Promise<OpenRouterModel[]> {
+  const key = getGoogleGenaiApiKey();
+  if (!key) return [];
+  try {
+    const res = await fetch(`${getGoogleGenaiEndpoint()}/models?key=${key}`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const models: OpenRouterModel[] = (json.models || [])
+      .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m: any) => ({
+        id: m.name.replace("models/", ""),
+        name: m.displayName || m.name.replace("models/", ""),
+      }));
+    models.sort((a, b) => a.name.localeCompare(b.name));
+    return models;
+  } catch {
+    return [];
+  }
+}
+
 export interface StreamCallbacks {
   onDelta: (text: string) => void;
   onDone: () => void;
@@ -407,8 +547,84 @@ async function parseSSEStream(body: ReadableStream<Uint8Array>, callbacks: Strea
   callbacks.onDone();
 }
 
+/** Parse Google GenAI SSE stream (different response format) */
+async function parseGoogleGenaiSSEStream(body: ReadableStream<Uint8Array>, callbacks: StreamCallbacks) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      let line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line.startsWith(":") || line.trim() === "") continue;
+      if (!line.startsWith("data: ")) continue;
+
+      const jsonStr = line.slice(6).trim();
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined;
+        if (content) callbacks.onDelta(content);
+      } catch {
+        buffer = line + "\n" + buffer;
+        break;
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    for (let raw of buffer.split("\n")) {
+      if (!raw) continue;
+      if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+      if (raw.startsWith(":") || raw.trim() === "") continue;
+      if (!raw.startsWith("data: ")) continue;
+      const jsonStr = raw.slice(6).trim();
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined;
+        if (content) callbacks.onDelta(content);
+      } catch { /* ignore */ }
+    }
+  }
+
+  callbacks.onDone();
+}
+
+/** Convert OpenRouter messages to Google GenAI contents format */
+function convertToGoogleGenaiMessages(messages: OpenRouterMessage[]) {
+  const contents: { role: string; parts: { text: string }[] }[] = [];
+  for (const msg of messages) {
+    if (msg.role === "system") continue;
+    contents.push({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    });
+  }
+  return contents;
+}
+
+function getSystemInstruction(messages: OpenRouterMessage[]) {
+  const sysMsg = messages.find((m) => m.role === "system");
+  return sysMsg ? { parts: [{ text: sysMsg.content }] } : undefined;
+}
+
+function getProviderLabel(provider: Provider): string {
+  if (provider === "mimo") return "Xiaomi Mimo";
+  if (provider === "google_genai") return "Google GenAI";
+  return "OpenRouter";
+}
+
 /**
- * Stream chat completions via SSE (supports OpenRouter and Xiaomi Mimo)
+ * Stream chat completions via SSE (supports OpenRouter, Xiaomi Mimo, and Google GenAI)
  */
 export async function streamChat(
   messages: OpenRouterMessage[],
@@ -417,27 +633,80 @@ export async function streamChat(
   maxTokensOverride?: number,
   provider?: Provider,
 ) {
-  const activeProvider = provider ?? getActiveProvider();
+  // Parse prefixed model ID to determine provider + raw model
+  const storedModel = getModel();
+  const parsed = parsePrefixedModelId(storedModel);
+  const activeProvider = provider ?? parsed.provider ?? getActiveProvider();
+  const model = parsed.modelId;
   const apiKey = getApiKeyForProvider(activeProvider);
   if (!apiKey) {
-    const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
-    callbacks.onError(`Vui lòng nhập API Key của ${providerLabel} trong phần Cài Đặt.`);
+    callbacks.onError(`Vui lòng nhập API Key của ${getProviderLabel(activeProvider)} trong phần Cài Đặt.`);
     return;
   }
-
-  const apiUrl = activeProvider === "mimo" ? `${getMimoEndpoint()}/chat/completions` : OPENROUTER_API_URL;
-  const model = getModel();
   const maxTokens = maxTokensOverride ?? (parseInt(localStorage.getItem("vietrp_max_tokens") || "") || getCachedSamplingParameters().max_tokens || DEFAULT_MAX_TOKENS);
+  const samplingParams = getCachedSamplingParameters();
 
   try {
-    // Get sampling parameters from global settings
-    const samplingParams = getCachedSamplingParameters();
+    // ─── Google GenAI: different API format ───
+    if (activeProvider === "google_genai") {
+      const endpoint = getGoogleGenaiEndpoint();
+      const apiUrl = `${endpoint}/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
+
+      const body: Record<string, any> = {
+        contents: convertToGoogleGenaiMessages(messages),
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: samplingParams.temperature,
+          topP: samplingParams.top_p,
+          topK: samplingParams.top_k,
+        },
+      };
+
+      const systemInstruction = getSystemInstruction(messages);
+      if (systemInstruction) body.systemInstruction = systemInstruction;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      });
+
+      if (!response.ok) {
+        if (response.status === 400 || response.status === 403) {
+          callbacks.onError("API Key không hợp lệ. Vui lòng kiểm tra lại trong Cài Đặt.");
+          return;
+        }
+        if (response.status === 404) {
+          callbacks.onError(`Model "${model}" không tồn tại trên Google GenAI. Vui lòng chọn model khác.`);
+          return;
+        }
+        if (response.status === 429) {
+          callbacks.onError("Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau.");
+          return;
+        }
+        const errorText = await response.text();
+        console.error("Google GenAI error:", response.status, errorText);
+        callbacks.onError(`Lỗi từ Google GenAI: ${response.status}. Vui lòng thử lại.`);
+        return;
+      }
+
+      if (!response.body) {
+        callbacks.onError("Không nhận được phản hồi từ AI.");
+        return;
+      }
+
+      await parseGoogleGenaiSSEStream(response.body, callbacks);
+      return;
+    }
+
+    // ─── OpenRouter / Mimo: OpenAI-compatible format ───
+    const apiUrl = activeProvider === "mimo" ? `${getMimoEndpoint()}/chat/completions` : OPENROUTER_API_URL;
 
     const headers: Record<string, string> = {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     };
-    // OpenRouter-specific headers
     if (activeProvider === "openrouter") {
       headers["HTTP-Referer"] = "https://vietrp.com";
       headers["X-Title"] = "VietRP";
@@ -461,7 +730,7 @@ export async function streamChat(
     });
 
     if (!response.ok) {
-      const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
+      const providerLabel = getProviderLabel(activeProvider);
       if (response.status === 401) {
         callbacks.onError("API Key không hợp lệ. Vui lòng kiểm tra lại trong Cài Đặt.");
         return;
@@ -493,8 +762,7 @@ export async function streamChat(
   } catch (err: any) {
     if (err.name === "AbortError") return;
     console.error("Stream error:", err);
-    const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
-    callbacks.onError(`Lỗi kết nối tới ${providerLabel}. Vui lòng kiểm tra API Key và kết nối mạng. (${err.message || "unknown"})`);
+    callbacks.onError(`Lỗi kết nối tới ${getProviderLabel(activeProvider)}. Vui lòng kiểm tra API Key và kết nối mạng. (${err.message || "unknown"})`);
   }
 }
 

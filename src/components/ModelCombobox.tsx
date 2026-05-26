@@ -1,15 +1,12 @@
-import { useState, useEffect } from "react";
-import { Check, ChevronsUpDown, Loader2, BadgeCheck, Lock } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Check, ChevronsUpDown, Loader2, BadgeCheck, Lock, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -23,9 +20,7 @@ import {
 } from "@/components/ui/sheet";
 import {
   AVAILABLE_MODELS,
-  fetchMimoModels,
-  type Provider,
-  type OpenRouterModel,
+  formatPrefixedModelId,
 } from "@/services/openRouter";
 import { fetchAllowedModels, type AllowedModel } from "@/services/globalSettingsDb";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -34,7 +29,6 @@ export interface ModelComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
   userTier?: string;
-  provider?: Provider;
 }
 
 type DisplayModel = {
@@ -42,76 +36,109 @@ type DisplayModel = {
   name: string;
   is_recommended?: boolean;
   is_free?: boolean;
-  provider?: string;
+  source?: string;
 };
 
-const ModelCombobox = ({ value, onValueChange, userTier = "free", provider }: ModelComboboxProps) => {
+const SOURCE_LABELS: Record<string, string> = {
+  openrouter: "OpenRouter",
+  mimo: "Xiaomi Mimo",
+  google_genai: "Google GenAI",
+};
+
+const ModelCombobox = ({ value, onValueChange, userTier = "free" }: ModelComboboxProps) => {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [adminModels, setAdminModels] = useState<AllowedModel[]>([]);
-  const [mimoModels, setMimoModels] = useState<OpenRouterModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasAdminModels, setHasAdminModels] = useState(false);
   const isMobile = useIsMobile();
 
   const isFreeUser = userTier === "free";
-  const isMimo = provider === "mimo";
 
   useEffect(() => {
     setLoading(true);
-    if (isMimo) {
-      fetchMimoModels()
-        .then((models) => setMimoModels(models))
-        .finally(() => setLoading(false));
+    fetchAllowedModels()
+      .then((allowed) => {
+        if (allowed.length > 0) {
+          setAdminModels(allowed);
+          setHasAdminModels(true);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Build unified model list grouped by source
+  const { recommended, bySource } = useMemo(() => {
+    const recommended: DisplayModel[] = [];
+    const bySource: Record<string, DisplayModel[]> = {};
+
+    if (hasAdminModels) {
+      for (const m of adminModels) {
+        const isNonOR = m.provider === "mimo" || m.provider === "google_genai";
+        const source = isNonOR ? m.provider : "openrouter";
+        const dm: DisplayModel = {
+          id: isNonOR ? formatPrefixedModelId(source as any, m.model_id) : m.model_id,
+          name: m.model_name,
+          is_recommended: m.is_recommended,
+          is_free: m.is_free,
+          source,
+        };
+        if (m.is_recommended) {
+          recommended.push(dm);
+        } else {
+          if (!bySource[source]) bySource[source] = [];
+          bySource[source].push(dm);
+        }
+      }
     } else {
-      fetchAllowedModels()
-        .then((allowed) => {
-          if (allowed.length > 0) {
-            setAdminModels(allowed);
-            setHasAdminModels(true);
-          }
-        })
-        .finally(() => setLoading(false));
+      bySource.openrouter = AVAILABLE_MODELS.map((m) => ({
+        id: m.id,
+        name: m.label,
+        source: "openrouter",
+      }));
     }
-  }, [isMimo]);
 
-  const recommendedModels: DisplayModel[] = isMimo
-    ? []
-    : hasAdminModels
-      ? adminModels
-          .filter((m) => m.is_recommended)
-          .map((m) => ({
-            id: m.model_id,
-            name: m.model_name,
-            is_recommended: true,
-            is_free: m.is_free,
-            provider: m.provider,
-          }))
-      : [];
+    return { recommended, bySource };
+  }, [adminModels, hasAdminModels]);
 
-  const otherModels: DisplayModel[] = isMimo
-    ? mimoModels.map((m) => ({ id: m.id, name: m.name }))
-    : hasAdminModels
-      ? adminModels
-          .filter((m) => !m.is_recommended)
-          .map((m) => ({
-            id: m.model_id,
-            name: m.model_name,
-            is_recommended: false,
-            is_free: m.is_free,
-            provider: m.provider,
-          }))
-      : AVAILABLE_MODELS.map((m) => ({ id: m.id, name: m.label }));
+  const allDisplayModels = useMemo(() => {
+    const others = Object.values(bySource).flat();
+    return [...recommended, ...others];
+  }, [recommended, bySource]);
 
-  const allDisplayModels = [...recommendedModels, ...otherModels];
-  const selectedLabel = allDisplayModels.find((m) => m.id === value)?.name || value;
+  const selectedModel = allDisplayModels.find((m) => m.id === value);
+  const selectedLabel = selectedModel?.name || value;
 
-  const isModelLocked = (model: DisplayModel) => !isMimo && isFreeUser && hasAdminModels && !model.is_free;
+  const isModelLocked = (model: DisplayModel) =>
+    model.source === "openrouter" && isFreeUser && hasAdminModels && !model.is_free;
 
   const handleSelect = (model: DisplayModel) => {
     if (isModelLocked(model)) return;
     onValueChange(model.id);
     setOpen(false);
+    setSearch("");
   };
+
+  const sourceOrder = ["openrouter", "mimo", "google_genai"];
+
+  // Filtered + grouped models
+  const { filteredRecommended, filteredBySource } = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const match = (m: DisplayModel) => !q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q);
+
+    const filteredRecommended = recommended.filter(match);
+    const filteredBySource: Record<string, DisplayModel[]> = {};
+    for (const src of sourceOrder) {
+      const models = bySource[src];
+      if (models) {
+        const filtered = models.filter(match);
+        if (filtered.length > 0) filteredBySource[src] = filtered;
+      }
+    }
+    return { filteredRecommended, filteredBySource };
+  }, [recommended, bySource, search]);
+
+  const hasResults = filteredRecommended.length > 0 || Object.values(filteredBySource).some((arr) => arr.length > 0);
 
   const triggerButton = (
     <Button
@@ -127,10 +154,10 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free", provider }: Mo
       ) : (
         <span className="truncate flex items-center gap-1.5">
           {selectedLabel}
-          {allDisplayModels.find((m) => m.id === value)?.is_recommended && (
+          {selectedModel?.is_recommended && (
             <BadgeCheck size={14} className="text-yellow-500 shrink-0" />
           )}
-          {allDisplayModels.find((m) => m.id === value)?.is_free && (
+          {selectedModel?.is_free && (
             <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1 py-0 rounded-full shrink-0">
               FREE
             </span>
@@ -141,125 +168,102 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free", provider }: Mo
     </Button>
   );
 
-  const modelListContent = (
-    <>
-      <CommandInput placeholder="Tìm model..." className="text-foreground" />
-      <CommandList className="max-h-[60vh] md:max-h-60">
-        <CommandEmpty className="text-muted-foreground">
-          Không tìm thấy model nào.
-        </CommandEmpty>
+  const renderModelItem = (m: DisplayModel) => {
+    const locked = isModelLocked(m);
+    return (
+      <CommandItem
+        key={m.id}
+        value={`${m.name} ${m.id}`}
+        onSelect={() => handleSelect(m)}
+        className={cn(
+          "text-foreground cursor-pointer",
+          locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
+        )}
+        disabled={locked}
+      >
+        {locked ? (
+          <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
+        ) : (
+          <Check
+            className={cn(
+              "mr-2 h-4 w-4",
+              value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
+            )}
+          />
+        )}
+        <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
+        {m.is_free ? (
+          <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1 shrink-0">
+            FREE
+          </span>
+        ) : m.source === "openrouter" && hasAdminModels ? (
+          <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1 shrink-0">
+            PRO
+          </span>
+        ) : null}
+      </CommandItem>
+    );
+  };
 
-        {recommendedModels.length > 0 && (
+  const renderModelList = () => (
+    <>
+      {/* Search input */}
+      <div className="flex items-center border-b px-3">
+        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Tìm model..."
+          className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground text-foreground"
+          autoFocus
+        />
+      </div>
+
+      <CommandList className="max-h-[60vh] md:max-h-60">
+        {!hasResults && (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            Không tìm thấy model nào.
+          </div>
+        )}
+
+        {/* Recommended */}
+        {filteredRecommended.length > 0 && (
           <CommandGroup heading="⭐ Đề xuất">
-            {recommendedModels.map((m) => {
-              const locked = isModelLocked(m);
-              return (
-                <CommandItem
-                  key={m.id}
-                  value={m.name}
-                  onSelect={() => handleSelect(m)}
-                  className={cn(
-                    "text-foreground cursor-pointer",
-                    locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
-                  )}
-                  disabled={locked}
-                >
-                  {locked ? (
-                    <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
-                      )}
-                    />
-                  )}
-                  <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
-                  {m.is_free ? (
-                    <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
-                      FREE
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
-                      PRO
-                    </span>
-                  )}
-                </CommandItem>
-              );
-            })}
+            {filteredRecommended.map(renderModelItem)}
           </CommandGroup>
         )}
 
-        {recommendedModels.length > 0 && otherModels.length > 0 && (
-          <CommandSeparator />
-        )}
-
-        <CommandGroup heading={isMimo ? "Xiaomi Mimo Models" : hasAdminModels ? "Tất cả model" : "Model mặc định"}>
-          {otherModels.map((m) => {
-            const locked = isModelLocked(m);
-            return (
-              <CommandItem
-                key={m.id}
-                value={m.name}
-                onSelect={() => handleSelect(m)}
-                className={cn(
-                  "text-foreground cursor-pointer",
-                  locked ? "opacity-50 cursor-not-allowed" : "data-[selected=true]:bg-neon-purple/10"
-                )}
-                disabled={locked}
-              >
-                {locked ? (
-                  <Lock className="mr-2 h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === m.id ? "opacity-100 text-neon-purple" : "opacity-0"
-                    )}
-                  />
-                )}
-                <span className={cn("truncate flex-1", locked && "text-muted-foreground")}>{m.name}</span>
-                {m.is_free ? (
-                  <span className="text-[9px] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full ml-1">
-                    FREE
-                  </span>
-                ) : hasAdminModels ? (
-                  <span className="text-[9px] font-bold bg-neon-purple/20 text-neon-purple px-1.5 py-0.5 rounded-full ml-1">
-                    PRO
-                  </span>
-                ) : null}
-              </CommandItem>
-            );
-          })}
-        </CommandGroup>
+        {/* Per-source groups */}
+        {Object.entries(filteredBySource).map(([src, models]) => (
+          <CommandGroup key={src} heading={SOURCE_LABELS[src] || src}>
+            {models.map(renderModelItem)}
+          </CommandGroup>
+        ))}
       </CommandList>
-      {(hasAdminModels || isMimo) && (
-        <div className="px-3 py-1.5 border-t border-gray-border">
-          <p className="text-[10px] text-muted-foreground">
-            {isMimo
-              ? `${allDisplayModels.length} model khả dụng`
-              : isFreeUser
-                ? `${allDisplayModels.filter((m) => m.is_free).length} model miễn phí · Nâng cấp Pro để dùng tất cả`
-                : `${allDisplayModels.length} model khả dụng`}
-          </p>
-        </div>
-      )}
+
+      <div className="px-3 py-1.5 border-t border-gray-border">
+        <p className="text-[10px] text-muted-foreground">
+          {allDisplayModels.length} model khả dụng
+          {isFreeUser && hasAdminModels && (
+            <span> · {allDisplayModels.filter((m) => m.is_free).length} miễn phí</span>
+          )}
+        </p>
+      </div>
     </>
   );
 
-  // Mobile: use bottom Sheet to avoid nested portal scroll lock
   if (isMobile) {
     return (
       <>
         <div onClick={() => setOpen(true)}>{triggerButton}</div>
-        <Sheet open={open} onOpenChange={setOpen}>
+        <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(""); }}>
           <SheetContent
             side="bottom"
             className="p-0 bg-oled-elevated border-gray-border rounded-t-2xl max-h-[80vh] flex flex-col"
           >
             <SheetTitle className="sr-only">Chọn model</SheetTitle>
-            <Command className="bg-oled-elevated flex-1 overflow-hidden">
-              {modelListContent}
+            <Command shouldFilter={false} className="bg-oled-elevated flex-1 overflow-hidden">
+              {renderModelList()}
             </Command>
           </SheetContent>
         </Sheet>
@@ -267,13 +271,12 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free", provider }: Mo
     );
   }
 
-  // Desktop: use Popover
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(""); }}>
       <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-oled-elevated border-gray-border z-50" align="start">
-        <Command className="bg-oled-elevated">
-          {modelListContent}
+        <Command shouldFilter={false} className="bg-oled-elevated">
+          {renderModelList()}
         </Command>
       </PopoverContent>
     </Popover>

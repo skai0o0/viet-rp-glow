@@ -68,12 +68,16 @@ interface UserApiKeysRow {
   openrouter_key: string | null;
   mimo_key: string | null;
   mimo_endpoint: string | null;
+  google_genai_key: string | null;
+  google_genai_endpoint: string | null;
 }
 
 export interface ApiKeysToSave {
   openrouter_key?: string;
   mimo_key?: string;
   mimo_endpoint?: string;
+  google_genai_key?: string;
+  google_genai_endpoint?: string;
 }
 
 export async function saveUserApiKeys(userId: string, keys: ApiKeysToSave): Promise<void> {
@@ -87,6 +91,12 @@ export async function saveUserApiKeys(userId: string, keys: ApiKeysToSave): Prom
   }
   if (keys.mimo_endpoint !== undefined) {
     encrypted.mimo_endpoint = keys.mimo_endpoint || null;
+  }
+  if (keys.google_genai_key !== undefined) {
+    encrypted.google_genai_key = keys.google_genai_key ? await encryptApiKey(keys.google_genai_key, userId) : null;
+  }
+  if (keys.google_genai_endpoint !== undefined) {
+    encrypted.google_genai_endpoint = keys.google_genai_endpoint || null;
   }
 
   encrypted.updated_at = new Date().toISOString();
@@ -105,19 +115,21 @@ export async function loadUserApiKeys(userId: string): Promise<{
   openrouter_key: string;
   mimo_key: string;
   mimo_endpoint: string;
+  google_genai_key: string;
+  google_genai_endpoint: string;
 }> {
   const { data, error } = await supabase
     .from("user_api_keys")
-    .select("openrouter_key, mimo_key, mimo_endpoint")
+    .select("openrouter_key, mimo_key, mimo_endpoint, google_genai_key, google_genai_endpoint")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !data) {
-    return { openrouter_key: "", mimo_key: "", mimo_endpoint: "" };
+    return { openrouter_key: "", mimo_key: "", mimo_endpoint: "", google_genai_key: "", google_genai_endpoint: "" };
   }
 
   const row = data as UserApiKeysRow;
-  const results = { openrouter_key: "", mimo_key: "", mimo_endpoint: "" };
+  const results = { openrouter_key: "", mimo_key: "", mimo_endpoint: "", google_genai_key: "", google_genai_endpoint: "" };
 
   try {
     if (row.openrouter_key) {
@@ -136,6 +148,16 @@ export async function loadUserApiKeys(userId: string): Promise<{
   }
 
   results.mimo_endpoint = row.mimo_endpoint || "";
+
+  try {
+    if (row.google_genai_key) {
+      results.google_genai_key = await decryptApiKey(row.google_genai_key, userId);
+    }
+  } catch (e) {
+    console.warn("Failed to decrypt Google GenAI key:", e);
+  }
+
+  results.google_genai_endpoint = row.google_genai_endpoint || "";
 
   return results;
 }

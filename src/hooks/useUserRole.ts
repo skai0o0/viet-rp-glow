@@ -19,6 +19,25 @@ interface UserRoleResult {
   checking: boolean;
 }
 
+const ROLE_CACHE_KEY = "vietrp_user_role";
+
+function getCachedRole(userId: string): UserRole | null {
+  try {
+    const raw = localStorage.getItem(ROLE_CACHE_KEY);
+    if (!raw) return null;
+    const { uid, role } = JSON.parse(raw);
+    return uid === userId ? (role as UserRole) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedRole(userId: string, role: UserRole) {
+  try {
+    localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid: userId, role }));
+  } catch {}
+}
+
 /**
  * Hook phân quyền 4 cấp: admin > op > moderator > user
  * - admin: toàn quyền (view + edit) mọi nơi
@@ -28,8 +47,14 @@ interface UserRoleResult {
  */
 export function useUserRole(): UserRoleResult {
   const { user } = useAuth();
-  const [role, setRole] = useState<UserRole>("user");
-  const [checking, setChecking] = useState(true);
+  const [role, setRole] = useState<UserRole>(() => {
+    if (!user) return "user";
+    return getCachedRole(user.id) ?? "user";
+  });
+  const [checking, setChecking] = useState(() => {
+    // Nếu có cache thì không cần loading — hiển thị ngay
+    return !user || !getCachedRole(user.id);
+  });
 
   useEffect(() => {
     if (!user) {
@@ -38,24 +63,34 @@ export function useUserRole(): UserRoleResult {
       return;
     }
 
+    let cancelled = false;
+
     const fetchRole = async () => {
       try {
         const { data, error } = await supabase.rpc("get_user_role", {
           p_user_id: user.id,
         } as any);
 
-        if (!error && data) {
-          setRole(data as UserRole);
-        } else {
-          setRole("user");
+        if (!cancelled) {
+          if (!error && data) {
+            const r = data as UserRole;
+            setRole(r);
+            setCachedRole(user.id, r);
+          } else {
+            setRole("user");
+          }
+          setChecking(false);
         }
       } catch {
-        setRole("user");
+        if (!cancelled) {
+          setRole("user");
+          setChecking(false);
+        }
       }
-      setChecking(false);
     };
 
     fetchRole();
+    return () => { cancelled = true; };
   }, [user]);
 
   const isAdmin = role === "admin";

@@ -12,6 +12,7 @@ import { extractCardJson } from "@/utils/extractCardJson";
 import {
   getApiKeyForProvider,
   getModel,
+  parsePrefixedModelId,
   getMimoEndpoint,
   type Provider,
 } from "./openRouter";
@@ -93,13 +94,65 @@ export async function nonStreamChat(
     model?: string;
   },
 ): Promise<string> {
-  const { provider, signal, maxTokens = 8192, temperature, model: modelOverride } = options;
+  const { provider: optProvider, signal, maxTokens = 8192, temperature, model: modelOverride } = options;
+
+  // Parse prefixed model ID if no explicit model override
+  const storedModel = getModel();
+  const parsed = parsePrefixedModelId(modelOverride ?? storedModel);
+  const provider = optProvider ?? parsed.provider;
+  const model = parsed.modelId;
+
   const apiKey = getApiKeyForProvider(provider);
   if (!apiKey) throw new Error("Chưa nhập API Key. Vào Cài đặt để thêm.");
-
-  const model = modelOverride ?? getModel();
   const samplingParams = getCachedSamplingParameters();
 
+  // ─── Google GenAI: different API format ───
+  if (provider === "google_genai") {
+    const { getGoogleGenaiEndpoint } = await import("@/services/openRouter");
+    const endpoint = getGoogleGenaiEndpoint();
+    const apiUrl = `${endpoint}/models/${model}:generateContent?key=${apiKey}`;
+
+    const contents = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+
+    const sysMsg = messages.find((m) => m.role === "system");
+    const body: Record<string, any> = {
+      contents,
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: temperature ?? samplingParams.temperature,
+        topP: samplingParams.top_p,
+        topK: samplingParams.top_k,
+      },
+    };
+    if (sysMsg) body.systemInstruction = { parts: [{ text: sysMsg.content }] };
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!response.ok) {
+      if (response.status === 400 || response.status === 403) throw new Error("API Key không hợp lệ.");
+      if (response.status === 404) throw new Error(`Model "${model}" không tồn tại trên Google GenAI.`);
+      if (response.status === 429) throw new Error("Đã vượt quá giới hạn yêu cầu.");
+      const errText = await response.text().catch(() => "unknown");
+      throw new Error(`Lỗi từ Google GenAI: ${response.status}. ${errText}`);
+    }
+
+    const json = await response.json();
+    const content: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    if (!content) throw new Error("AI trả về phản hồi trống.");
+    return content;
+  }
+
+  // ─── OpenRouter / Mimo: OpenAI-compatible format ───
   const isOpenRouter = provider !== "mimo";
   const apiUrl = isOpenRouter
     ? "https://openrouter.ai/api/v1/chat/completions"

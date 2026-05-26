@@ -31,6 +31,7 @@ import {
   getApiKeyForProvider,
   getActiveProvider,
   getModel,
+  parsePrefixedModelId,
   getMimoEndpoint,
 } from "./openRouter";
 
@@ -127,11 +128,13 @@ export async function forceGenerateSummary(
   currentMessages: ChatMessage[],
   currentSummary: string | null,
 ): Promise<string | null> {
-  const provider = getActiveProvider();
+  const storedModel = getModel();
+  const parsed = parsePrefixedModelId(storedModel);
+  const provider = parsed.provider;
+  const model = parsed.modelId;
+
   const apiKey = getApiKeyForProvider(provider);
   if (!apiKey) throw new Error("No API key configured. Please set your API key in Settings.");
-
-  const model = getModel();
 
   // Build the window: all messages minus the tail (keep recent context)
   const windowEnd = currentMessages.length - RECENT_KEPT;
@@ -145,7 +148,55 @@ export async function forceGenerateSummary(
 
   const userPrompt = buildArchivistUserPrompt(messagesToSummarize, currentSummary ?? undefined);
 
-  // Determine API endpoint
+  const systemPrompt = getMemoryArchivist();
+
+  // ─── Google GenAI: different API format ───
+  if (provider === "google_genai") {
+    const { getGoogleGenaiEndpoint } = await import("@/services/openRouter");
+    const endpoint = getGoogleGenaiEndpoint();
+    const apiUrl = `${endpoint}/models/${model}:generateContent?key=${apiKey}`;
+
+    const body = {
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { maxOutputTokens: 800, temperature: 0.3 },
+    };
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "unknown");
+      throw new Error(`Google GenAI returned ${response.status}: ${errText}`);
+    }
+
+    const json = await response.json();
+    const content: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    if (!content) throw new Error("AI returned empty response.");
+
+    const { summary, facts } = parseArchivistResponse(content);
+    if (!summary) throw new Error("Failed to parse summary from AI response.");
+
+    const tokenCount = countTokens(summary);
+    await saveSummary(sessionId, summary, currentMessages.length, tokenCount);
+    await clearFacts(sessionId);
+    if (facts.length > 0) {
+      await saveFacts(
+        sessionId,
+        facts.map((fact, i) => ({
+          fact,
+          category: "archivist",
+          messageIndex: i,
+        })),
+      );
+    }
+    return summary;
+  }
+
+  // ─── OpenRouter / Mimo: OpenAI-compatible format ───
   const isOpenRouter = provider !== "mimo";
   const apiUrl = isOpenRouter
     ? "https://openrouter.ai/api/v1/chat/completions"
@@ -166,7 +217,7 @@ export async function forceGenerateSummary(
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: getMemoryArchivist() },
+        { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       stream: false,
