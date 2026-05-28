@@ -75,7 +75,7 @@ Rules:
 
 Return ONLY the condensed personality, nothing else.`,
 
-    FIRST_MES_TOO_LONG: `Shorten this first message to under 200 tokens while keeping the scene intact.
+    FIRST_MES_TOO_LONG: `Shorten this first message to under 450 tokens while keeping the scene intact.
 Character: ${card.name}
 Current first_mes: ${card.first_mes}
 

@@ -243,13 +243,34 @@ const GenerationSettings = ({
               value={[maxTokens]}
               onValueChange={handleMaxTokensChange}
               min={100}
-              max={4096}
-              step={50}
+              max={16384}
+              step={64}
               className="[&_[role=slider]]:border-neon-purple [&_[role=slider]]:bg-oled-elevated [&_.range]:bg-neon-purple"
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>100</span>
-              <span>4096</span>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { v: 150, l: "150" },
+                { v: 200, l: "200" },
+                { v: 400, l: "400" },
+                { v: 500, l: "500" },
+                { v: 1000, l: "1K" },
+                { v: 2048, l: "2K" },
+                { v: 4096, l: "4K" },
+                { v: 8192, l: "8K" },
+                { v: 16384, l: "16K" },
+              ].map((p) => (
+                <button
+                  key={p.v}
+                  onClick={() => handleMaxTokensChange([p.v])}
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                    maxTokens === p.v
+                      ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/40"
+                      : "bg-oled-base text-muted-foreground border border-gray-border hover:text-foreground hover:border-gray-border/80"
+                  }`}
+                >
+                  {p.l}
+                </button>
+              ))}
             </div>
           </div>
 
