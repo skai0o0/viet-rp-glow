@@ -11,7 +11,7 @@ export const CARD_FIELD_BUDGET = {
   system_prompt: { maxTokens: 200, maxChars: 800  },
 
   // Injected separately — not in main system prompt
-  first_mes:     { maxTokens: 250, maxChars: 1000 },
+  first_mes:     { maxTokens: 500, maxChars: 2000 },
   mes_example:   { minPairs: 6, idealPairs: 8, maxPairs: 12 },
 
   // Metadata only — not injected into chat

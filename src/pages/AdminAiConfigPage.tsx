@@ -67,6 +67,21 @@ import {
   saveCharGenClone,
   fetchCharGenFormat,
   saveCharGenFormat,
+  // Section-based CharGen prompts
+  fetchCharGenBrainstormRole, saveCharGenBrainstormRole,
+  fetchCharGenBrainstormCharacter, saveCharGenBrainstormCharacter,
+  fetchCharGenBrainstormWorld, saveCharGenBrainstormWorld,
+  fetchCharGenBrainstormDialogue, saveCharGenBrainstormDialogue,
+  fetchCharGenBrainstormRules, saveCharGenBrainstormRules,
+  fetchCharGenCloneRole, saveCharGenCloneRole,
+  fetchCharGenCloneCharacter, saveCharGenCloneCharacter,
+  fetchCharGenCloneWorld, saveCharGenCloneWorld,
+  fetchCharGenCloneDialogue, saveCharGenCloneDialogue,
+  fetchCharGenCloneRules, saveCharGenCloneRules,
+  fetchCharGenFormatRole, saveCharGenFormatRole,
+  fetchCharGenFormatSchema, saveCharGenFormatSchema,
+  fetchCharGenFormatMapping, saveCharGenFormatMapping,
+  fetchCharGenFormatRules, saveCharGenFormatRules,
   fetchCharGenBudget,
   saveCharGenBudget,
   type CharGenBudget,
@@ -237,17 +252,26 @@ const AdminAiConfigPage = () => {
     top_p: 0.9,
     top_k: 40,
     repetition_penalty: 1.0,
-    max_tokens: 1500,
+    max_tokens: 2048,
   });
   const [savingSamplingParams, setSavingSamplingParams] = useState(false);
 
-  // Character Generation Prompts
-  const [charGenBrainstorm, setCharGenBrainstorm] = useState("");
-  const [savingCharGenBrainstorm, setSavingCharGenBrainstorm] = useState(false);
-  const [charGenClone, setCharGenClone] = useState("");
-  const [savingCharGenClone, setSavingCharGenClone] = useState(false);
-  const [charGenFormat, setCharGenFormat] = useState("");
-  const [savingCharGenFormat, setSavingCharGenFormat] = useState(false);
+  // Character Generation Prompts — section-based
+  const [cgBrainstormRole, setCgBrainstormRole] = useState("");
+  const [cgBrainstormCharacter, setCgBrainstormCharacter] = useState("");
+  const [cgBrainstormWorld, setCgBrainstormWorld] = useState("");
+  const [cgBrainstormDialogue, setCgBrainstormDialogue] = useState("");
+  const [cgBrainstormRules, setCgBrainstormRules] = useState("");
+  const [cgCloneRole, setCgCloneRole] = useState("");
+  const [cgCloneCharacter, setCgCloneCharacter] = useState("");
+  const [cgCloneWorld, setCgCloneWorld] = useState("");
+  const [cgCloneDialogue, setCgCloneDialogue] = useState("");
+  const [cgCloneRules, setCgCloneRules] = useState("");
+  const [cgFormatRole, setCgFormatRole] = useState("");
+  const [cgFormatSchema, setCgFormatSchema] = useState("");
+  const [cgFormatMapping, setCgFormatMapping] = useState("");
+  const [cgFormatRules, setCgFormatRules] = useState("");
+  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [charGenBudget, setCharGenBudget] = useState<CharGenBudget>(DEFAULT_CHAR_GEN_BUDGET);
   const [savingCharGenBudget, setSavingCharGenBudget] = useState(false);
 
@@ -298,9 +322,21 @@ const AdminAiConfigPage = () => {
     fetchGlobalPromptTypeB().then(setPromptTypeB);
     fetchGlobalPostHistoryTypeA().then(setPostHistoryTypeA);
     fetchGlobalPostHistoryTypeB().then(setPostHistoryTypeB);
-    fetchCharGenBrainstorm().then(setCharGenBrainstorm);
-    fetchCharGenClone().then(setCharGenClone);
-    fetchCharGenFormat().then(setCharGenFormat);
+    // CharGen sections
+    fetchCharGenBrainstormRole().then(setCgBrainstormRole);
+    fetchCharGenBrainstormCharacter().then(setCgBrainstormCharacter);
+    fetchCharGenBrainstormWorld().then(setCgBrainstormWorld);
+    fetchCharGenBrainstormDialogue().then(setCgBrainstormDialogue);
+    fetchCharGenBrainstormRules().then(setCgBrainstormRules);
+    fetchCharGenCloneRole().then(setCgCloneRole);
+    fetchCharGenCloneCharacter().then(setCgCloneCharacter);
+    fetchCharGenCloneWorld().then(setCgCloneWorld);
+    fetchCharGenCloneDialogue().then(setCgCloneDialogue);
+    fetchCharGenCloneRules().then(setCgCloneRules);
+    fetchCharGenFormatRole().then(setCgFormatRole);
+    fetchCharGenFormatSchema().then(setCgFormatSchema);
+    fetchCharGenFormatMapping().then(setCgFormatMapping);
+    fetchCharGenFormatRules().then(setCgFormatRules);
     fetchCharGenBudget().then(setCharGenBudget);
     fetchMemoryArchivist().then(setMemoryArchivist);
     fetchNsfwGatePrompt().then(setNsfwGatePrompt);
@@ -618,40 +654,16 @@ const AdminAiConfigPage = () => {
     }
   };
 
-  // ── Char Gen Prompt handlers ──
-  const handleSaveCharGenBrainstorm = async () => {
-    setSavingCharGenBrainstorm(true);
+  // ── Char Gen Section save handler ──
+  const handleSaveSection = async (sectionId: string, saveFn: () => Promise<void>) => {
+    setSavingSection(sectionId);
     try {
-      await saveCharGenBrainstorm(charGenBrainstorm);
-      toast.success("Đã lưu Brainstorm Prompt!");
+      await saveFn();
+      toast.success(`Đã lưu: ${sectionId}`);
     } catch {
       toast.error("Lưu thất bại!");
     } finally {
-      setSavingCharGenBrainstorm(false);
-    }
-  };
-
-  const handleSaveCharGenClone = async () => {
-    setSavingCharGenClone(true);
-    try {
-      await saveCharGenClone(charGenClone);
-      toast.success("Đã lưu Clone Prompt!");
-    } catch {
-      toast.error("Lưu thất bại!");
-    } finally {
-      setSavingCharGenClone(false);
-    }
-  };
-
-  const handleSaveCharGenFormat = async () => {
-    setSavingCharGenFormat(true);
-    try {
-      await saveCharGenFormat(charGenFormat);
-      toast.success("Đã lưu Format Prompt!");
-    } catch {
-      toast.error("Lưu thất bại!");
-    } finally {
-      setSavingCharGenFormat(false);
+      setSavingSection(null);
     }
   };
 
@@ -1114,8 +1126,8 @@ const AdminAiConfigPage = () => {
                 className="w-full flex items-center gap-1.5 px-1 py-1.5 rounded-md text-left hover:bg-oled-elevated transition-colors"
               >
                 {openRouterBrowseOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                <Search size={12} className="text-amber-400" />
-                <span className="text-xs text-amber-400 font-semibold flex-1">Tìm & thêm model</span>
+                <Search size={12} className="text-neon-blue" />
+                <span className="text-xs text-neon-blue font-semibold flex-1">Tìm & thêm model</span>
                 {allModels.length > 0 && (
                   <span className="text-[10px] text-muted-foreground">{allModels.length} model</span>
                 )}
@@ -1129,7 +1141,7 @@ const AdminAiConfigPage = () => {
                       disabled={loadingModels}
                       variant="outline"
                       size="sm"
-                      className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                      className="border-neon-blue/30 text-neon-blue hover:bg-neon-blue/10"
                     >
                       {loadingModels ? (
                         <Loader2 size={14} className="animate-spin mr-1" />
@@ -1148,7 +1160,7 @@ const AdminAiConfigPage = () => {
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
                           placeholder="Tìm model theo tên hoặc ID..."
-                          className="bg-oled-elevated border-gray-border text-foreground pl-9 text-xs focus:border-amber-500 focus:ring-amber-500/30"
+                          className="bg-oled-elevated border-gray-border text-foreground pl-9 text-xs focus:border-neon-blue focus:ring-neon-blue/30"
                         />
                       </div>
 
@@ -2094,13 +2106,38 @@ const AdminAiConfigPage = () => {
                 <input
                   type="range"
                   min="100"
-                  max="4096"
-                  step="50"
+                  max="16384"
+                  step="64"
                   value={samplingParams.max_tokens}
                   onChange={(e) => setSamplingParams({ ...samplingParams, max_tokens: parseInt(e.target.value) })}
                   className="w-full h-2 bg-oled-base rounded-lg appearance-none cursor-pointer accent-neon-purple"
                 />
-                <p className="text-[10px] text-muted-foreground">Giới hạn số token tối đa AI được phép sinh ra. 1500 = phù hợp roleplay / 4096 = phản hồi rất dài</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { v: 150, l: "150" },
+                    { v: 200, l: "200" },
+                    { v: 400, l: "400" },
+                    { v: 500, l: "500" },
+                    { v: 1000, l: "1K" },
+                    { v: 2048, l: "2K" },
+                    { v: 4096, l: "4K" },
+                    { v: 8192, l: "8K" },
+                    { v: 16384, l: "16K" },
+                  ].map((p) => (
+                    <button
+                      key={p.v}
+                      onClick={() => setSamplingParams({ ...samplingParams, max_tokens: p.v })}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                        samplingParams.max_tokens === p.v
+                          ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/40"
+                          : "bg-oled-base text-muted-foreground border border-gray-border hover:text-foreground hover:border-gray-border/80"
+                      }`}
+                    >
+                      {p.l}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">Giới hạn số token tối đa AI được phép sinh ra. 2K = mặc định roleplay / 4K+ = phản hồi rất dài</p>
               </div>
             </div>
 
@@ -2121,7 +2158,7 @@ const AdminAiConfigPage = () => {
           </CardContent>
         </Card>
 
-        {/* ═══════ Character Generation Prompts ═══════ */}
+        {/* ═══════ Character Generation Prompts (Section-based) ═══════ */}
         <Card className="bg-oled-surface border-oled-border">
           <CardContent className="p-5 space-y-6">
             <div className="flex items-center gap-2">
@@ -2130,80 +2167,77 @@ const AdminAiConfigPage = () => {
               <h2 className="text-sm font-semibold text-foreground">Character Generation Prompts</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              Prompts dùng cho AI tạo nhân vật (cả trang Admin và User).
+              Prompts chia theo section. Mỗi section chỉnh riêng, tự động ghép lại khi gen card.
             </p>
 
-            {/* Brainstorm Prompt */}
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">
-                Brainstorm — Creative Writer (Gen nhân vật mới)
-              </Label>
-              <Textarea
-                rows={12}
-                value={charGenBrainstorm}
-                onChange={(e) => setCharGenBrainstorm(e.target.value)}
-                placeholder="Prompt cho AI tạo nhân vật mới..."
-                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[180px]"
-              />
-              <Button
-                size="sm"
-                onClick={handleSaveCharGenBrainstorm}
-                disabled={savingCharGenBrainstorm}
-                className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
-                variant="outline"
-              >
-                {savingCharGenBrainstorm ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
-                Lưu Brainstorm
-              </Button>
-            </div>
+            {/* ── Helper to render a section group ── */}
+            {(() => {
+              const sectionGroups = [
+                {
+                  title: "Brainstorm — Creative Writer (Gen nhân vật mới)",
+                  color: "neon-purple",
+                  sections: [
+                    { id: "brainstorm_role",       label: "Role & Task",         value: cgBrainstormRole,       setter: setCgBrainstormRole,       save: () => saveCharGenBrainstormRole(cgBrainstormRole) },
+                    { id: "brainstorm_character",  label: "Character (ngoại hình, tính cách, tiểu sử)", value: cgBrainstormCharacter,  setter: setCgBrainstormCharacter,  save: () => saveCharGenBrainstormCharacter(cgBrainstormCharacter) },
+                    { id: "brainstorm_world",      label: "World (scenario, first_mes, lore)",           value: cgBrainstormWorld,      setter: setCgBrainstormWorld,      save: () => saveCharGenBrainstormWorld(cgBrainstormWorld) },
+                    { id: "brainstorm_dialogue",   label: "Dialogue Examples",   value: cgBrainstormDialogue,   setter: setCgBrainstormDialogue,   save: () => saveCharGenBrainstormDialogue(cgBrainstormDialogue) },
+                    { id: "brainstorm_rules",      label: "Rules",               value: cgBrainstormRules,      setter: setCgBrainstormRules,      save: () => saveCharGenBrainstormRules(cgBrainstormRules) },
+                  ],
+                },
+                {
+                  title: "Clone — Card Cloner (Sao chép từ nguồn)",
+                  color: "neon-rose",
+                  sections: [
+                    { id: "clone_role",       label: "Role & Task",         value: cgCloneRole,       setter: setCgCloneRole,       save: () => saveCharGenCloneRole(cgCloneRole) },
+                    { id: "clone_character",  label: "Character (extract name, appearance, personality)", value: cgCloneCharacter,  setter: setCgCloneCharacter,  save: () => saveCharGenCloneCharacter(cgCloneCharacter) },
+                    { id: "clone_world",      label: "World (extract scenario, first_mes, lore)",         value: cgCloneWorld,      setter: setCgCloneWorld,      save: () => saveCharGenCloneWorld(cgCloneWorld) },
+                    { id: "clone_dialogue",   label: "Dialogue Examples",   value: cgCloneDialogue,   setter: setCgCloneDialogue,   save: () => saveCharGenCloneDialogue(cgCloneDialogue) },
+                    { id: "clone_rules",      label: "Rules",               value: cgCloneRules,      setter: setCgCloneRules,      save: () => saveCharGenCloneRules(cgCloneRules) },
+                  ],
+                },
+                {
+                  title: "Format — JSON Formatter (Chuyển sang chara_card_v2)",
+                  color: "neon-blue",
+                  sections: [
+                    { id: "format_role",    label: "Role & Task",     value: cgFormatRole,    setter: setCgFormatRole,    save: () => saveCharGenFormatRole(cgFormatRole) },
+                    { id: "format_schema",  label: "JSON Schema",     value: cgFormatSchema,  setter: setCgFormatSchema,  save: () => saveCharGenFormatSchema(cgFormatSchema) },
+                    { id: "format_mapping", label: "Field Mapping",   value: cgFormatMapping, setter: setCgFormatMapping, save: () => saveCharGenFormatMapping(cgFormatMapping) },
+                    { id: "format_rules",   label: "JSON Rules",      value: cgFormatRules,   setter: setCgFormatRules,   save: () => saveCharGenFormatRules(cgFormatRules) },
+                  ],
+                },
+              ];
 
-            {/* Clone Prompt */}
-            <div className="space-y-2 pt-4 border-t border-oled-border">
-              <Label className="text-xs text-muted-foreground">
-                Clone — Card Cloner (Sao chép từ nguồn)
-              </Label>
-              <Textarea
-                rows={12}
-                value={charGenClone}
-                onChange={(e) => setCharGenClone(e.target.value)}
-                placeholder="Prompt cho AI clone nhân vật..."
-                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[180px]"
-              />
-              <Button
-                size="sm"
-                onClick={handleSaveCharGenClone}
-                disabled={savingCharGenClone}
-                className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
-                variant="outline"
-              >
-                {savingCharGenClone ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
-                Lưu Clone
-              </Button>
-            </div>
-
-            {/* Format Prompt */}
-            <div className="space-y-2 pt-4 border-t border-oled-border">
-              <Label className="text-xs text-muted-foreground">
-                Format — JSON Formatter (Chuyển sang chara_card_v2)
-              </Label>
-              <Textarea
-                rows={15}
-                value={charGenFormat}
-                onChange={(e) => setCharGenFormat(e.target.value)}
-                placeholder="Prompt cho AI format JSON..."
-                className="bg-oled-base border-oled-border text-foreground font-mono text-sm resize-y min-h-[220px]"
-              />
-              <Button
-                size="sm"
-                onClick={handleSaveCharGenFormat}
-                disabled={savingCharGenFormat}
-                className="bg-neon-blue/10 text-neon-blue border border-neon-blue/30 hover:bg-neon-blue/20"
-                variant="outline"
-              >
-                {savingCharGenFormat ? <Loader2 size={12} className="animate-spin mr-1" /> : <Save size={12} className="mr-1" />}
-                Lưu Format
-              </Button>
-            </div>
+              return sectionGroups.map((group, gi) => (
+                <div key={gi} className={`space-y-3 ${gi > 0 ? "pt-4 border-t border-oled-border" : ""}`}>
+                  <Label className="text-xs text-muted-foreground font-semibold">{group.title}</Label>
+                  <div className="space-y-3">
+                    {group.sections.map((sec) => (
+                      <div key={sec.id} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] text-muted-foreground/80">{sec.label}</Label>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleSaveSection(sec.id, sec.save)}
+                            disabled={savingSection === sec.id}
+                            className="h-6 px-2 text-[10px] text-neon-blue hover:bg-neon-blue/10"
+                          >
+                            {savingSection === sec.id ? <Loader2 size={10} className="animate-spin mr-1" /> : <Save size={10} className="mr-1" />}
+                            Lưu
+                          </Button>
+                        </div>
+                        <Textarea
+                          rows={3}
+                          value={sec.value}
+                          onChange={(e) => sec.setter(e.target.value)}
+                          className="bg-oled-base border-oled-border text-foreground font-mono text-xs resize-y min-h-[60px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
           </CardContent>
         </Card>
 
@@ -2244,6 +2278,24 @@ const AdminAiConfigPage = () => {
                         })}
                         className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
                       />
+                      <div className="flex flex-wrap gap-1">
+                        {[100, 150, 200, 300, 400, 500, 800, 1000].map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setCharGenBudget({
+                              ...charGenBudget,
+                              [key]: { ...charGenBudget[key], [tokenField]: v },
+                            })}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                              charGenBudget[key][tokenField] === v
+                                ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/40"
+                                : "bg-oled-surface text-muted-foreground border border-gray-border hover:text-foreground"
+                            }`}
+                          >
+                            {v >= 1000 ? `${v / 1000}K` : v}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div className="flex-1 space-y-1">
                       <Label className="text-[10px] text-muted-foreground">Max Chars</Label>
@@ -2258,6 +2310,24 @@ const AdminAiConfigPage = () => {
                         })}
                         className="bg-oled-base border-oled-border text-foreground h-8 text-sm font-mono"
                       />
+                      <div className="flex flex-wrap gap-1">
+                        {[400, 600, 1000, 1600, 2000, 4000, 6000, 8000].map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setCharGenBudget({
+                              ...charGenBudget,
+                              [key]: { ...charGenBudget[key], [charField]: v },
+                            })}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                              charGenBudget[key][charField] === v
+                                ? "bg-neon-blue/20 text-neon-blue border border-neon-blue/40"
+                                : "bg-oled-surface text-muted-foreground border border-gray-border hover:text-foreground"
+                            }`}
+                          >
+                            {v >= 1000 ? `${v / 1000}K` : v}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>

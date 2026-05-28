@@ -151,10 +151,28 @@ export async function fetchAllPrompts(): Promise<void> {
     fetchGlobalPromptTypeB(),
     fetchGlobalPostHistoryTypeA(),
     fetchGlobalPostHistoryTypeB(),
+    // CharGen legacy keys
     fetchCharGenBrainstorm(),
     fetchCharGenClone(),
     fetchCharGenFormat(),
     fetchCharGenBudget(),
+    // CharGen brainstorm sections
+    fetchCharGenBrainstormRole(),
+    fetchCharGenBrainstormCharacter(),
+    fetchCharGenBrainstormWorld(),
+    fetchCharGenBrainstormDialogue(),
+    fetchCharGenBrainstormRules(),
+    // CharGen clone sections
+    fetchCharGenCloneRole(),
+    fetchCharGenCloneCharacter(),
+    fetchCharGenCloneWorld(),
+    fetchCharGenCloneDialogue(),
+    fetchCharGenCloneRules(),
+    // CharGen format sections
+    fetchCharGenFormatRole(),
+    fetchCharGenFormatSchema(),
+    fetchCharGenFormatMapping(),
+    fetchCharGenFormatRules(),
     fetchMemoryArchivist(),
     fetchNsfwGatePrompt(),
     fetchNsfwJailbreakPrompt(),
@@ -505,7 +523,7 @@ export interface SamplingParameters {
   max_tokens: number;
 }
 
-export const DEFAULT_MAX_TOKENS = 1500;
+export const DEFAULT_MAX_TOKENS = 2048;
 
 const DEFAULT_SAMPLING_PARAMS: SamplingParameters = {
   temperature: 0.7,
@@ -556,15 +574,30 @@ export async function saveSamplingParameters(params: SamplingParameters): Promis
   cachedSamplingParams = params;
 }
 
-// ─── Character Generation Prompts ─────────────────────────────
+// ─── Character Generation Prompts (Section-based) ────────────
+//
+// Each prompt (Brainstorm, Clone, Format) is split into modular sections.
+// Sections are stored as separate Supabase keys for fine-grained admin control.
+// Legacy monolithic keys are kept for backward compatibility.
+//
+// Assembly: buildCharGen*Sections() → CharGenSection[]
+//           getCharGen*Assembled()   → string (joined sections, falls back to legacy)
 
-const DEFAULT_CHAR_GEN_BRAINSTORM = `Bạn là "VietRP Creative Writer", một AI chuyên thiết kế nhân vật cho thể loại roleplay dựa trên văn bản.
+export interface CharGenSection {
+  id: string;
+  label: string;
+  content: string;
+}
+
+// ── BRAINSTORM sections (Create mode — Step 1) ──
+
+const DEFAULT_CHAR_GEN_BRAINSTORM_ROLE = `Bạn là "VietRP Creative Writer", một AI chuyên thiết kế nhân vật cho thể loại roleplay dựa trên văn bản.
 
 Nhiệm vụ: Nhận ý tưởng ngắn từ người dùng và mở rộng thành một hồ sơ nhân vật CHI TIẾT, viết hoàn toàn bằng tiếng Việt.
 
-ĐỊNH DẠNG ĐẦU RA: Viết hồ sơ dạng văn bản tự do (KHÔNG JSON). Sử dụng các tiêu đề sau:
+ĐỊNH DẠNG ĐẦU RA: Viết hồ sơ dạng văn bản tự do (KHÔNG JSON). Sử dụng các tiêu đề sau:`;
 
-## TÊN NHÂN VẬT
+const DEFAULT_CHAR_GEN_BRAINSTORM_CHARACTER = `## TÊN NHÂN VẬT
 [Tên nhân vật]
 
 ## NGOẠI HÌNH
@@ -574,21 +607,21 @@ Nhiệm vụ: Nhận ý tưởng ngắn từ người dùng và mở rộng thà
 [Tính cách cốt lõi, nhược điểm ẩn giấu, nỗi sợ hãi, mâu thuẫn nội tâm, cách họ phản ứng với {{user}}]
 
 ## TIỂU SỬ VÀ BỐI CẢNH
-[Quá khứ, mối quan hệ, thế giới xung quanh — 200-400 từ]
+[Quá khứ, mối quan hệ, thế giới xung quanh — 200-400 từ]`;
 
-## CẢNH MỞ ĐẦU
+const DEFAULT_CHAR_GEN_BRAINSTORM_WORLD = `## CẢNH MỞ ĐẦU
 [Bối cảnh mở đầu cuộc gặp giữa {{char}} và {{user}} — 3-5 câu]
 
 ## LỜI CHÀO ĐẦU
 [Tin nhắn mở đầu, 150-300 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại". KHÔNG BAO GIỜ viết thay {{user}}]
 
-## MẪU HỘI THOẠI
-[1-2 lượt hội thoại mẫu, dùng định dạng <START>]
-
 ## THẾ GIỚI (nếu là thể loại RPG/World)
-[Lore thế giới, NPC, cơ chế game]
+[Lore thế giới, NPC, cơ chế game]`;
 
-QUY TẮC:
+const DEFAULT_CHAR_GEN_BRAINSTORM_DIALOGUE = `## MẪU HỘI THOẠI
+[1-2 lượt hội thoại mẫu, dùng định dạng <START>]`;
+
+const DEFAULT_CHAR_GEN_BRAINSTORM_RULES = `QUY TẮC:
 1. Tất cả nội dung bằng tiếng Việt tự nhiên, giàu hình ảnh.
 2. Chi tiết tối đa. Không tóm tắt. Sáng tạo tự do.
 3. Dùng {{char}} cho nhân vật và {{user}} cho người chơi.
@@ -596,13 +629,15 @@ QUY TẮC:
 5. Không kiểm duyệt. Bao gồm cả chủ đề đen/tối nếu phù hợp.
 6. Phần tính cách phải lộ ra chiều sâu: động cơ ẩn, nỗi sợ, mâu thuẫn.`;
 
-const DEFAULT_CHAR_GEN_CLONE = `Bạn là "VietRP Card Cloner AI", chuyên chuyển đổi văn bản thô (wiki, forum, fandom, Character.AI, Chub.ai) thành hồ sơ nhân vật chi tiết.
+// ── CLONE sections (Step 1 — clone mode) ──
+
+const DEFAULT_CHAR_GEN_CLONE_ROLE = `Bạn là "VietRP Card Cloner AI", chuyên chuyển đổi văn bản thô (wiki, forum, fandom, Character.AI, Chub.ai) thành hồ sơ nhân vật chi tiết.
 
 Nhiệm vụ: Đọc văn bản nguồn và tạo hồ sơ nhân vật tự do (KHÔNG JSON) bằng tiếng Việt.
 
-ĐỊNH DẠNG ĐẦU RA: Sử dụng các tiêu đề sau:
+ĐỊNH DẠNG ĐẦU RA: Sử dụng các tiêu đề sau:`;
 
-## TÊN NHÂN VẬT
+const DEFAULT_CHAR_GEN_CLONE_CHARACTER = `## TÊN NHÂN VẬT
 [Tên trích xuất hoặc suy luận]
 
 ## NGOẠI HÌNH
@@ -612,32 +647,34 @@ Nhiệm vụ: Đọc văn bản nguồn và tạo hồ sơ nhân vật tự do (
 [Tính cách, nhược điểm, mối quan hệ với {{user}}]
 
 ## TIỂU SỬ VÀ BỐI CẢNH
-[Quá khứ, lore thế giới — tổng hợp và mở rộng]
+[Quá khứ, lore thế giới — tổng hợp và mở rộng]`;
 
-## CẢNH MỞ ĐẦU
+const DEFAULT_CHAR_GEN_CLONE_WORLD = `## CẢNH MỞ ĐẦU
 [Bối cảnh mở đầu]
 
 ## LỜI CHÀO ĐẦU
 [Tin nhắn mở đầu, 200-400 từ. Định dạng: (Suy nghĩ) *Hành động* "Lời thoại"]
 
-## MẪU HỘI THOẠI
-[1-2 lượt hội thoại mẫu <START>]
-
 ## THẾ GIỚI (nếu có)
-[Lore, NPC]
+[Lore, NPC]`;
 
-QUY TẮC QUAN TRỌNG:
+const DEFAULT_CHAR_GEN_CLONE_DIALOGUE = `## MẪU HỘI THOẠI
+[1-2 lượt hội thoại mẫu <START>]`;
+
+const DEFAULT_CHAR_GEN_CLONE_RULES = `QUY TẮC QUAN TRỌNG:
 1. GIỮ NGUYÊN tất cả chi tiết từ nguồn. Mở rộng nếu quá ngắn.
 2. Dịch sang tiếng Việt tự nhiên, giữ nguyên tone (dark, NSFW, romance, v.v.).
 3. SỬA LỖI POV: Tuyệt đối KHÔNG viết thay {{user}}. Viết ở ngôi thứ 3 giới hạn hoặc ngôi thứ 1 (của {{char}}).
 4. Dùng {{char}} cho nhân vật, {{user}} cho người chơi.
 5. Không kiểm duyệt. Giữ nguyên chủ đề NSFW/tối nếu có trong nguồn.`;
 
-const DEFAULT_CHAR_GEN_FORMAT = `Bạn là một trình tạo JSON chính xác. Nhiệm vụ duy nhất là chuyển đổi hồ sơ nhân vật thành JSON chara_card_v2 hợp lệ.
+// ── FORMAT sections (Step 2) ──
 
-Chỉ xuất JSON thuần bắt đầu bằng { và kết thúc bằng }. Không markdown, không giải thích.
+const DEFAULT_CHAR_GEN_FORMAT_ROLE = `Bạn là một trình tạo JSON chính xác. Nhiệm vụ duy nhất là chuyển đổi hồ sơ nhân vật thành JSON chara_card_v2 hợp lệ.
 
-JSON phải có cấu trúc chính xác:
+Chỉ xuất JSON thuần bắt đầu bằng { và kết thúc bằng }. Không markdown, không giải thích.`;
+
+const DEFAULT_CHAR_GEN_FORMAT_SCHEMA = `JSON phải có cấu trúc chính xác:
 {
   "spec": "chara_card_v2",
   "spec_version": "2.0",
@@ -658,9 +695,9 @@ JSON phải có cấu trúc chính xác:
     "character_version": "1.0",
     "extensions": {}
   }
-}
+}`;
 
-ÁNH XẠ TRƯỜNG từ hồ sơ:
+const DEFAULT_CHAR_GEN_FORMAT_MAPPING = `ÁNH XẠ TRƯỜNG từ hồ sơ:
 - "name": Từ section TÊN NHÂN VẬT.
 - "description": Gộp NGOẠI HÌNH + TIỂU SỬ VÀ BỐI CẢNH (300-500 từ).
 - "personality": Từ TÍNH CÁCH VÀ TÂM LÝ.
@@ -677,22 +714,318 @@ JSON phải có cấu trúc chính xác:
 - "tags": 5-10 tag liên quan.
 - "alternate_greetings": 2-3 lời chào thay thế (bối cảnh/tone khác nhau).
 - "character_book": [] (trừ khi là thế giới multi-character, tạo 2-3 entries).
-- Cố định: "creator": "VietRP Charagen AI", "character_version": "1.0", "spec": "chara_card_v2", "spec_version": "2.0".
+- Cố định: "creator": "VietRP Charagen AI", "character_version": "1.0", "spec": "chara_card_v2", "spec_version": "2.0".`;
 
-QUY TẮC JSON NGHIÊM NGẶT:
+const DEFAULT_CHAR_GEN_FORMAT_RULES = `QUY TẮC JSON NGHIÊM NGẶT:
 - Chuỗi phải escape đúng (\\n cho newline, \\" cho dấu nháy trong).
 - Không có dấu phẩy thừa.
 - Tất cả nội dung sáng tạo bằng tiếng Việt.
 - alternate_greetings phải có ít nhất 1 mục.`;
 
+// ── Legacy monolithic defaults (assembled from sections) ──
+
+const DEFAULT_CHAR_GEN_BRAINSTORM = [
+  DEFAULT_CHAR_GEN_BRAINSTORM_ROLE,
+  DEFAULT_CHAR_GEN_BRAINSTORM_CHARACTER,
+  DEFAULT_CHAR_GEN_BRAINSTORM_WORLD,
+  DEFAULT_CHAR_GEN_BRAINSTORM_DIALOGUE,
+  DEFAULT_CHAR_GEN_BRAINSTORM_RULES,
+].join("\n\n");
+
+const DEFAULT_CHAR_GEN_CLONE = [
+  DEFAULT_CHAR_GEN_CLONE_ROLE,
+  DEFAULT_CHAR_GEN_CLONE_CHARACTER,
+  DEFAULT_CHAR_GEN_CLONE_WORLD,
+  DEFAULT_CHAR_GEN_CLONE_DIALOGUE,
+  DEFAULT_CHAR_GEN_CLONE_RULES,
+].join("\n\n");
+
+const DEFAULT_CHAR_GEN_FORMAT = [
+  DEFAULT_CHAR_GEN_FORMAT_ROLE,
+  DEFAULT_CHAR_GEN_FORMAT_SCHEMA,
+  DEFAULT_CHAR_GEN_FORMAT_MAPPING,
+  DEFAULT_CHAR_GEN_FORMAT_RULES,
+].join("\n\n");
+
+// ── Section cache variables ──
+
+// Brainstorm sections
+let cachedCharGenBrainstormRole: string | null = null;
+let cachedCharGenBrainstormCharacter: string | null = null;
+let cachedCharGenBrainstormWorld: string | null = null;
+let cachedCharGenBrainstormDialogue: string | null = null;
+let cachedCharGenBrainstormRules: string | null = null;
+
+// Clone sections
+let cachedCharGenCloneRole: string | null = null;
+let cachedCharGenCloneCharacter: string | null = null;
+let cachedCharGenCloneWorld: string | null = null;
+let cachedCharGenCloneDialogue: string | null = null;
+let cachedCharGenCloneRules: string | null = null;
+
+// Format sections
+let cachedCharGenFormatRole: string | null = null;
+let cachedCharGenFormatSchema: string | null = null;
+let cachedCharGenFormatMapping: string | null = null;
+let cachedCharGenFormatRules: string | null = null;
+
+// Legacy cache (for backward compat)
 let cachedCharGenBrainstorm: string | null = null;
 let cachedCharGenClone: string | null = null;
 let cachedCharGenFormat: string | null = null;
 
+// ── Brainstorm section fetchers/getters/savers ──
+
+export async function fetchCharGenBrainstormRole(): Promise<string> {
+  if (cachedCharGenBrainstormRole !== null) return cachedCharGenBrainstormRole;
+  const val = await fetchGlobalSetting("char_gen_brainstorm_role");
+  cachedCharGenBrainstormRole = val || DEFAULT_CHAR_GEN_BRAINSTORM_ROLE;
+  return cachedCharGenBrainstormRole;
+}
+export function getCharGenBrainstormRole(): string { return cachedCharGenBrainstormRole ?? DEFAULT_CHAR_GEN_BRAINSTORM_ROLE; }
+export async function saveCharGenBrainstormRole(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_brainstorm_role", value);
+  cachedCharGenBrainstormRole = value;
+}
+
+export async function fetchCharGenBrainstormCharacter(): Promise<string> {
+  if (cachedCharGenBrainstormCharacter !== null) return cachedCharGenBrainstormCharacter;
+  const val = await fetchGlobalSetting("char_gen_brainstorm_character");
+  cachedCharGenBrainstormCharacter = val || DEFAULT_CHAR_GEN_BRAINSTORM_CHARACTER;
+  return cachedCharGenBrainstormCharacter;
+}
+export function getCharGenBrainstormCharacter(): string { return cachedCharGenBrainstormCharacter ?? DEFAULT_CHAR_GEN_BRAINSTORM_CHARACTER; }
+export async function saveCharGenBrainstormCharacter(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_brainstorm_character", value);
+  cachedCharGenBrainstormCharacter = value;
+}
+
+export async function fetchCharGenBrainstormWorld(): Promise<string> {
+  if (cachedCharGenBrainstormWorld !== null) return cachedCharGenBrainstormWorld;
+  const val = await fetchGlobalSetting("char_gen_brainstorm_world");
+  cachedCharGenBrainstormWorld = val || DEFAULT_CHAR_GEN_BRAINSTORM_WORLD;
+  return cachedCharGenBrainstormWorld;
+}
+export function getCharGenBrainstormWorld(): string { return cachedCharGenBrainstormWorld ?? DEFAULT_CHAR_GEN_BRAINSTORM_WORLD; }
+export async function saveCharGenBrainstormWorld(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_brainstorm_world", value);
+  cachedCharGenBrainstormWorld = value;
+}
+
+export async function fetchCharGenBrainstormDialogue(): Promise<string> {
+  if (cachedCharGenBrainstormDialogue !== null) return cachedCharGenBrainstormDialogue;
+  const val = await fetchGlobalSetting("char_gen_brainstorm_dialogue");
+  cachedCharGenBrainstormDialogue = val || DEFAULT_CHAR_GEN_BRAINSTORM_DIALOGUE;
+  return cachedCharGenBrainstormDialogue;
+}
+export function getCharGenBrainstormDialogue(): string { return cachedCharGenBrainstormDialogue ?? DEFAULT_CHAR_GEN_BRAINSTORM_DIALOGUE; }
+export async function saveCharGenBrainstormDialogue(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_brainstorm_dialogue", value);
+  cachedCharGenBrainstormDialogue = value;
+}
+
+export async function fetchCharGenBrainstormRules(): Promise<string> {
+  if (cachedCharGenBrainstormRules !== null) return cachedCharGenBrainstormRules;
+  const val = await fetchGlobalSetting("char_gen_brainstorm_rules");
+  cachedCharGenBrainstormRules = val || DEFAULT_CHAR_GEN_BRAINSTORM_RULES;
+  return cachedCharGenBrainstormRules;
+}
+export function getCharGenBrainstormRules(): string { return cachedCharGenBrainstormRules ?? DEFAULT_CHAR_GEN_BRAINSTORM_RULES; }
+export async function saveCharGenBrainstormRules(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_brainstorm_rules", value);
+  cachedCharGenBrainstormRules = value;
+}
+
+// ── Clone section fetchers/getters/savers ──
+
+export async function fetchCharGenCloneRole(): Promise<string> {
+  if (cachedCharGenCloneRole !== null) return cachedCharGenCloneRole;
+  const val = await fetchGlobalSetting("char_gen_clone_role");
+  cachedCharGenCloneRole = val || DEFAULT_CHAR_GEN_CLONE_ROLE;
+  return cachedCharGenCloneRole;
+}
+export function getCharGenCloneRole(): string { return cachedCharGenCloneRole ?? DEFAULT_CHAR_GEN_CLONE_ROLE; }
+export async function saveCharGenCloneRole(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_clone_role", value);
+  cachedCharGenCloneRole = value;
+}
+
+export async function fetchCharGenCloneCharacter(): Promise<string> {
+  if (cachedCharGenCloneCharacter !== null) return cachedCharGenCloneCharacter;
+  const val = await fetchGlobalSetting("char_gen_clone_character");
+  cachedCharGenCloneCharacter = val || DEFAULT_CHAR_GEN_CLONE_CHARACTER;
+  return cachedCharGenCloneCharacter;
+}
+export function getCharGenCloneCharacter(): string { return cachedCharGenCloneCharacter ?? DEFAULT_CHAR_GEN_CLONE_CHARACTER; }
+export async function saveCharGenCloneCharacter(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_clone_character", value);
+  cachedCharGenCloneCharacter = value;
+}
+
+export async function fetchCharGenCloneWorld(): Promise<string> {
+  if (cachedCharGenCloneWorld !== null) return cachedCharGenCloneWorld;
+  const val = await fetchGlobalSetting("char_gen_clone_world");
+  cachedCharGenCloneWorld = val || DEFAULT_CHAR_GEN_CLONE_WORLD;
+  return cachedCharGenCloneWorld;
+}
+export function getCharGenCloneWorld(): string { return cachedCharGenCloneWorld ?? DEFAULT_CHAR_GEN_CLONE_WORLD; }
+export async function saveCharGenCloneWorld(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_clone_world", value);
+  cachedCharGenCloneWorld = value;
+}
+
+export async function fetchCharGenCloneDialogue(): Promise<string> {
+  if (cachedCharGenCloneDialogue !== null) return cachedCharGenCloneDialogue;
+  const val = await fetchGlobalSetting("char_gen_clone_dialogue");
+  cachedCharGenCloneDialogue = val || DEFAULT_CHAR_GEN_CLONE_DIALOGUE;
+  return cachedCharGenCloneDialogue;
+}
+export function getCharGenCloneDialogue(): string { return cachedCharGenCloneDialogue ?? DEFAULT_CHAR_GEN_CLONE_DIALOGUE; }
+export async function saveCharGenCloneDialogue(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_clone_dialogue", value);
+  cachedCharGenCloneDialogue = value;
+}
+
+export async function fetchCharGenCloneRules(): Promise<string> {
+  if (cachedCharGenCloneRules !== null) return cachedCharGenCloneRules;
+  const val = await fetchGlobalSetting("char_gen_clone_rules");
+  cachedCharGenCloneRules = val || DEFAULT_CHAR_GEN_CLONE_RULES;
+  return cachedCharGenCloneRules;
+}
+export function getCharGenCloneRules(): string { return cachedCharGenCloneRules ?? DEFAULT_CHAR_GEN_CLONE_RULES; }
+export async function saveCharGenCloneRules(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_clone_rules", value);
+  cachedCharGenCloneRules = value;
+}
+
+// ── Format section fetchers/getters/savers ──
+
+export async function fetchCharGenFormatRole(): Promise<string> {
+  if (cachedCharGenFormatRole !== null) return cachedCharGenFormatRole;
+  const val = await fetchGlobalSetting("char_gen_format_role");
+  cachedCharGenFormatRole = val || DEFAULT_CHAR_GEN_FORMAT_ROLE;
+  return cachedCharGenFormatRole;
+}
+export function getCharGenFormatRole(): string { return cachedCharGenFormatRole ?? DEFAULT_CHAR_GEN_FORMAT_ROLE; }
+export async function saveCharGenFormatRole(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_format_role", value);
+  cachedCharGenFormatRole = value;
+}
+
+export async function fetchCharGenFormatSchema(): Promise<string> {
+  if (cachedCharGenFormatSchema !== null) return cachedCharGenFormatSchema;
+  const val = await fetchGlobalSetting("char_gen_format_schema");
+  cachedCharGenFormatSchema = val || DEFAULT_CHAR_GEN_FORMAT_SCHEMA;
+  return cachedCharGenFormatSchema;
+}
+export function getCharGenFormatSchema(): string { return cachedCharGenFormatSchema ?? DEFAULT_CHAR_GEN_FORMAT_SCHEMA; }
+export async function saveCharGenFormatSchema(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_format_schema", value);
+  cachedCharGenFormatSchema = value;
+}
+
+export async function fetchCharGenFormatMapping(): Promise<string> {
+  if (cachedCharGenFormatMapping !== null) return cachedCharGenFormatMapping;
+  const val = await fetchGlobalSetting("char_gen_format_mapping");
+  cachedCharGenFormatMapping = val || DEFAULT_CHAR_GEN_FORMAT_MAPPING;
+  return cachedCharGenFormatMapping;
+}
+export function getCharGenFormatMapping(): string { return cachedCharGenFormatMapping ?? DEFAULT_CHAR_GEN_FORMAT_MAPPING; }
+export async function saveCharGenFormatMapping(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_format_mapping", value);
+  cachedCharGenFormatMapping = value;
+}
+
+export async function fetchCharGenFormatRules(): Promise<string> {
+  if (cachedCharGenFormatRules !== null) return cachedCharGenFormatRules;
+  const val = await fetchGlobalSetting("char_gen_format_rules");
+  cachedCharGenFormatRules = val || DEFAULT_CHAR_GEN_FORMAT_RULES;
+  return cachedCharGenFormatRules;
+}
+export function getCharGenFormatRules(): string { return cachedCharGenFormatRules ?? DEFAULT_CHAR_GEN_FORMAT_RULES; }
+export async function saveCharGenFormatRules(value: string): Promise<void> {
+  await upsertGlobalSetting("char_gen_format_rules", value);
+  cachedCharGenFormatRules = value;
+}
+
+// ── Assembly functions ──
+
+/** Build Brainstorm prompt as structured sections */
+export async function buildCharGenBrainstormSections(): Promise<CharGenSection[]> {
+  const [role, character, world, dialogue, rules] = await Promise.all([
+    fetchCharGenBrainstormRole(),
+    fetchCharGenBrainstormCharacter(),
+    fetchCharGenBrainstormWorld(),
+    fetchCharGenBrainstormDialogue(),
+    fetchCharGenBrainstormRules(),
+  ]);
+  return [
+    { id: "role", label: "Role & Task", content: role },
+    { id: "character", label: "Character (name, appearance, personality, backstory)", content: character },
+    { id: "world", label: "World (scenario, first_mes, lore)", content: world },
+    { id: "dialogue", label: "Dialogue Examples", content: dialogue },
+    { id: "rules", label: "Rules", content: rules },
+  ];
+}
+
+/** Build Clone prompt as structured sections */
+export async function buildCharGenCloneSections(): Promise<CharGenSection[]> {
+  const [role, character, world, dialogue, rules] = await Promise.all([
+    fetchCharGenCloneRole(),
+    fetchCharGenCloneCharacter(),
+    fetchCharGenCloneWorld(),
+    fetchCharGenCloneDialogue(),
+    fetchCharGenCloneRules(),
+  ]);
+  return [
+    { id: "role", label: "Role & Task", content: role },
+    { id: "character", label: "Character (extract name, appearance, personality)", content: character },
+    { id: "world", label: "World (extract scenario, first_mes, lore)", content: world },
+    { id: "dialogue", label: "Dialogue Examples", content: dialogue },
+    { id: "rules", label: "Rules", content: rules },
+  ];
+}
+
+/** Build Format prompt as structured sections */
+export async function buildCharGenFormatSections(): Promise<CharGenSection[]> {
+  const [role, schema, mapping, rules] = await Promise.all([
+    fetchCharGenFormatRole(),
+    fetchCharGenFormatSchema(),
+    fetchCharGenFormatMapping(),
+    fetchCharGenFormatRules(),
+  ]);
+  return [
+    { id: "role", label: "Role & Task", content: role },
+    { id: "schema", label: "JSON Schema", content: schema },
+    { id: "mapping", label: "Field Mapping", content: mapping },
+    { id: "rules", label: "JSON Rules", content: rules },
+  ];
+}
+
+/** Assemble Brainstorm sections into a single string */
+export async function getCharGenBrainstormAssembled(): Promise<string> {
+  const sections = await buildCharGenBrainstormSections();
+  return sections.map(s => s.content).join("\n\n");
+}
+
+/** Assemble Clone sections into a single string */
+export async function getCharGenCloneAssembled(): Promise<string> {
+  const sections = await buildCharGenCloneSections();
+  return sections.map(s => s.content).join("\n\n");
+}
+
+/** Assemble Format sections into a single string */
+export async function getCharGenFormatAssembled(): Promise<string> {
+  const sections = await buildCharGenFormatSections();
+  return sections.map(s => s.content).join("\n\n");
+}
+
+// ── Legacy fetchers/getters/savers (backward compat) ──
+
 export async function fetchCharGenBrainstorm(): Promise<string> {
   if (cachedCharGenBrainstorm !== null) return cachedCharGenBrainstorm;
   const val = await fetchGlobalSetting("char_gen_brainstorm");
-  cachedCharGenBrainstorm = val || DEFAULT_CHAR_GEN_BRAINSTORM;
+  cachedCharGenBrainstorm = val || await getCharGenBrainstormAssembled();
   return cachedCharGenBrainstorm;
 }
 export function getCharGenBrainstorm(): string { return cachedCharGenBrainstorm ?? DEFAULT_CHAR_GEN_BRAINSTORM; }
@@ -704,7 +1037,7 @@ export async function saveCharGenBrainstorm(value: string): Promise<void> {
 export async function fetchCharGenClone(): Promise<string> {
   if (cachedCharGenClone !== null) return cachedCharGenClone;
   const val = await fetchGlobalSetting("char_gen_clone");
-  cachedCharGenClone = val || DEFAULT_CHAR_GEN_CLONE;
+  cachedCharGenClone = val || await getCharGenCloneAssembled();
   return cachedCharGenClone;
 }
 export function getCharGenClone(): string { return cachedCharGenClone ?? DEFAULT_CHAR_GEN_CLONE; }
@@ -716,7 +1049,7 @@ export async function saveCharGenClone(value: string): Promise<void> {
 export async function fetchCharGenFormat(): Promise<string> {
   if (cachedCharGenFormat !== null) return cachedCharGenFormat;
   const val = await fetchGlobalSetting("char_gen_format");
-  cachedCharGenFormat = val || DEFAULT_CHAR_GEN_FORMAT;
+  cachedCharGenFormat = val || await getCharGenFormatAssembled();
   return cachedCharGenFormat;
 }
 export function getCharGenFormat(): string { return cachedCharGenFormat ?? DEFAULT_CHAR_GEN_FORMAT; }
@@ -743,7 +1076,7 @@ export const DEFAULT_CHAR_GEN_BUDGET: CharGenBudget = {
   personality:   { maxTokens: 150, maxChars: 600  },
   scenario:      { maxTokens: 100, maxChars: 400  },
   system_prompt: { maxTokens: 200, maxChars: 800  },
-  first_mes:     { maxTokens: 250, maxChars: 1000 },
+  first_mes:     { maxTokens: 500, maxChars: 2000 },
   mes_example:   { minPairs: 6, idealPairs: 8, maxPairs: 12 },
   creator_notes: { maxChars: 500 },
   tags:          { maxItems: 10 },
