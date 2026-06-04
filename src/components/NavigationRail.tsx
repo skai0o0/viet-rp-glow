@@ -26,19 +26,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { copyToClipboard } from "@/utils/clipboard";
 
-const topItems = [
-  { icon: Home, label: "Khám phá", path: "/" },
-  { icon: MessageSquare, label: "Cuộc trò chuyện", path: "/chat" },
-  { icon: PlusCircle, label: "Tạo Card", path: "/create", aliases: ["/admin/chargen"] },
-];
-
 const NavItem = ({
   item,
 }: {
   item: { icon: React.ElementType; label: string; path: string; aliases?: string[] };
 }) => {
   const location = useLocation();
-  const isActive = location.pathname === item.path || (item.aliases?.includes(location.pathname) ?? false);
+  const basePath = item.path.split("?")[0];
+  const isActive = location.pathname === basePath || (item.aliases?.includes(location.pathname) ?? false);
   const Icon = item.icon;
 
   return (
@@ -79,6 +74,12 @@ const NavigationRail = () => {
   const { balance: creditBalance } = useUserCredits();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const topItems = [
+    { icon: Home, label: "Khám phá", path: "/" },
+    { icon: MessageSquare, label: "Cuộc trò chuyện", path: "/chat" },
+    { icon: PlusCircle, label: "Tạo Card", path: isAdminOrOp ? "/create?tab=ai" : "/create", aliases: ["/admin/chargen"] },
+  ];
 
   const [nsfwMode, setNsfwMode] = useState(() => localStorage.getItem("vietrp_nsfw_mode") === "true");
   const [isPortraitTablet, setIsPortraitTablet] = useState(false);

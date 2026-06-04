@@ -94,10 +94,10 @@ pub async fn handle_chat(
 
     // 4. Check tier access
     let user_sub_level = match claims.role.as_deref() {
-        Some("admin") | Some("op") => "unlimited",
-        _ => "free", // TODO: derive from user's actual subscription
+        Some("admin") | Some("op") => "unlimited".to_string(),
+        _ => ctx.subscription_tier.to_lowercase(),
     };
-    if !tier_access_allowed(user_sub_level, &ctx.min_subscription) {
+    if !tier_access_allowed(&user_sub_level, &ctx.min_subscription) {
         return Err(AppError::Forbidden(format!(
             "Tier '{}' requires '{}' subscription or higher",
             req.tier_key, ctx.min_subscription

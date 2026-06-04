@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import {
@@ -32,6 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useSearchParams } from "react-router-dom";
+import { useChatQuota } from "@/hooks/useChatQuota";
+import { deriveChatAccess } from "@/utils/chatAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/contexts/AuthContext";
@@ -121,8 +124,36 @@ const slideVariants = {
 };
 
 const CreatePage = () => {
-  const { isAdmin } = useUserRole();
+  const { role, isAdmin } = useUserRole();
+  const { quota } = useChatQuota();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const { isSubscriptionUser } = useMemo(
+    () => deriveChatAccess(role, quota),
+    [role, quota]
+  );
+
+  const initialTab = useMemo(() => {
+    if (isSubscriptionUser) return "manual";
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "manual") return "manual";
+    return "ai";
+  }, [isSubscriptionUser, searchParams]);
+
   const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual");
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  const handleTabChange = (val: "manual" | "ai") => {
+    setActiveTab(val);
+    setSearchParams((prev) => {
+      prev.set("tab", val);
+      return prev;
+    }, { replace: true });
+  };
+
   const [aiHeaderActions, setAiHeaderActions] = useState<ReactNode>(null);
   const { user } = useAuth();
 
@@ -433,18 +464,20 @@ const CreatePage = () => {
       />
 
       {/* Tab Switcher */}
-      <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/30">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "manual" | "ai")} className="w-full max-w-md">
-          <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
-            <TabsTrigger value="manual" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-              Tạo Card
-            </TabsTrigger>
-            <TabsTrigger value="ai" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-              AI Charagen
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      {!isSubscriptionUser && (
+        <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/30">
+          <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "manual" | "ai")} className="w-full max-w-md">
+            <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
+              <TabsTrigger value="manual" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+                Tạo Card
+              </TabsTrigger>
+              <TabsTrigger value="ai" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
+                AI Charagen
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {activeTab === "manual" ? (

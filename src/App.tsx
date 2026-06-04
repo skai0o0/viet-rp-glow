@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AppLayout from "@/layouts/AppLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -30,7 +30,6 @@ const AdminRoadmapPage = lazyWithRetry(() => import("@/pages/AdminRoadmapPage"))
 const AdminKnowledgePage = lazyWithRetry(() => import("@/pages/AdminKnowledgePage"));
 const AdminSqlEditorPage = lazyWithRetry(() => import("@/pages/AdminSqlEditorPage"));
 const AdminDashboardPage = lazyWithRetry(() => import("@/pages/AdminDashboardPage"));
-const AdminCharGenPage = lazyWithRetry(() => import("@/pages/AdminCharGenPage"));
 const AdminAiConfigPage = lazyWithRetry(() => import("@/pages/AdminAiConfigPage"));
 const AdminApprovalsPage = lazyWithRetry(() => import("@/pages/AdminApprovalsPage"));
 const AdminCreditsPage = lazyWithRetry(() => import("@/pages/AdminCreditsPage"));
@@ -93,7 +92,7 @@ const App = () => (
                 <Route path="/admin/knowledge" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminKnowledgePage /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/admin/sql" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminSqlEditorPage /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/admin/dashboard" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminDashboardPage /></ErrorBoundary></ProtectedRoute>} />
-                <Route path="/admin/chargen" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminCharGenPage /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/admin/chargen" element={<Navigate to="/create?tab=ai" replace />} />
                 <Route path="/admin/api-settings" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminAiConfigPage /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/admin/approvals" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminApprovalsPage /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/admin/credits" element={<ProtectedRoute><ErrorBoundary name="admin"><AdminCreditsPage /></ErrorBoundary></ProtectedRoute>} />

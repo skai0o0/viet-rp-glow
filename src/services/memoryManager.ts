@@ -154,7 +154,11 @@ export async function forceGenerateSummary(
   if (provider === "google_genai") {
     const { getGoogleGenaiEndpoint } = await import("@/services/openRouter");
     const endpoint = getGoogleGenaiEndpoint();
-    const apiUrl = `${endpoint}/models/${model}:generateContent?key=${apiKey}`;
+    let cleanModel = model;
+    if (cleanModel.startsWith("google/")) {
+      cleanModel = cleanModel.replace("google/", "");
+    }
+    const apiUrl = `${endpoint}/models/${cleanModel}:generateContent?key=${apiKey}`;
 
     const body = {
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],

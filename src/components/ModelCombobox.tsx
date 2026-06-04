@@ -74,8 +74,8 @@ const ModelCombobox = ({ value, onValueChange, userTier = "free" }: ModelCombobo
 
     if (hasAdminModels) {
       for (const m of adminModels) {
-        const isNonOR = m.provider === "mimo" || m.provider === "google_genai";
-        const source = isNonOR ? m.provider : "openrouter";
+        const isNonOR = m.provider === "mimo" || m.provider === "google_genai" || m.provider === "google";
+        const source = isNonOR ? (m.provider === "google" ? "google_genai" : m.provider) : "openrouter";
         const dm: DisplayModel = {
           id: isNonOR ? formatPrefixedModelId(source as any, m.model_id) : m.model_id,
           name: m.model_name,

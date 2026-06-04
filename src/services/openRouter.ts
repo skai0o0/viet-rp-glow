@@ -298,10 +298,18 @@ export function formatPrefixedModelId(provider: Provider, modelId: string): stri
   return `${provider}::${modelId}`;
 }
 
-export function parsePrefixedModelId(prefixed: string): { provider: Provider; modelId: string } {
+export function parsePrefixedModelId(prefixed: string): { provider: Provider | undefined; modelId: string } {
   const sep = prefixed.indexOf("::");
-  if (sep === -1) return { provider: "openrouter", modelId: prefixed };
-  const provider = prefixed.slice(0, sep) as Provider;
+  if (sep === -1) {
+    if (prefixed.startsWith("anthropic/") || prefixed.startsWith("gryphe/") || prefixed.startsWith("mistralai/") || prefixed.startsWith("nousresearch/") || prefixed.startsWith("meta/")) {
+      return { provider: "openrouter", modelId: prefixed };
+    }
+    return { provider: undefined, modelId: prefixed };
+  }
+  let provider = prefixed.slice(0, sep) as Provider;
+  if ((provider as string) === "google") {
+    provider = "google_genai";
+  }
   if (provider === "mimo" || provider === "google_genai") {
     return { provider, modelId: prefixed.slice(sep + 2) };
   }
@@ -324,7 +332,7 @@ export function getRawModelId(prefixed?: string): string {
 /** Get the provider implied by the prefixed model ID */
 export function getModelProvider(prefixed?: string): Provider {
   const id = prefixed ?? getModel();
-  return parsePrefixedModelId(id).provider;
+  return parsePrefixedModelId(id).provider ?? "openrouter";
 }
 
 export function setModel(model: string) {
@@ -650,7 +658,11 @@ export async function streamChat(
     // ─── Google GenAI: different API format ───
     if (activeProvider === "google_genai") {
       const endpoint = getGoogleGenaiEndpoint();
-      const apiUrl = `${endpoint}/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
+      let cleanModel = model;
+      if (cleanModel.startsWith("google/")) {
+        cleanModel = cleanModel.replace("google/", "");
+      }
+      const apiUrl = `${endpoint}/models/${cleanModel}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
       const body: Record<string, any> = {
         contents: convertToGoogleGenaiMessages(messages),
