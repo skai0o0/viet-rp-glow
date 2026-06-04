@@ -40,20 +40,37 @@ import {
   PanelRightClose,
   PanelRightOpen,
   ArrowRightLeft,
+  SlidersHorizontal,
+  ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createCharacter, type DbCharacter } from "@/services/characterDb";
 import { compressAvatar } from "@/utils/imageOptimization";
-import { getApiKeyForProvider, getModel, getActiveProvider, type Provider } from "@/services/openRouter";
+import {
+  getApiKeyForProvider,
+  getModel,
+  setModel,
+  getActiveProvider,
+  setActiveProvider,
+  formatPrefixedModelId,
+  parsePrefixedModelId,
+  type Provider,
+} from "@/services/openRouter";
 import { runCharGenPipeline, type CharGenPhase } from "@/services/charGenService";
 import { TavernCardV2, TavernCardV2Data } from "@/types/taverncard";
 import { normalizeCard } from "@/lib/cardNormalizer";
 import { validateCard, type ValidationResult, type Issue } from "@/lib/cardValidator";
 import { repairCardField } from "@/lib/cardRepair";
 import CardQualityScore from "@/components/CardQualityScore";
+import ModelCombobox from "@/components/ModelCombobox";
 
 import CharGenAssistant from "@/components/CharGenAssistant";
-import { getCharGenBrainstorm, getCharGenClone, getCharGenFormat } from "@/services/globalSettingsDb";
+import {
+  getCharGenBrainstorm,
+  getCharGenClone,
+  getCharGenFormat,
+  fetchAllowedModels,
+} from "@/services/globalSettingsDb";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
@@ -63,7 +80,7 @@ export interface AiCharGenContentProps {
 
 const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
   const { user } = useAuth();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isOp, isAdminOrOp } = useUserRole();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -145,9 +162,55 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [repairingFields, setRepairingFields] = useState<Set<string>>(new Set());
 
-  // Model settings (use default, no picker for users)
-  const [activeProvider] = useState<Provider>(() => getActiveProvider());
-  const selectedModel = getModel();
+  // Model settings
+  const [activeProvider, setActiveProviderState] = useState<Provider>(() => getActiveProvider());
+  const [selectedModel, setSelectedModel] = useState<string>(() => getModel());
+  const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
+
+  const handleModelChange = useCallback((value: string) => {
+    setModel(value);
+    setSelectedModel(value);
+
+    // Auto-detect and set provider if prefixed
+    const { provider } = parsePrefixedModelId(value);
+    const resolvedProvider = provider ?? "openrouter";
+    setActiveProviderState(resolvedProvider);
+    setActiveProvider(resolvedProvider);
+  }, []);
+
+  const handleProviderChange = useCallback(async (newProvider: Provider) => {
+    setActiveProviderState(newProvider);
+    setActiveProvider(newProvider);
+
+    // Auto-select a model of the new provider if the current selected model doesn't belong to it
+    const parsed = parsePrefixedModelId(selectedModel);
+    const currentModelProvider = parsed.provider ?? "openrouter";
+    if (currentModelProvider !== newProvider) {
+      try {
+        const allowed = await fetchAllowedModels();
+        const matching = allowed.find(m => {
+          const mSource = (m.provider === "google" || m.provider === "google_genai") ? "google_genai" : m.provider;
+          return mSource === newProvider;
+        });
+        if (matching) {
+          const isNonOR = matching.provider === "mimo" || matching.provider === "google_genai" || matching.provider === "google";
+          const source = isNonOR ? (matching.provider === "google" ? "google_genai" : matching.provider) : "openrouter";
+          const newModelId = isNonOR ? formatPrefixedModelId(source as any, matching.model_id) : matching.model_id;
+          setModel(newModelId);
+          setSelectedModel(newModelId);
+        } else {
+          // Fallbacks if not found in database
+          let fallbackModel = "google/gemini-2.5-flash";
+          if (newProvider === "mimo") fallbackModel = "mimo::gpt-4o";
+          else if (newProvider === "google_genai") fallbackModel = "google_genai::gemini-2.5-flash";
+          setModel(fallbackModel);
+          setSelectedModel(fallbackModel);
+        }
+      } catch (err) {
+        console.error("Error setting default model for provider:", err);
+      }
+    }
+  }, [selectedModel]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -160,7 +223,7 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
     if (!text || phase !== "idle") return;
 
     if (!getApiKeyForProvider(activeProvider)) {
-      const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : "OpenRouter";
+      const providerLabel = activeProvider === "mimo" ? "Xiaomi Mimo" : activeProvider === "google_genai" ? "Google GenAI" : "OpenRouter";
       toast.error(`Chưa nhập API Key ${providerLabel}. Vào Cài đặt để thêm.`);
       return;
     }
@@ -970,6 +1033,88 @@ const AiCharGenContent = ({ onActionsChange }: AiCharGenContentProps) => {
           {/* ─── Input bar ─── */}
           <div className="p-3 md:p-4 bg-oled-base border-t border-gray-border" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
             <div className="max-w-3xl mx-auto">
+              {/* ── Model settings row for Admin/Operator ── */}
+              {isAdminOrOp && (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      onClick={() => setModelSettingsOpen((v) => !v)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all duration-200 border ${
+                        modelSettingsOpen
+                          ? "bg-neon-purple/10 border-neon-purple/40 text-neon-purple"
+                          : "bg-oled-surface border-oled-border text-muted-foreground hover:text-neon-purple hover:border-neon-purple/30"
+                      }`}
+                    >
+                      <SlidersHorizontal size={11} />
+                      <span>Model</span>
+                      <ChevronDown
+                        size={10}
+                        className={`transition-transform duration-200 ${modelSettingsOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {/* Provider badge */}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      activeProvider === "mimo"
+                        ? "bg-neon-rose/15 text-neon-rose border border-neon-rose/30"
+                        : activeProvider === "google_genai"
+                          ? "bg-neon-blue/15 text-neon-blue border border-neon-blue/30"
+                          : "bg-neon-purple/15 text-neon-purple border border-neon-purple/30"
+                    }`}>
+                      {activeProvider === "mimo" ? "Mimo" : activeProvider === "google_genai" ? "Google GenAI" : "OpenRouter"}
+                    </span>
+                    {/* Show selected model name as a compact badge when collapsed */}
+                    {!modelSettingsOpen && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">
+                        {selectedModel.split("/").pop()?.split(":")[0] ?? selectedModel}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* ── Collapsible model picker ── */}
+                  <AnimatePresence initial={false}>
+                    {modelSettingsOpen && (
+                      <motion.div
+                        key="model-settings"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        className="overflow-hidden mb-2"
+                      >
+                        <div className="bg-oled-surface border border-oled-border rounded-xl p-3 flex flex-col gap-2">
+                          {/* Provider toggle */}
+                          <div className="flex gap-1.5">
+                            {([
+                              { id: "openrouter" as Provider, label: "OpenRouter" },
+                              { id: "mimo" as Provider, label: "Xiaomi Mimo" },
+                              { id: "google_genai" as Provider, label: "Google GenAI" },
+                            ]).map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() => handleProviderChange(p.id)}
+                                className={`flex-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 border ${
+                                  activeProvider === p.id
+                                    ? p.id === "mimo"
+                                      ? "bg-neon-rose/15 border-neon-rose/40 text-neon-rose"
+                                      : p.id === "google_genai"
+                                        ? "bg-neon-blue/15 border-neon-blue/40 text-neon-blue"
+                                        : "bg-neon-purple/15 border-neon-purple/40 text-neon-purple"
+                                    : "bg-oled-elevated border-gray-border text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Model AI</p>
+                          <ModelCombobox value={selectedModel} onValueChange={handleModelChange} userTier="all" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+
               <div
                 className={`flex items-end gap-2 bg-oled-surface rounded-2xl px-4 py-2 border transition-all duration-300 ${
                   cloneMode

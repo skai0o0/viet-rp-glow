@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Loader2,
@@ -40,6 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { AdminPageShell, AdminSection } from "@/admin/components";
 import {
@@ -161,6 +162,12 @@ const TIER_META: Record<string, { icon: React.ElementType; color: string }> = {
 const AdminAiConfigPage = () => {
   const { user, isLoading } = useAuth();
   const { isAdmin, isOp, canViewAdminHub, canEditAdminHub, checking } = useUserRole();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "providers";
+
+  const handleTabChange = (tab: string) => {
+    setSearchParams({ tab });
+  };
 
   // API verification
   const [testApiKey, setTestApiKey] = useState(() => getApiKey());
@@ -946,7 +953,10 @@ const AdminAiConfigPage = () => {
     if (allowedModelIds.has(model.id)) return;
     setAdding(model.id);
     try {
-      const provider = sourceProvider || model.id.split("/")[0] || "";
+      let provider = sourceProvider || model.id.split("/")[0] || "";
+      if (provider === "google") {
+        provider = "google_genai";
+      }
       const isFree =
         model.pricing?.prompt === "0" && model.pricing?.completion === "0";
 
@@ -1059,9 +1069,29 @@ const AdminAiConfigPage = () => {
       title="AI Configuration"
       subtitle="API Keys, Models, Prompts & Sampling"
     >
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full space-y-6">
+        <TabsList className="grid grid-cols-2 lg:grid-cols-4 bg-oled-surface border border-oled-border p-1 gap-1 h-auto">
+          <TabsTrigger value="providers" className="data-[state=active]:bg-neon-blue/20 data-[state=active]:text-neon-blue py-2.5 flex items-center justify-center gap-2 text-xs font-semibold">
+            <Key size={14} />
+            <span>API Keys & Providers</span>
+          </TabsTrigger>
+          <TabsTrigger value="models" className="data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple py-2.5 flex items-center justify-center gap-2 text-xs font-semibold">
+            <Layers size={14} />
+            <span>Models & Tiers</span>
+          </TabsTrigger>
+          <TabsTrigger value="prompts" className="data-[state=active]:bg-neon-rose/20 data-[state=active]:text-neon-rose py-2.5 flex items-center justify-center gap-2 text-xs font-semibold">
+            <Wand2 size={14} />
+            <span>Prompts & Tuning</span>
+          </TabsTrigger>
+          <TabsTrigger value="safety" className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 py-2.5 flex items-center justify-center gap-2 text-xs font-semibold">
+            <ShieldCheck size={14} />
+            <span>Safety & Utilities</span>
+          </TabsTrigger>
+        </TabsList>
 
-        {/* API Key Verification */}
-        <Card className="bg-oled-surface border-oled-border">
+        <TabsContent value="providers" className="space-y-6 outline-none">
+          {/* API Key Verification */}
+          <Card className="bg-oled-surface border-oled-border">
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-neon-blue shadow-neon-blue" />
@@ -1683,8 +1713,10 @@ const AdminAiConfigPage = () => {
             </CardContent>
           </Card>
         )}
+        </TabsContent>
 
-        {/* ═══════ Model Tiers (Fixed: free / pro / ultra) ═══════ */}
+        <TabsContent value="models" className="space-y-6 outline-none">
+          {/* ═══════ Model Tiers (Fixed: free / pro / ultra) ═══════ */}
         <Card className="bg-oled-surface border-oled-border">
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center gap-2">
@@ -1851,8 +1883,10 @@ const AdminAiConfigPage = () => {
             )}
           </CardContent>
         </Card>
+        </TabsContent>
 
-        {/* ═══════ Type-Specific AI Prompts ═══════ */}
+        <TabsContent value="prompts" className="space-y-6 outline-none">
+          {/* ═══════ Type-Specific AI Prompts ═══════ */}
         <Card className="bg-oled-surface border-oled-border">
           <CardContent className="p-5 space-y-6">
             <div className="flex items-center gap-2">
@@ -2431,8 +2465,10 @@ const AdminAiConfigPage = () => {
             </Button>
           </CardContent>
         </Card>
+        </TabsContent>
 
-        {/* ═══════ Memory & Content Safety Prompts ═══════ */}
+        <TabsContent value="safety" className="space-y-6 outline-none">
+          {/* ═══════ Memory & Content Safety Prompts ═══════ */}
         <Card className="bg-oled-surface border-oled-border">
           <CardContent className="p-5 space-y-6">
             <div className="flex items-center gap-2">
@@ -2705,6 +2741,8 @@ const AdminAiConfigPage = () => {
             )}
           </CardContent>
         </Card>
+        </TabsContent>
+      </Tabs>
     </AdminPageShell>
   );
 };

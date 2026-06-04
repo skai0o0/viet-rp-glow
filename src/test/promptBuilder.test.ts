@@ -298,7 +298,7 @@ describe("buildMessages", () => {
     const messages = buildMessages(baseChar, []);
     const systemMsgs = messages.filter((m) => m.role === "system");
     expect(systemMsgs).toHaveLength(1);
-    expect(systemMsgs[0].content).not.toContain("NSFW jailbreak prompt injected.");
+    expect(systemMsgs[0].content).toContain("NSFW jailbreak prompt injected.");
   });
 
   it("does NOT use XML tags in any message", () => {

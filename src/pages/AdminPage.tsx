@@ -68,7 +68,7 @@ const AdminPage = () => {
       label: "AI & Models",
       links: [
         { icon: Zap, label: "AI Configuration", description: "API Keys, Models, Prompts & Sampling", path: "/admin/api-settings", color: "text-orange-400 bg-orange-400/10" },
-        { icon: Wand2, label: "AI Card Generator", description: "Tạo Character Card bằng LLM, duyệt & xuất bản", path: "/admin/chargen", color: "text-neon-rose bg-neon-rose/10" },
+        { icon: Wand2, label: "AI Card Generator", description: "Tạo Character Card bằng LLM, duyệt & xuất bản", path: "/create?tab=ai", color: "text-neon-rose bg-neon-rose/10" },
       ],
     },
     {
