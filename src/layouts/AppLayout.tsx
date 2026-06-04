@@ -16,13 +16,13 @@ const AppLayout = () => {
         className="flex-1 flex flex-col min-w-0 md:!pb-0"
         style={{ paddingBottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="popLayout" initial={false}>
           <motion.main
             key={location.pathname}
-            initial={false}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             className="flex-1 flex flex-col min-h-0"
           >
             <Outlet />

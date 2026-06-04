@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
 import {
   Loader2,
   Save,
@@ -479,96 +480,96 @@ const CreatePage = () => {
         </div>
       )}
 
-      <AnimatePresence mode="wait">
-        {activeTab === "manual" ? (
-          <motion.div
-            key="manual"
-            initial={{ opacity: 0, x: -40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="flex-1 flex flex-col min-h-0"
-          >
-            {/* Stepper Indicator */}
-            <div className="shrink-0 border-b border-gray-border bg-oled-surface/20">
-              <StepIndicator current={currentStep} labels={STEPS.map((s) => s.label)} />
-            </div>
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        {/* Manual Tab Content */}
+        <div
+          className={cn(
+            "absolute inset-0 flex flex-col min-h-0 transition-all duration-300 ease-in-out",
+            activeTab === "manual"
+              ? "opacity-100 translate-x-0 pointer-events-auto z-10 visible"
+              : "opacity-0 -translate-x-4 pointer-events-none z-0 overflow-hidden invisible"
+          )}
+        >
+          {/* Stepper Indicator */}
+          <div className="shrink-0 border-b border-gray-border bg-oled-surface/20">
+            <StepIndicator current={currentStep} labels={STEPS.map((s) => s.label)} />
+          </div>
 
-            {/* Step Content */}
-            <div className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-36 md:pb-24">
-              <div className="max-w-2xl mx-auto">
-                <AnimatePresence mode="wait" custom={direction}>
-                  <motion.div
-                    key={currentStep}
-                    custom={direction}
-                    variants={slideVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="space-y-6"
-                  >
-                    {renderStepContent()}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            </div>
-
-            {/* Sticky Bottom Navigation */}
-            <div className="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-16 md:w-[calc(100%-4rem)] z-30 border-t border-gray-border bg-oled-surface/90 backdrop-blur-xl">
-              <div className="max-w-2xl mx-auto flex items-center justify-between p-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goBack}
-                  disabled={currentStep === 0}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+          {/* Step Content */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-4 pb-36 md:pb-24">
+            <div className="max-w-2xl mx-auto">
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={currentStep}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  className="space-y-6"
                 >
-                  <ArrowLeft size={14} className="mr-1" /> Quay lại
-                </Button>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground">
-                    Bước {currentStep + 1}/{STEPS.length}
-                  </span>
-                </div>
-
-                {currentStep < STEPS.length - 1 ? (
-                  <Button
-                    size="sm"
-                    onClick={goNext}
-                    disabled={!canNext()}
-                    className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple disabled:opacity-40"
-                  >
-                    Tiếp theo <ArrowRight size={14} className="ml-1" />
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple"
-                  >
-                    {isSaving ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
-                    {isSaving ? "Đang lưu..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
-                  </Button>
-                )}
-              </div>
+                  {renderStepContent()}
+                </motion.div>
+              </AnimatePresence>
             </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="ai"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 40 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="flex-1 flex flex-col min-h-0"
-          >
-            <AiCharGenContent onActionsChange={setAiHeaderActions} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+
+          {/* Sticky Bottom Navigation */}
+          <div className="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-16 md:w-[calc(100%-4rem)] z-30 border-t border-gray-border bg-oled-surface/90 backdrop-blur-xl">
+            <div className="max-w-2xl mx-auto flex items-center justify-between p-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                disabled={currentStep === 0}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+              >
+                <ArrowLeft size={14} className="mr-1" /> Quay lại
+              </Button>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">
+                  Bước {currentStep + 1}/{STEPS.length}
+                </span>
+              </div>
+
+              {currentStep < STEPS.length - 1 ? (
+                <Button
+                  size="sm"
+                  onClick={goNext}
+                  disabled={!canNext()}
+                  className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple disabled:opacity-40"
+                >
+                  Tiếp theo <ArrowRight size={14} className="ml-1" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="bg-neon-purple hover:bg-neon-purple/80 text-white shadow-neon-purple"
+                >
+                  {isSaving ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
+                  {isSaving ? "Đang lưu..." : isAdmin ? "Lưu Nhân Vật" : "Gửi duyệt"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* AI Tab Content */}
+        <div
+          className={cn(
+            "absolute inset-0 flex flex-col min-h-0 transition-all duration-300 ease-in-out",
+            activeTab === "ai"
+              ? "opacity-100 translate-x-0 pointer-events-auto z-10 visible"
+              : "opacity-0 translate-x-4 pointer-events-none z-0 overflow-hidden invisible"
+          )}
+        >
+          <AiCharGenContent onActionsChange={setAiHeaderActions} />
+        </div>
+      </div>
 
       {/* Fullscreen Preview Dialog */}
       {showPreview && createPortal(
