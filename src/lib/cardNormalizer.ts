@@ -14,18 +14,32 @@ export function trimToTokens(text: string, maxTokens: number): string {
   if (!text) return "";
   if (countTokens(text) <= maxTokens) return text;
 
-  // Use WASM-aware truncation first, then snap to sentence boundary
-  const rough = truncateToTokens(text, maxTokens);
-  const lastBreak = Math.max(
-    rough.lastIndexOf("."),
-    rough.lastIndexOf("!"),
-    rough.lastIndexOf("?"),
-    rough.lastIndexOf("\n"),
-  );
-  // If we found a sentence boundary in the last 30%, use it
-  return lastBreak > rough.length * 0.7
-    ? rough.slice(0, lastBreak + 1).trimEnd()
-    : rough.trimEnd() + "...";
+  // Split into sentence/paragraph segments
+  // This regex matches a block of text followed by sentence endings (. ! ?) or newlines.
+  const segments = text.match(/[^\.!\?\n]+[\.!\?\n]*/g);
+  if (!segments || segments.length === 0) {
+    const rough = truncateToTokens(text, maxTokens);
+    return rough.trimEnd() + "...";
+  }
+
+  let accumulatedText = "";
+  for (const segment of segments) {
+    const candidate = accumulatedText + segment;
+    if (countTokens(candidate) > maxTokens) {
+      break;
+    }
+    accumulatedText = candidate;
+  }
+
+  const trimmed = accumulatedText.trimEnd();
+
+  // If even the first segment is too long to fit, fallback to raw truncation
+  if (!trimmed) {
+    const rough = truncateToTokens(text, maxTokens);
+    return rough.trimEnd() + "...";
+  }
+
+  return trimmed;
 }
 
 /**
