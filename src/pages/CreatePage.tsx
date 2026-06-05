@@ -44,6 +44,7 @@ import { CharacterBookEntry } from "@/types/taverncard";
 import { createCharacter } from "@/services/characterDb";
 import CreatePageHeader from "@/components/CreatePageHeader";
 import AiCharGenContent from "@/components/AiCharGenContent";
+import LazyCharGenContent from "@/components/LazyCharGenContent";
 import { sanitizeUserInput } from "@/lib/inputSanitizer";
 
 
@@ -138,16 +139,17 @@ const CreatePage = () => {
     if (isSubscriptionUser) return "manual";
     const tabParam = searchParams.get("tab");
     if (tabParam === "manual") return "manual";
+    if (tabParam === "lazy") return "lazy";
     return "ai";
   }, [isSubscriptionUser, searchParams]);
 
-  const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual");
+  const [activeTab, setActiveTab] = useState<"manual" | "ai" | "lazy">("manual");
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  const handleTabChange = (val: "manual" | "ai") => {
+  const handleTabChange = (val: "manual" | "ai" | "lazy") => {
     setActiveTab(val);
     setSearchParams((prev) => {
       prev.set("tab", val);
@@ -467,13 +469,16 @@ const CreatePage = () => {
       {/* Tab Switcher */}
       {!isSubscriptionUser && (
         <div className="shrink-0 px-4 py-3 border-b border-gray-border bg-oled-surface/30">
-          <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "manual" | "ai")} className="w-full max-w-md">
+          <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "manual" | "ai" | "lazy")} className="w-full max-w-md">
             <TabsList className="w-full bg-oled-surface border border-gray-border h-auto">
-              <TabsTrigger value="manual" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-                Tạo Card
+              <TabsTrigger value="manual" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs sm:text-sm">
+                Thủ công
               </TabsTrigger>
-              <TabsTrigger value="ai" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple">
-                AI Charagen
+              <TabsTrigger value="ai" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs sm:text-sm">
+                AI Chat
+              </TabsTrigger>
+              <TabsTrigger value="lazy" className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple text-xs sm:text-sm">
+                Tạo nhanh (AI)
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -568,6 +573,18 @@ const CreatePage = () => {
           )}
         >
           <AiCharGenContent onActionsChange={setAiHeaderActions} />
+        </div>
+
+        {/* Lazy AI Tab Content */}
+        <div
+          className={cn(
+            "absolute inset-0 flex flex-col min-h-0 transition-all duration-300 ease-in-out",
+            activeTab === "lazy"
+              ? "opacity-100 translate-x-0 pointer-events-auto z-10 visible"
+              : "opacity-0 translate-x-4 pointer-events-none z-0 overflow-hidden invisible"
+          )}
+        >
+          <LazyCharGenContent onActionsChange={setAiHeaderActions} />
         </div>
       </div>
 
